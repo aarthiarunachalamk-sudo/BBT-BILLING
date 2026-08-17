@@ -28,32 +28,20 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 24),
-              // Smart Billing 360 Logo
+              // BitByte branding
               Center(
                 child: Column(
                   children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF0F52BA), width: 3),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'S',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF0F52BA),
-                          ),
-                        ),
-                      ),
+                    Image.asset(
+                      'assets/logo.png',
+                      width: 112,
+                      height: 90,
+                      fit: BoxFit.contain,
+                      semanticLabel: 'BitByte logo',
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'SMART BILLING 360',
+                      'BIT BYTE Technologies',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,

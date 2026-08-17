@@ -92,11 +92,12 @@ class _SplashScreenState extends State<SplashScreen>
                       children: [
                         const Spacer(flex: 3),
                         Container(
-                          width: 118,
-                          height: 118,
+                          width: 260,
+                          height: 206,
+                          padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(30),
+                            borderRadius: BorderRadius.circular(28),
                             boxShadow: const [
                               BoxShadow(
                                 color: Color(0x55000000),
@@ -105,45 +106,13 @@ class _SplashScreenState extends State<SplashScreen>
                               ),
                             ],
                           ),
-                          child: const Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Text(
-                                'BBT',
-                                style: TextStyle(
-                                  color: Color(0xFF0F52BA),
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -1,
-                                ),
-                              ),
-                              Positioned(
-                                right: 13,
-                                bottom: 12,
-                                child: Icon(
-                                  Icons.receipt_long_rounded,
-                                  color: Color(0xFF10B981),
-                                  size: 24,
-                                ),
-                              ),
-                            ],
+                          child: Image.asset(
+                            'assets/logo.png',
+                            fit: BoxFit.contain,
+                            semanticLabel: 'BitByte logo',
                           ),
                         ),
-                        const SizedBox(height: 32),
-                        const FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            'BIT BYTE TECHNOLOGIES',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 25,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.6,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 26),
                         Container(
                           width: 56,
                           height: 3,
