@@ -68,34 +68,52 @@ Future<void> _showAddCategoryDialog(
   AdminState state,
 ) async {
   final controller = TextEditingController();
+  var saving = false;
   await showDialog<void>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Add Category'),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        decoration: const InputDecoration(labelText: 'Category name'),
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setDialogState) => AlertDialog(
+        title: const Text('Add Category'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          enabled: !saving,
+          decoration: const InputDecoration(labelText: 'Category name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: saving ? null : () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: saving
+                ? null
+                : () async {
+                    final name = controller.text.trim();
+                    if (name.isEmpty) return;
+                    setDialogState(() => saving = true);
+                    try {
+                      await state.createCategory(name);
+                      if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    } catch (error) {
+                      if (dialogContext.mounted) {
+                        setDialogState(() => saving = false);
+                      }
+                      if (context.mounted) {
+                        showNotice(context, error.toString());
+                      }
+                    }
+                  },
+            child: saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Save'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () async {
-            final name = controller.text.trim();
-            if (name.isEmpty) return;
-            try {
-              await state.createCategory(name);
-              if (dialogContext.mounted) Navigator.pop(dialogContext);
-            } catch (error) {
-              if (context.mounted) showNotice(context, error.toString());
-            }
-          },
-          child: const Text('Save'),
-        ),
-      ],
     ),
   );
   controller.dispose();

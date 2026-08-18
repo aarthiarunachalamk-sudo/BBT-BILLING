@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:bbt_billing/main.dart' as app;
+import 'package:bbt_billing/frontend/admin/admin_api.dart';
 import 'package:bbt_billing/frontend/admin/admin_app.dart';
 import 'package:bbt_billing/frontend/admin/admin_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -117,5 +122,44 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Category name'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
+  });
+
+  test('existing category is reused without another backend request', () async {
+    final state = AdminState()
+      ..categories = [
+        {'id': 1, 'name': 'Turmeric powder', 'is_active': true},
+      ];
+    addTearDown(state.dispose);
+
+    await state.createCategory('  TURMERIC POWDER  ');
+
+    expect(state.categories, hasLength(1));
+  });
+
+  test('API list errors are displayed without square brackets', () async {
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient(
+        (_) async => http.Response(
+          jsonEncode({
+            'name': ['category with this name already exists.'],
+          }),
+          400,
+          headers: {'content-type': 'application/json'},
+        ),
+      ),
+    );
+    addTearDown(api.dispose);
+
+    expect(
+      () => api.create('categories', {'name': 'Turmeric powder'}),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.message,
+          'message',
+          'category with this name already exists.',
+        ),
+      ),
+    );
   });
 }

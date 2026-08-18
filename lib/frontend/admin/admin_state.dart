@@ -312,7 +312,20 @@ class AdminState extends ChangeNotifier {
   }
 
   Future<void> createCategory(String name) async {
-    await api.create('categories', {'name': name, 'is_active': true});
+    final normalized = name.trim().toLowerCase();
+    if (categories.any(
+      (category) =>
+          category['name']?.toString().trim().toLowerCase() == normalized,
+    )) {
+      return;
+    }
+    try {
+      await api.create('categories', {'name': name.trim(), 'is_active': true});
+    } on ApiException catch (exception) {
+      if (!exception.message.toLowerCase().contains('already exists')) {
+        rethrow;
+      }
+    }
     categories = await api.getList('categories');
     _hydrateControls();
     notifyListeners();

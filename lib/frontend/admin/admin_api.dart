@@ -129,16 +129,23 @@ class AdminApi {
       final detail = data is Map
           ? data['detail'] ?? data.values.firstOrNull
           : null;
-      throw ApiException(
-        detail?.toString() ?? 'Server request failed',
-        response.statusCode,
-      );
+      throw ApiException(_errorMessage(detail), response.statusCode);
     }
     return data;
   }
 
   Map<String, dynamic> _decodeMap(http.Response response) =>
       (_decode(response) as Map).cast<String, dynamic>();
+
+  String _errorMessage(dynamic detail) {
+    if (detail is List) {
+      return detail.map((value) => value.toString()).join(' ');
+    }
+    if (detail is Map) {
+      return detail.values.map(_errorMessage).join(' ');
+    }
+    return detail?.toString() ?? 'Server request failed';
+  }
 
   void dispose() => _client.close();
 
