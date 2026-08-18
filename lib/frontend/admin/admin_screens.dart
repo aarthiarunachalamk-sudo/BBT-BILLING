@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'admin_state.dart';
 import 'admin_widgets.dart';
 part 'screens/login_screen.dart';
+part 'screens/change_password_screen.dart';
 part 'screens/admin_dashboard_screen.dart';
 part 'screens/staff_management_screen.dart';
 part 'screens/roles_permissions_screen.dart';
@@ -35,6 +37,7 @@ const adminScreenNames = [
   'WhatsApp Invoice Control',
   'Reports & Store Settings',
   'Audit Log & Logout',
+  'Change Password',
 ];
 
 Widget buildAdminScreen(AdminState state) => switch (state.screen) {
@@ -53,6 +56,8 @@ Widget buildAdminScreen(AdminState state) => switch (state.screen) {
   12 => ReturnsScreen(state),
   13 => WhatsAppScreen(state),
   14 => ReportsSettingsScreen(state),
+  15 => AuditScreen(state),
+  16 => ChangePasswordScreen(state),
   _ => AuditScreen(state),
 };
 

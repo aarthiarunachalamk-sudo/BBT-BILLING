@@ -44,6 +44,34 @@ class AdminLoginTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_admin_can_change_password_with_current_password(self):
+        response = self.client.post(
+            reverse("change-password"),
+            {
+                "identifier": "aarthi@gmail.com",
+                "current_password": "Aarthi@123",
+                "new_password": "NewAarthi@456",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NewAarthi@456"))
+
+    def test_change_password_rejects_wrong_current_password(self):
+        response = self.client.post(
+            reverse("change-password"),
+            {
+                "identifier": "aarthi",
+                "current_password": "wrong-password",
+                "new_password": "NewAarthi@456",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("Aarthi@123"))
+
 
 class AdminFlowTests(APITestCase):
     def setUp(self):

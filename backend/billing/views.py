@@ -2,6 +2,8 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncDate
@@ -63,6 +65,52 @@ class AdminTokenObtainPairView(TokenObtainPairView):
             forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
             AuditLog.objects.create(user=user, action="Login", module="Auth", ip_address=forwarded or request.META.get("REMOTE_ADDR"), device=request.META.get("HTTP_USER_AGENT", "")[:255])
         return response
+
+
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def change_password(request):
+    identifier = str(request.data.get("identifier", "")).strip()
+    current_password = str(request.data.get("current_password", ""))
+    new_password = str(request.data.get("new_password", ""))
+    if not identifier or not current_password or not new_password:
+        return Response(
+            {"detail": "Username/email, current password, and new password are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    query = {"email__iexact": identifier} if "@" in identifier else {"username__iexact": identifier}
+    user = User.objects.filter(**query).first()
+    if user is None or not user.is_active or not user.check_password(current_password):
+        return Response(
+            {"detail": "The username/email or current password is incorrect."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if user.check_password(new_password):
+        return Response(
+            {"detail": "The new password must be different from the current password."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        validate_password(new_password, user=user)
+    except ValidationError as exception:
+        return Response(
+            {"detail": " ".join(exception.messages)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+    AuditLog.objects.create(
+        user=user,
+        action="Password changed",
+        module="Auth",
+        ip_address=forwarded or request.META.get("REMOTE_ADDR"),
+        device=request.META.get("HTTP_USER_AGENT", "")[:255],
+    )
+    return Response({"detail": "Password changed successfully."})
 
 
 def record_audit(request, action, module, instance=None, metadata=None):

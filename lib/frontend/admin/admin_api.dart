@@ -53,6 +53,22 @@ class AdminApi {
     return data;
   }
 
+  Future<Map<String, dynamic>> changePassword({
+    required String identifier,
+    required String currentPassword,
+    required String newPassword,
+  }) async => _decodeMap(
+    await _client.post(
+      Uri.parse('$baseUrl/auth/change-password/'),
+      headers: _headers,
+      body: jsonEncode({
+        'identifier': identifier,
+        'current_password': currentPassword,
+        'new_password': newPassword,
+      }),
+    ),
+  );
+
   Future<Map<String, dynamic>> getMap(String path) async => _decodeMap(
     await _client.get(Uri.parse('$baseUrl/$path/'), headers: _headers),
   );

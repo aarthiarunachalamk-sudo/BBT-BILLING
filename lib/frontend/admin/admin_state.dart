@@ -15,6 +15,7 @@ class AdminState extends ChangeNotifier {
   bool logoutConfirmationVisible = false;
   bool loading = false;
   String? error;
+  String passwordChangeIdentifier = '';
   Map<String, dynamic> dashboard = {};
   List<Map<String, dynamic>> users = [];
   List<Map<String, dynamic>> products = [];
@@ -43,8 +44,42 @@ class AdminState extends ChangeNotifier {
   final Map<String, bool> categoryActive = {};
 
   void go(int value) {
-    screen = value.clamp(0, 15);
+    screen = value.clamp(0, 16);
     notifyListeners();
+  }
+
+  void openChangePassword(String identifier) {
+    passwordChangeIdentifier = identifier;
+    error = null;
+    screen = 16;
+    notifyListeners();
+  }
+
+  Future<bool> changePassword({
+    required String identifier,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await api.changePassword(
+        identifier: identifier,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      return true;
+    } on ApiException catch (exception) {
+      error = exception.message;
+      return false;
+    } catch (_) {
+      error = 'Cannot reach ${api.baseUrl}';
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> login(String email, String password) async {

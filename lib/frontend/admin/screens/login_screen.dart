@@ -8,10 +8,42 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const _rememberKey = 'admin_remember_me';
+  static const _identifierKey = 'admin_login_identifier';
+
   bool obscure = true;
   bool remember = false;
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedLogin();
+  }
+
+  Future<void> _loadRememberedLogin() async {
+    final preferences = await SharedPreferences.getInstance();
+    final shouldRemember = preferences.getBool(_rememberKey) ?? false;
+    final identifier = shouldRemember
+        ? preferences.getString(_identifierKey) ?? ''
+        : '';
+    if (!mounted) return;
+    setState(() {
+      remember = shouldRemember;
+      emailController.text = identifier;
+    });
+  }
+
+  Future<void> _saveRememberedLogin() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_rememberKey, remember);
+    if (remember) {
+      await preferences.setString(_identifierKey, emailController.text.trim());
+    } else {
+      await preferences.remove(_identifierKey);
+    }
+  }
 
   @override
   void dispose() {
@@ -76,13 +108,17 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               Checkbox(
                 value: remember,
-                onChanged: (v) => setState(() => remember = v ?? false),
+                onChanged: (value) async {
+                  setState(() => remember = value ?? false);
+                  await _saveRememberedLogin();
+                },
               ),
               const Text('Remember me', style: TextStyle(fontSize: 12)),
               const Spacer(),
               TextButton(
-                onPressed: () =>
-                    showNotice(context, 'Password reset link sent'),
+                onPressed: () => widget.state.openChangePassword(
+                  emailController.text.trim(),
+                ),
                 child: const Text(
                   'Forgot Password?',
                   style: TextStyle(fontSize: 12),
@@ -106,6 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       emailController.text.trim(),
                       passwordController.text,
                     );
+                    if (success) await _saveRememberedLogin();
                     if (!success && context.mounted) {
                       showNotice(context, widget.state.error ?? 'Login failed');
                     }
