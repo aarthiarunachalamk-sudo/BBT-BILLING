@@ -10,15 +10,19 @@ class VideoSplashScreen extends StatefulWidget {
   State<VideoSplashScreen> createState() => _VideoSplashScreenState();
 }
 
-class _VideoSplashScreenState extends State<VideoSplashScreen> {
+class _VideoSplashScreenState extends State<VideoSplashScreen>
+    with WidgetsBindingObserver {
   late final VideoPlayerController _controller;
   bool _finished = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.asset('assets/splash-screen.mp4')
-      ..addListener(_videoListener);
+    WidgetsBinding.instance.addObserver(this);
+    _controller = VideoPlayerController.asset(
+      'assets/splash-screen.mp4',
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    )..addListener(_videoListener);
     _startVideo();
   }
 
@@ -30,8 +34,24 @@ class _VideoSplashScreenState extends State<VideoSplashScreen> {
       if (!mounted) return;
       setState(() {});
       await _controller.play();
+      if (!_controller.value.isPlaying) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        if (mounted && !_finished && _controller.value.isInitialized) {
+          await _controller.play();
+        }
+      }
     } catch (_) {
       _finish();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        !_finished &&
+        _controller.value.isInitialized &&
+        !_controller.value.isCompleted) {
+      _controller.play();
     }
   }
 
@@ -46,6 +66,7 @@ class _VideoSplashScreenState extends State<VideoSplashScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.removeListener(_videoListener);
     _controller.dispose();
     super.dispose();
