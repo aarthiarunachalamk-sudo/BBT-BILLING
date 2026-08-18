@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
 from .models import (
+    AuditLog,
     Category,
     Client,
     DiscountApproval,
@@ -10,9 +11,15 @@ from .models import (
     InvoiceItem,
     Item,
     Payment,
+    PurchaseOrder,
+    PurchaseOrderItem,
     Quotation,
     QuotationItem,
     Supplier,
+    ReturnItem,
+    ReturnRequest,
+    RolePermission,
+    StoreSettings,
     User,
     WhatsAppMessage,
 )
@@ -70,3 +77,10 @@ admin.site.register(InventoryTransaction)
 admin.site.register(DiscountApproval)
 admin.site.register(Payment)
 admin.site.register(WhatsAppMessage)
+admin.site.register(RolePermission)
+admin.site.register(PurchaseOrder)
+admin.site.register(PurchaseOrderItem)
+admin.site.register(ReturnRequest)
+admin.site.register(ReturnItem)
+admin.site.register(StoreSettings)
+admin.site.register(AuditLog)

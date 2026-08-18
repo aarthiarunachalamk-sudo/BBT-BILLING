@@ -1,17 +1,38 @@
-# bbt_billing
+# Supermarket Billing Admin
 
-A new Flutter project.
+Flutter admin application backed by Django REST Framework and JWT authentication.
 
-## Getting Started
+## Local setup
 
-This project is a starting point for a Flutter application.
+```powershell
+cd backend
+python -m pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_demo
+python manage.py runserver
+```
 
-A few resources to get you started if this is your first Flutter project:
+The seeded admin login is `admin@supermart.com` / `admin123`.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+In another terminal, run Flutter. Desktop and web can use the default local API URL:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```powershell
+flutter run
+```
+
+For the Android emulator, point the app at the host machine:
+
+```powershell
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
+```
+
+For a deployed backend, pass its HTTPS API URL using the same `API_BASE_URL` define.
+
+## Verification
+
+```powershell
+flutter analyze
+flutter test
+cd backend
+python manage.py test
+```

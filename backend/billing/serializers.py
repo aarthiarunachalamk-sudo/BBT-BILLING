@@ -2,8 +2,10 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import (
+    AuditLog,
     Category,
     Client,
     DiscountApproval,
@@ -12,14 +14,32 @@ from .models import (
     InvoiceItem,
     Item,
     Payment,
+    PurchaseOrder,
+    PurchaseOrderItem,
     Quotation,
     QuotationItem,
     Supplier,
+    ReturnItem,
+    ReturnRequest,
+    RolePermission,
+    StoreSettings,
     WhatsAppMessage,
 )
 
 
 User = get_user_model()
+
+
+class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        login = attrs.get(self.username_field, "")
+        if "@" in login:
+            user = User.objects.filter(email__iexact=login).first()
+            if user:
+                attrs[self.username_field] = user.username
+        data = super().validate(attrs)
+        data["user"] = UserSerializer(self.user).data
+        return data
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -55,6 +75,8 @@ class ClientSerializer(serializers.ModelSerializer):
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    product_count = serializers.IntegerField(source="items.count", read_only=True)
+
     class Meta:
         model = Category
         fields = "__all__"
@@ -187,3 +209,89 @@ class WhatsAppMessageSerializer(serializers.ModelSerializer):
         model = WhatsAppMessage
         fields = "__all__"
         read_only_fields = ["sent_by", "status", "provider_message_id", "sent_at"]
+
+
+class RolePermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RolePermission
+        fields = "__all__"
+
+
+class PurchaseOrderItemSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source="item.name", read_only=True)
+
+    class Meta:
+        model = PurchaseOrderItem
+        fields = "__all__"
+        read_only_fields = ["purchase_order", "amount", "tax_amount"]
+
+
+class PurchaseOrderSerializer(serializers.ModelSerializer):
+    items = PurchaseOrderItemSerializer(many=True)
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+    reviewed_by_name = serializers.CharField(source="reviewed_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = "__all__"
+        read_only_fields = ["number", "created_by", "reviewed_by", "reviewed_at", "subtotal", "tax_amount", "total"]
+
+    def create(self, validated_data):
+        items = validated_data.pop("items")
+        order = PurchaseOrder.objects.create(**validated_data)
+        for item in items:
+            PurchaseOrderItem.objects.create(purchase_order=order, **item)
+        order.recalculate()
+        return order
+
+
+class ReturnItemSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source="invoice_item.name", read_only=True)
+
+    class Meta:
+        model = ReturnItem
+        fields = "__all__"
+        read_only_fields = ["return_request", "amount"]
+
+
+class ReturnRequestSerializer(serializers.ModelSerializer):
+    items = ReturnItemSerializer(many=True)
+    invoice_number = serializers.CharField(source="invoice.number", read_only=True)
+
+    class Meta:
+        model = ReturnRequest
+        fields = "__all__"
+        read_only_fields = ["number", "refund_amount", "status", "requested_by", "reviewed_by", "reviewed_at"]
+
+    def create(self, validated_data):
+        items = validated_data.pop("items")
+        request = ReturnRequest.objects.create(refund_amount=Decimal("0.00"), **validated_data)
+        total = Decimal("0.00")
+        for item in items:
+            invoice_item = item["invoice_item"]
+            quantity = item["quantity"]
+            if invoice_item.invoice_id != request.invoice_id:
+                raise serializers.ValidationError({"items": "All items must belong to the selected invoice."})
+            if quantity > invoice_item.quantity:
+                raise serializers.ValidationError({"items": f"Return quantity exceeds {invoice_item.name} quantity."})
+            amount = invoice_item.unit_price * quantity
+            ReturnItem.objects.create(return_request=request, amount=amount, **item)
+            total += amount
+        request.refund_amount = total
+        request.save(update_fields=["refund_amount", "updated_at"])
+        return request
+
+
+class StoreSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StoreSettings
+        fields = "__all__"
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.get_full_name", read_only=True)
+
+    class Meta:
+        model = AuditLog
+        fields = "__all__"

@@ -26,6 +26,14 @@ def receipt_number():
     return make_number("RCPT")
 
 
+def purchase_order_number():
+    return make_number("PO")
+
+
+def return_number():
+    return make_number("RET")
+
+
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -375,3 +383,133 @@ class WhatsAppMessage(TimeStampedModel):
 
     class Meta:
         ordering = ["created_at"]
+
+
+class RolePermission(TimeStampedModel):
+    role = models.CharField(max_length=30, unique=True)
+    dashboard = models.BooleanField(default=True)
+    products = models.BooleanField(default=False)
+    billing = models.BooleanField(default=False)
+    inventory = models.BooleanField(default=False)
+    discounts = models.BooleanField(default=False)
+    reports = models.BooleanField(default=False)
+    returns = models.BooleanField(default=False)
+    settings = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["role"]
+
+    def __str__(self):
+        return self.role.replace("_", " ").title()
+
+
+class PurchaseOrder(TimeStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PENDING = "pending", "Pending Approval"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        RECEIVED = "received", "Received"
+
+    number = models.CharField(max_length=40, unique=True, default=purchase_order_number)
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name="purchase_orders")
+    order_date = models.DateField(default=timezone.localdate)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    subtotal = models.DecimalField(**MONEY)
+    tax_amount = models.DecimalField(**MONEY)
+    total = models.DecimalField(**MONEY)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_purchase_orders")
+    reviewed_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="reviewed_purchase_orders")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-order_date", "-created_at"]
+
+    def recalculate(self):
+        subtotal = sum((line.amount for line in self.items.all()), Decimal("0.00"))
+        tax = sum((line.tax_amount for line in self.items.all()), Decimal("0.00"))
+        self.subtotal, self.tax_amount, self.total = subtotal, tax, subtotal + tax
+        self.save(update_fields=["subtotal", "tax_amount", "total", "updated_at"])
+
+    def __str__(self):
+        return self.number
+
+
+class PurchaseOrderItem(TimeStampedModel):
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="items")
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="purchase_order_lines")
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    unit_cost = models.DecimalField(**MONEY)
+    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+    amount = models.DecimalField(**MONEY)
+    tax_amount = models.DecimalField(**MONEY)
+
+    class Meta:
+        ordering = ["id"]
+
+    def save(self, *args, **kwargs):
+        self.amount = self.unit_cost * self.quantity
+        self.tax_amount = self.amount * self.tax_percent / Decimal("100")
+        super().save(*args, **kwargs)
+
+
+class ReturnRequest(TimeStampedModel):
+    class Method(models.TextChoices):
+        CASH = "cash", "Cash"
+        ORIGINAL = "original", "Original Payment"
+        CREDIT = "credit", "Store Credit"
+        REPLACEMENT = "replacement", "Replacement"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    number = models.CharField(max_length=40, unique=True, default=return_number)
+    invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="returns")
+    reason = models.TextField()
+    refund_method = models.CharField(max_length=15, choices=Method.choices)
+    refund_amount = models.DecimalField(**MONEY)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    requested_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="requested_returns")
+    reviewed_by = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True, related_name="reviewed_returns")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class ReturnItem(TimeStampedModel):
+    return_request = models.ForeignKey(ReturnRequest, on_delete=models.CASCADE, related_name="items")
+    invoice_item = models.ForeignKey(InvoiceItem, on_delete=models.PROTECT, related_name="return_lines")
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    amount = models.DecimalField(**MONEY)
+
+
+class StoreSettings(TimeStampedModel):
+    store_name = models.CharField(max_length=150, default="Supermarket")
+    invoice_prefix = models.CharField(max_length=12, default="BILL-")
+    default_gst = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("5.00"))
+    max_cashier_discount = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
+    approval_threshold = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
+    round_off = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.01"))
+    whatsapp_enabled = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name_plural = "store settings"
+
+
+class AuditLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="audit_logs")
+    action = models.CharField(max_length=120)
+    module = models.CharField(max_length=50)
+    object_type = models.CharField(max_length=80, blank=True)
+    object_id = models.CharField(max_length=80, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    device = models.CharField(max_length=255, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

@@ -7,8 +7,10 @@ from django.utils import timezone
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import (
+    AuditLog,
     Category,
     Client,
     DiscountApproval,
@@ -17,20 +19,30 @@ from .models import (
     InvoiceItem,
     Item,
     Payment,
+    PurchaseOrder,
     Quotation,
     Supplier,
+    ReturnRequest,
+    RolePermission,
+    StoreSettings,
     WhatsAppMessage,
 )
 from .serializers import (
+    AuditLogSerializer,
     CategorySerializer,
     ClientSerializer,
     DiscountApprovalSerializer,
+    EmailTokenObtainPairSerializer,
     InventoryTransactionSerializer,
     InvoiceSerializer,
     ItemSerializer,
     PaymentSerializer,
+    PurchaseOrderSerializer,
     QuotationSerializer,
     SupplierSerializer,
+    ReturnRequestSerializer,
+    RolePermissionSerializer,
+    StoreSettingsSerializer,
     UserSerializer,
     WhatsAppMessageSerializer,
 )
@@ -39,8 +51,46 @@ from .serializers import (
 User = get_user_model()
 
 
+class AdminTokenObtainPairView(TokenObtainPairView):
+    serializer_class = EmailTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == status.HTTP_200_OK and response.data.get("user"):
+            user = User.objects.filter(pk=response.data["user"]["id"]).first()
+            forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+            AuditLog.objects.create(user=user, action="Login", module="Auth", ip_address=forwarded or request.META.get("REMOTE_ADDR"), device=request.META.get("HTTP_USER_AGENT", "")[:255])
+        return response
+
+
+def record_audit(request, action, module, instance=None, metadata=None):
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+    AuditLog.objects.create(
+        user=request.user if request.user.is_authenticated else None,
+        action=action,
+        module=module,
+        object_type=instance.__class__.__name__ if instance else "",
+        object_id=str(instance.pk) if instance else "",
+        ip_address=forwarded or request.META.get("REMOTE_ADDR"),
+        device=request.META.get("HTTP_USER_AGENT", "")[:255],
+        metadata=metadata or {},
+    )
+
+
 class SearchableModelViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        record_audit(self.request, f"{instance.__class__.__name__} created", instance.__class__.__name__, instance)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        record_audit(self.request, f"{instance.__class__.__name__} updated", instance.__class__.__name__, instance)
+
+    def perform_destroy(self, instance):
+        record_audit(self.request, f"{instance.__class__.__name__} deleted", instance.__class__.__name__, instance)
+        instance.delete()
 
 
 class UserViewSet(SearchableModelViewSet):
@@ -308,7 +358,116 @@ class WhatsAppMessageViewSet(SearchableModelViewSet):
     ordering_fields = ["created_at", "sent_at"]
 
     def perform_create(self, serializer):
-        serializer.save(sent_by=self.request.user)
+        message = serializer.save(sent_by=self.request.user)
+        record_audit(self.request, "Invoice message queued", "WhatsApp", message)
+
+
+class RolePermissionViewSet(SearchableModelViewSet):
+    queryset = RolePermission.objects.all()
+    serializer_class = RolePermissionSerializer
+    permission_classes = [permissions.IsAdminUser]
+    search_fields = ["role"]
+
+    def perform_update(self, serializer):
+        permission = serializer.save()
+        record_audit(self.request, "Permissions updated", "Roles", permission)
+
+
+class PurchaseOrderViewSet(SearchableModelViewSet):
+    queryset = PurchaseOrder.objects.select_related("supplier", "created_by", "reviewed_by").prefetch_related("items__item")
+    serializer_class = PurchaseOrderSerializer
+    search_fields = ["number", "supplier__name"]
+    ordering_fields = ["order_date", "total", "created_at"]
+
+    def perform_create(self, serializer):
+        order = serializer.save(created_by=self.request.user)
+        record_audit(self.request, "Purchase order created", "Purchase", order)
+
+    @action(detail=True, methods=["post"])
+    def decide(self, request, pk=None):
+        order = self.get_object()
+        decision = request.data.get("decision")
+        if order.status != PurchaseOrder.Status.PENDING:
+            return Response({"detail": "Only pending orders can be decided."}, status=status.HTTP_400_BAD_REQUEST)
+        if decision not in {PurchaseOrder.Status.APPROVED, PurchaseOrder.Status.REJECTED}:
+            return Response({"decision": "Use 'approved' or 'rejected'."}, status=status.HTTP_400_BAD_REQUEST)
+        order.status = decision
+        order.reviewed_by = request.user
+        order.reviewed_at = timezone.now()
+        order.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])
+        record_audit(request, f"Purchase order {decision}", "Purchase", order)
+        return Response(self.get_serializer(order).data)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def receive(self, request, pk=None):
+        order = PurchaseOrder.objects.select_for_update().get(pk=pk)
+        if order.status != PurchaseOrder.Status.APPROVED:
+            return Response({"detail": "Only approved orders can be received."}, status=status.HTTP_400_BAD_REQUEST)
+        for line in order.items.select_related("item"):
+            item = Item.objects.select_for_update().get(pk=line.item_id)
+            previous = item.stock_quantity
+            item.stock_quantity += line.quantity
+            item.save(update_fields=["stock_quantity", "updated_at"])
+            InventoryTransaction.objects.create(item=item, transaction_type=InventoryTransaction.TransactionType.STOCK_IN, quantity=line.quantity, previous_stock=previous, new_stock=item.stock_quantity, reference=order.number, performed_by=request.user)
+        order.status = PurchaseOrder.Status.RECEIVED
+        order.save(update_fields=["status", "updated_at"])
+        record_audit(request, "Purchase order received", "Inventory", order)
+        return Response(self.get_serializer(order).data)
+
+
+class ReturnRequestViewSet(SearchableModelViewSet):
+    queryset = ReturnRequest.objects.select_related("invoice", "requested_by", "reviewed_by").prefetch_related("items__invoice_item__item")
+    serializer_class = ReturnRequestSerializer
+    search_fields = ["number", "invoice__number", "reason"]
+
+    def perform_create(self, serializer):
+        returned = serializer.save(requested_by=self.request.user)
+        record_audit(self.request, "Return requested", "Returns", returned)
+
+    @action(detail=True, methods=["post"])
+    @transaction.atomic
+    def decide(self, request, pk=None):
+        returned = ReturnRequest.objects.select_for_update().get(pk=pk)
+        decision = request.data.get("decision")
+        if returned.status != ReturnRequest.Status.PENDING:
+            return Response({"detail": "This return has already been decided."}, status=status.HTTP_400_BAD_REQUEST)
+        if decision not in {ReturnRequest.Status.APPROVED, ReturnRequest.Status.REJECTED}:
+            return Response({"decision": "Use 'approved' or 'rejected'."}, status=status.HTTP_400_BAD_REQUEST)
+        if decision == ReturnRequest.Status.APPROVED:
+            for line in returned.items.select_related("invoice_item__item"):
+                item = Item.objects.select_for_update().get(pk=line.invoice_item.item_id)
+                if item.item_type == Item.ItemType.SERVICE:
+                    continue
+                previous = item.stock_quantity
+                item.stock_quantity += line.quantity
+                item.save(update_fields=["stock_quantity", "updated_at"])
+                InventoryTransaction.objects.create(item=item, transaction_type=InventoryTransaction.TransactionType.STOCK_IN, quantity=line.quantity, previous_stock=previous, new_stock=item.stock_quantity, reference=returned.number, notes="Approved customer return", performed_by=request.user)
+        returned.status = decision
+        returned.reviewed_by = request.user
+        returned.reviewed_at = timezone.now()
+        returned.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])
+        record_audit(request, f"Return {decision}", "Returns", returned)
+        return Response(self.get_serializer(returned).data)
+
+
+class StoreSettingsViewSet(SearchableModelViewSet):
+    queryset = StoreSettings.objects.all()
+    serializer_class = StoreSettingsSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def perform_update(self, serializer):
+        settings = serializer.save()
+        record_audit(self.request, "Store settings updated", "Settings", settings)
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = AuditLog.objects.select_related("user").all()
+    serializer_class = AuditLogSerializer
+    permission_classes = [permissions.IsAdminUser]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["user__username", "user__first_name", "action", "module", "ip_address"]
+    ordering_fields = ["created_at", "module"]
 
 
 @api_view(["GET"])
@@ -324,8 +483,16 @@ def dashboard(request):
         stock_quantity__gt=0,
         stock_quantity__lte=models.F("reorder_level"),
     ).count()
+    pending_orders = PurchaseOrder.objects.filter(status=PurchaseOrder.Status.PENDING).count()
+    pending_discounts = DiscountApproval.objects.filter(status=DiscountApproval.Status.PENDING).count()
+    bills_today = Invoice.objects.filter(invoice_date=today).count()
     return Response({
+        "today_sales": paid_today,
         "paid_today": paid_today,
+        "total_bills": bills_today,
+        "profit": paid_today * Decimal("0.28"),
+        "pending_purchase_orders": pending_orders,
+        "pending_discount_approvals": pending_discounts,
         "outstanding_total": sum((invoice.balance_due for invoice in Invoice.objects.exclude(status=Invoice.Status.CANCELLED)), Decimal("0.00")),
         "overdue_invoice_count": overdue.count(),
         "low_stock_count": low_stock,

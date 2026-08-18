@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Category, Client, InventoryTransaction, Invoice, Item, Payment, User
+from .models import AuditLog, Category, Client, InventoryTransaction, Invoice, Item, Payment, PurchaseOrder, Supplier, User
 
 
 class BillingWorkflowTests(APITestCase):
@@ -83,9 +83,27 @@ class BillingWorkflowTests(APITestCase):
         self.client.force_authenticate(user=None)
         response = self.client.post(
             reverse("token_obtain_pair"),
-            {"username": "sales", "password": "StrongPass123!"},
+            {"username": "sales@example.com", "password": "StrongPass123!"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access", response.data)
         self.assertIn("refresh", response.data)
+
+    def test_purchase_order_approval_and_receipt_updates_stock(self):
+        supplier = Supplier.objects.create(name="Test Supplier")
+        response = self.client.post(
+            reverse("purchaseorder-list"),
+            {"supplier": supplier.pk, "items": [{"item": self.material.pk, "quantity": 3, "unit_cost": "70.00", "tax_percent": "5.00"}]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        order_id = response.data["id"]
+        approve = self.client.post(reverse("purchaseorder-decide", args=[order_id]), {"decision": "approved"}, format="json")
+        self.assertEqual(approve.status_code, status.HTTP_200_OK, approve.data)
+        received = self.client.post(reverse("purchaseorder-receive", args=[order_id]), {}, format="json")
+        self.assertEqual(received.status_code, status.HTTP_200_OK, received.data)
+        self.material.refresh_from_db()
+        self.assertEqual(self.material.stock_quantity, 13)
+        self.assertEqual(PurchaseOrder.objects.get(pk=order_id).status, PurchaseOrder.Status.RECEIVED)
+        self.assertTrue(AuditLog.objects.filter(module="Inventory", object_id=str(order_id)).exists())
