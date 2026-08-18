@@ -68,6 +68,7 @@ class AdminState extends ChangeNotifier {
       await api.login(email, password);
       loggedIn = true;
       screen = 1;
+      await refreshAll();
       return true;
     } on ApiException catch (exception) {
       error = exception.message;
@@ -204,26 +205,33 @@ class AdminState extends ChangeNotifier {
   }
 
   Future<void> decidePurchaseOrder(bool approved) async {
-    if (purchaseOrders.isEmpty) return;
-    await api.action(
-      'purchase-orders',
-      purchaseOrders.first['id'] as int,
-      'decide',
-      {'decision': approved ? 'approved' : 'rejected'},
-    );
+    final pending = purchaseOrders.where((row) => row['status'] == 'pending');
+    if (pending.isEmpty) {
+      throw const ApiException('No pending purchase order is available.');
+    }
+    await api.action('purchase-orders', pending.first['id'] as int, 'decide', {
+      'decision': approved ? 'approved' : 'rejected',
+    });
     purchaseOrders = await api.getList('purchase-orders');
+    dashboard = await api.getMap('dashboard');
     notifyListeners();
   }
 
   Future<void> decideDiscount(bool approved) async {
-    if (discountApprovals.isEmpty) return;
+    final pending = discountApprovals.where(
+      (row) => row['status'] == 'pending',
+    );
+    if (pending.isEmpty) {
+      throw const ApiException('No pending discount approval is available.');
+    }
     await api.action(
       'discount-approvals',
-      discountApprovals.first['id'] as int,
+      pending.first['id'] as int,
       'decide',
       {'decision': approved ? 'approved' : 'rejected'},
     );
     discountApprovals = await api.getList('discount-approvals');
+    dashboard = await api.getMap('dashboard');
     notifyListeners();
   }
 

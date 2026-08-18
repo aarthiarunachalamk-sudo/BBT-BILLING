@@ -17,7 +17,7 @@ class AdminApi {
           baseUrl ??
           const String.fromEnvironment(
             'API_BASE_URL',
-            defaultValue: 'https://bbt-billing-api.onrender.com/api',
+            defaultValue: 'https://bbt-billing.onrender.com/api',
           );
 
   final http.Client _client;
