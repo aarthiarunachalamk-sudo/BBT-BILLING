@@ -7,7 +7,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome Admin'), findsOneWidget);
-    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Username or Email'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.text('Login'), findsOneWidget);
   });

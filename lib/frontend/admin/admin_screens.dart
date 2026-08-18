@@ -80,19 +80,11 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool obscure = true;
   bool remember = false;
-  late final TextEditingController serverController;
-  final emailController = TextEditingController(text: 'admin@supermart.com');
-  final passwordController = TextEditingController(text: 'admin123');
-
-  @override
-  void initState() {
-    super.initState();
-    serverController = TextEditingController(text: widget.state.serverUrl);
-  }
+  final emailController = TextEditingController(text: 'aarthi');
+  final passwordController = TextEditingController();
 
   @override
   void dispose() {
-    serverController.dispose();
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
@@ -130,19 +122,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: 30),
           TextFormField(
-            controller: serverController,
-            keyboardType: TextInputType.url,
-            autocorrect: false,
-            decoration: const InputDecoration(
-              labelText: 'Server URL',
-              hintText: 'https://your-service.onrender.com',
-              prefixIcon: Icon(Icons.cloud_outlined),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
             controller: emailController,
-            decoration: const InputDecoration(labelText: 'Email'),
+            autocorrect: false,
+            decoration: const InputDecoration(labelText: 'Username or Email'),
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -191,7 +173,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   'Login',
                   onPressed: () async {
                     final success = await widget.state.login(
-                      serverController.text,
                       emailController.text.trim(),
                       passwordController.text,
                     );
