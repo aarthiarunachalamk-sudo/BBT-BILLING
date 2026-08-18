@@ -7,6 +7,7 @@ from .models import (
     Category,
     Client,
     DiscountApproval,
+    InventoryTransaction,
     Item,
     PurchaseOrder,
     PurchaseOrderItem,
@@ -148,6 +149,54 @@ class AdminFlowTests(APITestCase):
         self.assertIn("sales_growth", response.data)
         self.assertIn("bills_growth", response.data)
         self.assertIn("profit_growth", response.data)
+
+    def test_product_creation_records_opening_inventory(self):
+        category = Category.objects.get(name="Test Category")
+        response = self.client.post(
+            "/api/items/",
+            {
+                "item_type": "material",
+                "name": "Turmeric Powder",
+                "sku": "TURMERIC-001",
+                "category": category.pk,
+                "unit": "Pack",
+                "purchase_price": "40.00",
+                "selling_price": "55.00",
+                "tax_percent": "5.00",
+                "stock_quantity": 20,
+                "reorder_level": 5,
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        product = Item.objects.get(sku="TURMERIC-001")
+        opening = InventoryTransaction.objects.get(item=product)
+        self.assertEqual(opening.quantity, 20)
+        self.assertEqual(opening.previous_stock, 0)
+        self.assertEqual(opening.new_stock, 20)
+
+    def test_product_creation_rejects_duplicate_sku_ignoring_case(self):
+        existing = Item.objects.get(sku="TEST-ITEM")
+        response = self.client.post(
+            "/api/items/",
+            {
+                "item_type": "material",
+                "name": "Duplicate",
+                "sku": existing.sku.lower(),
+                "category": existing.category_id,
+                "unit": "Pack",
+                "purchase_price": "10.00",
+                "selling_price": "15.00",
+                "tax_percent": "5.00",
+                "stock_quantity": 1,
+                "reorder_level": 1,
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("sku", response.data)
 
     def test_admin_can_complete_connected_actions(self):
         order = PurchaseOrder.objects.get(status=PurchaseOrder.Status.PENDING)

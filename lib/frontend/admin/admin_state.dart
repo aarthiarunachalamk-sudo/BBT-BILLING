@@ -11,6 +11,7 @@ class AdminState extends ChangeNotifier {
   bool loggedIn = false;
   String staffFilter = 'All';
   String inventoryFilter = 'Low Stock';
+  String productQuery = '';
   String selectedRole = 'Cashier';
   bool logoutConfirmationVisible = false;
   bool loading = false;
@@ -305,19 +306,32 @@ class AdminState extends ChangeNotifier {
     settingsDraft[key] = value;
   }
 
-  Future<void> createProduct(Map<String, dynamic> values) async {
-    await api.create('items', values);
-    products = await api.getList('items');
+  Future<Map<String, dynamic>> createProduct(
+    Map<String, dynamic> values,
+  ) async {
+    final created = await api.create('items', values);
+    products = [
+      created,
+      ...products.where((product) => product['id'] != created['id']),
+    ];
+    productQuery = '';
+    try {
+      dashboard = await api.getMap('dashboard');
+    } on ApiException {
+      // The product is already saved; dashboard can refresh on the next visit.
+    }
     notifyListeners();
+    return created;
   }
 
-  Future<void> createCategory(String name) async {
+  Future<Map<String, dynamic>> createCategory(String name) async {
     final normalized = name.trim().toLowerCase();
-    if (categories.any(
+    final existing = categories.where(
       (category) =>
           category['name']?.toString().trim().toLowerCase() == normalized,
-    )) {
-      return;
+    );
+    if (existing.isNotEmpty) {
+      return existing.first;
     }
     try {
       await api.create('categories', {'name': name.trim(), 'is_active': true});
@@ -329,6 +343,14 @@ class AdminState extends ChangeNotifier {
     categories = await api.getList('categories');
     _hydrateControls();
     notifyListeners();
+    final saved = categories.where(
+      (category) =>
+          category['name']?.toString().trim().toLowerCase() == normalized,
+    );
+    if (saved.isEmpty) {
+      throw const ApiException('Category could not be loaded after saving.');
+    }
+    return saved.first;
   }
 
   Future<void> createSupplier(Map<String, dynamic> values) async {
@@ -433,6 +455,11 @@ class AdminState extends ChangeNotifier {
 
   void setInventoryFilter(String value) {
     inventoryFilter = value;
+    notifyListeners();
+  }
+
+  void setProductQuery(String value) {
+    productQuery = value;
     notifyListeners();
   }
 

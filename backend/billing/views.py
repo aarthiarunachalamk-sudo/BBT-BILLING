@@ -178,6 +178,21 @@ class ItemViewSet(SearchableModelViewSet):
     search_fields = ["name", "sku", "description", "category__name"]
     ordering_fields = ["name", "selling_price", "stock_quantity", "created_at"]
 
+    def perform_create(self, serializer):
+        item = serializer.save()
+        if item.item_type == Item.ItemType.MATERIAL and item.stock_quantity > 0:
+            InventoryTransaction.objects.create(
+                item=item,
+                transaction_type=InventoryTransaction.TransactionType.STOCK_IN,
+                quantity=item.stock_quantity,
+                previous_stock=0,
+                new_stock=item.stock_quantity,
+                reference="Opening stock",
+                notes="Opening stock recorded when product was created.",
+                performed_by=self.request.user,
+            )
+        record_audit(self.request, "Item created", "Item", item)
+
     def get_queryset(self):
         queryset = super().get_queryset()
         item_type = self.request.query_params.get("type")

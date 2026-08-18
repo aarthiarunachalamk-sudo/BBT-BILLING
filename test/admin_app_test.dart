@@ -162,4 +162,51 @@ void main() {
       ),
     );
   });
+
+  test('saved product is added to the dynamic product list', () async {
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        if (request.method == 'POST' && request.url.path.endsWith('/items/')) {
+          return http.Response(
+            jsonEncode({
+              'id': 10,
+              'item_type': 'material',
+              'name': 'Turmeric Powder 250g',
+              'sku': 'TURMERIC-001',
+              'category': 1,
+              'category_name': 'Spices',
+              'unit': 'Pack',
+              'purchase_price': '40.00',
+              'selling_price': '55.00',
+              'tax_percent': '5.00',
+              'stock_quantity': 20,
+              'reorder_level': 5,
+              'stock_status': 'in_stock',
+              'is_active': true,
+            }),
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'GET' &&
+            request.url.path.endsWith('/dashboard/')) {
+          return http.Response(
+            '{}',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{}', 404);
+      }),
+    );
+    final state = AdminState(api: api);
+    addTearDown(state.dispose);
+
+    final product = await state.createProduct({'name': 'Turmeric Powder 250g'});
+
+    expect(product['sku'], 'TURMERIC-001');
+    expect(state.products, hasLength(1));
+    expect(state.products.first['category_name'], 'Spices');
+  });
 }

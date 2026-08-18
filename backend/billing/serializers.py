@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -80,6 +81,16 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = "__all__"
+        extra_kwargs = {"name": {"validators": []}}
+
+    def validate_name(self, value):
+        name = value.strip()
+        queryset = Category.objects.filter(name__iexact=name)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("Category with this name already exists.")
+        return name
 
 
 class SupplierSerializer(serializers.ModelSerializer):
@@ -96,6 +107,50 @@ class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = "__all__"
+        extra_kwargs = {"sku": {"validators": []}}
+
+    def validate_name(self, value):
+        return value.strip()
+
+    def validate_sku(self, value):
+        sku = value.strip()
+        queryset = Item.objects.filter(sku__iexact=sku)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("A product with this SKU already exists.")
+        return sku
+
+    def validate(self, attrs):
+        purchase_price = attrs.get(
+            "purchase_price", getattr(self.instance, "purchase_price", 0)
+        )
+        selling_price = attrs.get(
+            "selling_price", getattr(self.instance, "selling_price", 0)
+        )
+        stock = attrs.get(
+            "stock_quantity", getattr(self.instance, "stock_quantity", 0)
+        )
+        reorder = attrs.get(
+            "reorder_level", getattr(self.instance, "reorder_level", 0)
+        )
+        expiry = attrs.get(
+            "expiry_date", getattr(self.instance, "expiry_date", None)
+        )
+        errors = {}
+        if purchase_price < 0:
+            errors["purchase_price"] = "Purchase price cannot be negative."
+        if selling_price <= 0:
+            errors["selling_price"] = "Selling price must be greater than zero."
+        if stock < 0:
+            errors["stock_quantity"] = "Opening stock cannot be negative."
+        if reorder < 0:
+            errors["reorder_level"] = "Minimum stock cannot be negative."
+        if expiry and not self.instance and expiry < timezone.localdate():
+            errors["expiry_date"] = "Expiry date cannot be in the past."
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
 
 class InventoryTransactionSerializer(serializers.ModelSerializer):

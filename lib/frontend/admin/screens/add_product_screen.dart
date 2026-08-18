@@ -14,12 +14,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final sku = TextEditingController();
   final purchasePrice = TextEditingController();
   final sellingPrice = TextEditingController();
-  final stock = TextEditingController();
-  final reorderLevel = TextEditingController();
+  final stock = TextEditingController(text: '0');
+  final reorderLevel = TextEditingController(text: '5');
   final expiryDate = TextEditingController();
   int gst = 0;
   int? categoryId;
   String? unit;
+  bool saving = false;
 
   @override
   void initState() {
@@ -43,6 +44,78 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   String? requiredText(String? value) =>
       value == null || value.trim().isEmpty ? 'Required' : null;
+
+  String? moneyValidator(String? value, {required bool allowZero}) {
+    if (value == null || value.trim().isEmpty) return 'Required';
+    final amount = double.tryParse(value.trim());
+    if (amount == null) return 'Enter a valid amount';
+    if (amount < 0 || (!allowZero && amount == 0)) {
+      return allowZero ? 'Cannot be negative' : 'Must be greater than zero';
+    }
+    return null;
+  }
+
+  String? stockValidator(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Required';
+    final amount = int.tryParse(value.trim());
+    if (amount == null) return 'Enter a whole number';
+    if (amount < 0) return 'Cannot be negative';
+    return null;
+  }
+
+  String? expiryValidator(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final date = DateTime.tryParse(value.trim());
+    if (date == null) return 'Use YYYY-MM-DD';
+    final today = DateTime.now();
+    final startOfToday = DateTime(today.year, today.month, today.day);
+    if (date.isBefore(startOfToday)) return 'Date cannot be in the past';
+    return null;
+  }
+
+  Future<void> addCategory() async {
+    final category = await _showAddCategoryDialog(context, widget.state);
+    if (!mounted || category == null) return;
+    setState(() => categoryId = category['id'] as int?);
+  }
+
+  Future<void> saveProduct() async {
+    if (saving || formKey.currentState?.validate() != true) return;
+    if (categoryId == null) {
+      showNotice(context, 'Select a category.');
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      final product = await widget.state.createProduct({
+        'item_type': 'material',
+        'name': name.text.trim(),
+        'sku': sku.text.trim(),
+        'category': categoryId,
+        'unit': unit,
+        'purchase_price': purchasePrice.text.trim(),
+        'selling_price': sellingPrice.text.trim(),
+        'tax_percent': gst.toString(),
+        'stock_quantity': int.parse(stock.text.trim()),
+        'reorder_level': int.parse(reorderLevel.text.trim()),
+        'expiry_date': expiryDate.text.trim().isEmpty
+            ? null
+            : expiryDate.text.trim(),
+        'is_active': true,
+      });
+      if (!mounted) return;
+      setState(() => saving = false);
+      showNotice(
+        context,
+        '${product['name'] ?? 'Product'} saved successfully.',
+      );
+      widget.state.go(4);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => saving = false);
+      showNotice(context, error.toString());
+    }
+  }
 
   @override
   Widget build(BuildContext context) => _AdminPage(
@@ -77,20 +150,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           child: PrimaryAction(
                             'Add Category',
                             icon: Icons.add,
-                            onPressed: () async {
-                              await _showAddCategoryDialog(
-                                context,
-                                widget.state,
-                              );
-                              if (mounted &&
-                                  widget.state.categories.isNotEmpty) {
-                                setState(() {
-                                  categoryId =
-                                      widget.state.categories.first['id']
-                                          as int?;
-                                });
-                              }
-                            },
+                            onPressed: addCategory,
                           ),
                         ),
                       ],
@@ -107,6 +167,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         validator: requiredText,
                         decoration: const InputDecoration(
                           labelText: 'Product Name *',
+                          hintText: 'Example: Turmeric Powder 250g',
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -119,21 +180,44 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      DropdownButtonFormField<int>(
-                        initialValue: categoryId,
-                        decoration: const InputDecoration(
-                          labelText: 'Category *',
-                        ),
-                        items: widget.state.categories
-                            .map(
-                              (category) => DropdownMenuItem<int>(
-                                value: category['id'] as int,
-                                child: Text(category['name']?.toString() ?? ''),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              key: ValueKey(
+                                'category-$categoryId-${widget.state.categories.length}',
                               ),
-                            )
-                            .toList(),
-                        onChanged: (value) =>
-                            setState(() => categoryId = value),
+                              initialValue: categoryId,
+                              decoration: const InputDecoration(
+                                labelText: 'Category *',
+                                helperText: 'Example: Spices',
+                              ),
+                              items: widget.state.categories
+                                  .map(
+                                    (category) => DropdownMenuItem<int>(
+                                      value: category['id'] as int,
+                                      child: Text(
+                                        category['name']?.toString() ?? '',
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: saving
+                                  ? null
+                                  : (value) =>
+                                        setState(() => categoryId = value),
+                              validator: (value) =>
+                                  value == null ? 'Select a category' : null,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filled(
+                            onPressed: saving ? null : addCategory,
+                            tooltip: 'Add category',
+                            icon: const Icon(Icons.add),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 14),
                       Row(
@@ -141,7 +225,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           Expanded(
                             child: TextFormField(
                               controller: purchasePrice,
-                              validator: requiredText,
+                              validator: (value) =>
+                                  moneyValidator(value, allowZero: true),
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
@@ -155,7 +240,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           Expanded(
                             child: TextFormField(
                               controller: sellingPrice,
-                              validator: requiredText,
+                              validator: (value) =>
+                                  moneyValidator(value, allowZero: false),
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
@@ -170,6 +256,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       const SizedBox(height: 14),
                       TextFormField(
                         controller: expiryDate,
+                        validator: expiryValidator,
                         keyboardType: TextInputType.datetime,
                         decoration: const InputDecoration(
                           labelText: 'Expiry Date (optional)',
@@ -234,7 +321,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           Expanded(
                             child: TextFormField(
                               controller: stock,
-                              validator: requiredText,
+                              validator: stockValidator,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
                                 labelText: 'Opening Stock *',
@@ -245,7 +332,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           Expanded(
                             child: TextFormField(
                               controller: reorderLevel,
-                              validator: requiredText,
+                              validator: stockValidator,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
                                 labelText: 'Minimum Stock *',
@@ -262,38 +349,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: PrimaryAction(
-              'Save Product',
-              onPressed: () async {
-                if (formKey.currentState?.validate() != true ||
-                    categoryId == null) {
-                  return;
-                }
-                try {
-                  await widget.state.createProduct({
-                    'item_type': 'material',
-                    'name': name.text.trim(),
-                    'sku': sku.text.trim(),
-                    'category': categoryId,
-                    'unit': unit,
-                    'purchase_price': purchasePrice.text.trim(),
-                    'selling_price': sellingPrice.text.trim(),
-                    'tax_percent': gst.toString(),
-                    'stock_quantity': int.tryParse(stock.text.trim()) ?? 0,
-                    'reorder_level':
-                        int.tryParse(reorderLevel.text.trim()) ?? 0,
-                    'expiry_date': expiryDate.text.trim().isEmpty
-                        ? null
-                        : expiryDate.text.trim(),
-                    'is_active': true,
-                  });
-                  if (context.mounted) {
-                    showNotice(context, 'Product saved successfully');
-                    widget.state.go(4);
-                  }
-                } catch (error) {
-                  if (context.mounted) showNotice(context, error.toString());
-                }
-              },
+              saving ? 'Saving Product...' : 'Save Product',
+              onPressed: saveProduct,
             ),
           ),
       ],

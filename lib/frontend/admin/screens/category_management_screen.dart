@@ -55,7 +55,9 @@ class CategoriesScreen extends StatelessWidget {
           child: PrimaryAction(
             'Add Category',
             icon: Icons.add,
-            onPressed: () => _showAddCategoryDialog(context, state),
+            onPressed: () async {
+              await _showAddCategoryDialog(context, state);
+            },
           ),
         ),
       ],
@@ -63,13 +65,13 @@ class CategoriesScreen extends StatelessWidget {
   );
 }
 
-Future<void> _showAddCategoryDialog(
+Future<Map<String, dynamic>?> _showAddCategoryDialog(
   BuildContext context,
   AdminState state,
 ) async {
   final controller = TextEditingController();
   var saving = false;
-  await showDialog<void>(
+  final result = await showDialog<Map<String, dynamic>>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setDialogState) => AlertDialog(
@@ -78,7 +80,10 @@ Future<void> _showAddCategoryDialog(
           controller: controller,
           autofocus: true,
           enabled: !saving,
-          decoration: const InputDecoration(labelText: 'Category name'),
+          decoration: const InputDecoration(
+            labelText: 'Category name',
+            hintText: 'Example: Spices, Snacks, Beverages',
+          ),
         ),
         actions: [
           TextButton(
@@ -93,8 +98,10 @@ Future<void> _showAddCategoryDialog(
                     if (name.isEmpty) return;
                     setDialogState(() => saving = true);
                     try {
-                      await state.createCategory(name);
-                      if (dialogContext.mounted) Navigator.pop(dialogContext);
+                      final category = await state.createCategory(name);
+                      if (dialogContext.mounted) {
+                        Navigator.pop(dialogContext, category);
+                      }
                     } catch (error) {
                       if (dialogContext.mounted) {
                         setDialogState(() => saving = false);
@@ -117,4 +124,5 @@ Future<void> _showAddCategoryDialog(
     ),
   );
   controller.dispose();
+  return result;
 }

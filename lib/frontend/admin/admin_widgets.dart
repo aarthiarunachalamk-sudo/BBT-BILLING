@@ -134,11 +134,13 @@ class PrimaryAction extends StatelessWidget {
 }
 
 class SearchBox extends StatelessWidget {
-  const SearchBox(this.hint, {super.key, this.trailing});
+  const SearchBox(this.hint, {super.key, this.trailing, this.onChanged});
   final String hint;
   final IconData? trailing;
+  final ValueChanged<String>? onChanged;
   @override
   Widget build(BuildContext context) => TextField(
+    onChanged: onChanged,
     decoration: InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(fontSize: 12, color: muted),
