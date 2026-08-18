@@ -55,7 +55,14 @@ void main() {
       };
     addTearDown(state.dispose);
 
-    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedBuilder(
+          animation: state,
+          builder: (context, child) => AdminViewport(state: state),
+        ),
+      ),
+    );
 
     expect(find.text('₹ 45320.00'), findsOneWidget);
     expect(find.text('256'), findsOneWidget);
@@ -64,5 +71,30 @@ void main() {
     expect(find.text('12'), findsOneWidget);
     expect(find.text('7'), findsOneWidget);
     expect(find.text('↑ 8.5% vs yesterday'), findsOneWidget);
+  });
+
+  testWidgets('Android back returns an admin sub-screen to dashboard', (
+    tester,
+  ) async {
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 4;
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedBuilder(
+          animation: state,
+          builder: (context, child) => AdminViewport(state: state),
+        ),
+      ),
+    );
+    expect(find.text('Product Management'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(state.screen, 1);
+    expect(find.text('Admin Dashboard'), findsOneWidget);
   });
 }

@@ -80,89 +80,101 @@ class AdminViewport extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screen = buildAdminScreen(state);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 1000) return screen;
-        return Material(
-          color: const Color(0xFFEAF0F8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(48),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.storefront_rounded,
-                        color: navy,
-                        size: 52,
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'SUPERMARKET\nBILLING ADMIN',
-                        style: TextStyle(
-                          fontSize: 38,
-                          height: 1.05,
-                          fontWeight: FontWeight.w900,
+    final canExitApp = state.screen == 0 || state.screen == 1;
+    return PopScope(
+      canPop: canExitApp,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (state.loggedIn) {
+          state.setNav(0);
+        } else {
+          state.go(0);
+        }
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 1000) return screen;
+          return Material(
+            color: const Color(0xFFEAF0F8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(48),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.storefront_rounded,
                           color: navy,
+                          size: 52,
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Products, people, purchasing and reporting — managed in one place.',
-                        style: TextStyle(fontSize: 16, color: muted),
-                      ),
-                      const SizedBox(height: 28),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: List.generate(
-                          adminScreenNames.length,
-                          (i) => ActionChip(
-                            label: Text(
-                              '${i + 1}. ${adminScreenNames[i]}',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            backgroundColor: state.screen == i
-                                ? const Color(0xFFDCEAFF)
-                                : Colors.white,
-                            side: BorderSide(
-                              color: state.screen == i ? blue : line,
-                            ),
-                            onPressed: () => state.go(i),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'SUPERMARKET\nBILLING ADMIN',
+                          style: TextStyle(
+                            fontSize: 38,
+                            height: 1.05,
+                            fontWeight: FontWeight.w900,
+                            color: navy,
                           ),
                         ),
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Products, people, purchasing and reporting — managed in one place.',
+                          style: TextStyle(fontSize: 16, color: muted),
+                        ),
+                        const SizedBox(height: 28),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: List.generate(
+                            adminScreenNames.length,
+                            (i) => ActionChip(
+                              label: Text(
+                                '${i + 1}. ${adminScreenNames[i]}',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              backgroundColor: state.screen == i
+                                  ? const Color(0xFFDCEAFF)
+                                  : Colors.white,
+                              side: BorderSide(
+                                color: state.screen == i ? blue : line,
+                              ),
+                              onPressed: () => state.go(i),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 430,
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 34,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(26),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x2603183B),
+                        blurRadius: 28,
+                        offset: Offset(0, 12),
                       ),
                     ],
                   ),
+                  child: screen,
                 ),
-              ),
-              Container(
-                width: 430,
-                margin: const EdgeInsets.symmetric(
-                  vertical: 24,
-                  horizontal: 34,
-                ),
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(26),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x2603183B),
-                      blurRadius: 28,
-                      offset: Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: screen,
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
