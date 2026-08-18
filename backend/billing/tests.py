@@ -139,6 +139,16 @@ class AdminFlowTests(APITestCase):
                 response = self.client.get(endpoint)
                 self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
+    def test_dashboard_values_are_calculated_from_database(self):
+        response = self.client.get("/api/dashboard/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["low_stock_count"], 1)
+        self.assertEqual(response.data["pending_purchase_orders"], 1)
+        self.assertEqual(response.data["pending_discount_approvals"], 1)
+        self.assertIn("sales_growth", response.data)
+        self.assertIn("bills_growth", response.data)
+        self.assertIn("profit_growth", response.data)
+
     def test_admin_can_complete_connected_actions(self):
         order = PurchaseOrder.objects.get(status=PurchaseOrder.Status.PENDING)
         response = self.client.post(

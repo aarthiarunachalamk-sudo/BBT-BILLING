@@ -140,6 +140,18 @@ class AdminState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshDashboard() async {
+    error = null;
+    try {
+      dashboard = await api.getMap('dashboard');
+    } on ApiException catch (exception) {
+      error = exception.message;
+    } catch (_) {
+      error = 'Cannot reach ${api.baseUrl}';
+    }
+    notifyListeners();
+  }
+
   void _hydrateControls() {
     staffActive.clear();
     categoryActive.clear();

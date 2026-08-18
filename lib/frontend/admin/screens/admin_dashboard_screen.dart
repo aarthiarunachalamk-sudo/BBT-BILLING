@@ -13,97 +13,117 @@ class DashboardScreen extends StatelessWidget {
         icon: const Icon(Icons.notifications_none),
       ),
     ],
-    child: ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 1.6,
-          children: [
-            _Metric(
-              'Today Sales',
-              _money(state.dashboard['today_sales']),
-              'Live from payments',
-              green,
-            ),
-            _Metric(
-              'Total Bills',
-              '${state.dashboard['total_bills'] ?? 0}',
-              'Invoices today',
-              green,
-            ),
-            _Metric(
-              'Profit',
-              _money(state.dashboard['profit']),
-              'From invoice costs',
-              green,
-            ),
-            _Metric(
-              'Low Stock',
-              '${state.dashboard['low_stock_count'] ?? 0}',
-              'Items',
-              const Color(0xFFFF3B18),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SectionCard(
-          child: Column(
+    child: RefreshIndicator(
+      onRefresh: () async {
+        await state.refreshDashboard();
+        if (context.mounted && state.error != null) {
+          showNotice(context, state.error!);
+        }
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(14),
+        children: [
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            mainAxisExtent: 140,
             children: [
-              _AlertRow(
-                Icons.warning_amber_rounded,
-                Colors.orange,
-                'Pending Discount Approvals',
-                '${state.dashboard['pending_discount_approvals'] ?? 0}',
-                () => state.go(11),
+              _Metric(
+                'Today Sales',
+                _money(state.dashboard['today_sales']),
+                '${_growth(state.dashboard['sales_growth'])} vs yesterday',
+                _growthTone(state.dashboard['sales_growth']),
               ),
-              const Divider(),
-              _AlertRow(
-                Icons.shopping_bag_outlined,
-                blue,
-                'Pending Purchase Orders',
-                '${state.dashboard['pending_purchase_orders'] ?? 0}',
-                () => state.go(8),
+              _Metric(
+                'Total Bills',
+                '${state.dashboard['total_bills'] ?? 0}',
+                '${_growth(state.dashboard['bills_growth'])} vs yesterday',
+                _growthTone(state.dashboard['bills_growth']),
+              ),
+              _Metric(
+                'Profit',
+                _money(state.dashboard['profit']),
+                '${_growth(state.dashboard['profit_growth'])} vs yesterday',
+                _growthTone(state.dashboard['profit_growth']),
+              ),
+              _Metric(
+                'Low Stock',
+                '${state.dashboard['low_stock_count'] ?? 0}',
+                'Items',
+                muted,
+                const Color(0xFFFF3B18),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 20),
-        const Text(
-          'Quick Actions',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _Quick(Icons.add_circle_outline, 'Add Product', () => state.go(5)),
-            _Quick(Icons.person_add_alt, 'Add User', () => state.go(2)),
-            _Quick(
-              Icons.shopping_cart_outlined,
-              'New Purchase',
-              () => state.go(8),
+          const SizedBox(height: 12),
+          SectionCard(
+            child: Column(
+              children: [
+                _AlertRow(
+                  Icons.warning_amber_rounded,
+                  Colors.orange,
+                  'Pending Discount Approvals',
+                  '${state.dashboard['pending_discount_approvals'] ?? 0}',
+                  () => state.go(11),
+                ),
+                const Divider(),
+                _AlertRow(
+                  Icons.shopping_bag_outlined,
+                  blue,
+                  'Pending Purchase Orders',
+                  '${state.dashboard['pending_purchase_orders'] ?? 0}',
+                  () => state.go(8),
+                ),
+              ],
             ),
-            _Quick(
-              Icons.analytics_outlined,
-              'Sales Report',
-              () => state.go(10),
-            ),
-          ],
-        ),
-      ],
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Quick Actions',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _Quick(
+                Icons.add_circle_outline,
+                'Add Product',
+                () => state.go(5),
+              ),
+              _Quick(Icons.person_add_alt, 'Add User', () => state.go(2)),
+              _Quick(
+                Icons.shopping_cart_outlined,
+                'New Purchase',
+                () => state.go(8),
+              ),
+              _Quick(
+                Icons.analytics_outlined,
+                'Sales Report',
+                () => state.go(10),
+              ),
+            ],
+          ),
+        ],
+      ),
     ),
   );
 }
 
 class _Metric extends StatelessWidget {
-  const _Metric(this.title, this.value, this.note, this.color);
+  const _Metric(
+    this.title,
+    this.value,
+    this.note,
+    this.noteColor, [
+    this.valueColor = ink,
+  ]);
   final String title, value, note;
-  final Color color;
+  final Color valueColor, noteColor;
   @override
   Widget build(BuildContext context) => SectionCard(
     child: Column(
@@ -123,10 +143,10 @@ class _Metric extends StatelessWidget {
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w800,
-            color: color == green ? ink : color,
+            color: valueColor,
           ),
         ),
-        Text(note, style: TextStyle(fontSize: 9, color: color)),
+        Text(note, style: TextStyle(fontSize: 9, color: noteColor)),
       ],
     ),
   );
@@ -135,6 +155,11 @@ class _Metric extends StatelessWidget {
 String _money(dynamic value) {
   final amount = double.tryParse(value?.toString() ?? '') ?? 0;
   return '₹ ${amount.toStringAsFixed(2)}';
+}
+
+Color _growthTone(dynamic value) {
+  final amount = double.tryParse(value?.toString() ?? '') ?? 0;
+  return amount < 0 ? red : green;
 }
 
 String _percent(dynamic value, int fallback) {

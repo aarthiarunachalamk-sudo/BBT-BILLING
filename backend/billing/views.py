@@ -569,16 +569,20 @@ def dashboard(request):
         total=Sum("amount"), count=Count("id")
     )
     payment_breakdown = list(payment_rows)
-    profit_today = sum(
-        (
-            (line.unit_price - line.item.purchase_price) * line.quantity
-            for line in InvoiceItem.objects.select_related("item").filter(
-                invoice__invoice_date=today,
-                invoice__status__in=[Invoice.Status.PAID, Invoice.Status.PARTIAL],
-            )
-        ),
-        Decimal("0.00"),
-    )
+    def profit_for(day):
+        return sum(
+            (
+                (line.unit_price - line.item.purchase_price) * line.quantity
+                for line in InvoiceItem.objects.select_related("item").filter(
+                    invoice__invoice_date=day,
+                    invoice__status__in=[Invoice.Status.PAID, Invoice.Status.PARTIAL],
+                )
+            ),
+            Decimal("0.00"),
+        )
+
+    profit_today = profit_for(today)
+    profit_yesterday = profit_for(yesterday)
 
     def growth(current, previous):
         if previous == 0:
@@ -594,6 +598,7 @@ def dashboard(request):
         "returns_total": returns_total,
         "sales_growth": growth(paid_today, paid_yesterday),
         "bills_growth": growth(bills_today, bills_yesterday),
+        "profit_growth": growth(profit_today, profit_yesterday),
         "pending_purchase_orders": pending_orders,
         "pending_discount_approvals": pending_discounts,
         "outstanding_total": sum((invoice.balance_due for invoice in Invoice.objects.exclude(status=Invoice.Status.CANCELLED)), Decimal("0.00")),
