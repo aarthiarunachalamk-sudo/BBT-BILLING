@@ -67,6 +67,8 @@ Add these Render environment variables:
 
 Deploy the service. The build script installs packages, collects static files, and creates/updates all database tables.
 
+If the deploy log says `Running build command 'pip install -r requirements.txt'`, the Render dashboard is overriding this repository configuration. Open **Settings → Build & Deploy**, change **Build Command** to `bash build.sh`, save it, and deploy again using **Clear build cache & deploy**. The build script retries temporary PyPI 5xx failures automatically.
+
 After the first deploy, open Render Shell and run:
 
 ```bash

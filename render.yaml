@@ -7,6 +7,10 @@ services:
     startCommand: gunicorn config.wsgi:application
     healthCheckPath: /health/
     envVars:
+      - key: PIP_DEFAULT_TIMEOUT
+        value: "120"
+      - key: PIP_RETRIES
+        value: "20"
       - key: DATABASE_URL
         sync: false
       - key: DJANGO_SECRET_KEY
