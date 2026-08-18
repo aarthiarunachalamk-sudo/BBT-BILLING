@@ -86,14 +86,15 @@ class ReportsSettingsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         TextFormField(
-          initialValue:
-              state.settingsDraft['invoice_prefix']?.toString() ?? 'BILL-',
+          initialValue: state.settingsDraft['invoice_prefix']?.toString() ?? '',
           decoration: const InputDecoration(labelText: 'Invoice Prefix'),
           onChanged: (value) => state.updateSetting('invoice_prefix', value),
         ),
         const SizedBox(height: 10),
         DropdownButtonFormField<String>(
-          initialValue: _percent(state.settingsDraft['default_gst'], 5),
+          initialValue: state.settingsDraft['default_gst'] == null
+              ? null
+              : _percent(state.settingsDraft['default_gst'], 0),
           decoration: const InputDecoration(labelText: 'Default GST'),
           items: [
             '0%',
@@ -106,10 +107,9 @@ class ReportsSettingsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         DropdownButtonFormField<String>(
-          initialValue: _percent(
-            state.settingsDraft['max_cashier_discount'],
-            10,
-          ),
+          initialValue: state.settingsDraft['max_cashier_discount'] == null
+              ? null
+              : _percent(state.settingsDraft['max_cashier_discount'], 0),
           decoration: const InputDecoration(labelText: 'Max Cashier Discount'),
           items: [
             '5%',
@@ -123,7 +123,9 @@ class ReportsSettingsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         DropdownButtonFormField<String>(
-          initialValue: _percent(state.settingsDraft['approval_threshold'], 10),
+          initialValue: state.settingsDraft['approval_threshold'] == null
+              ? null
+              : _percent(state.settingsDraft['approval_threshold'], 0),
           decoration: const InputDecoration(labelText: 'Approval Threshold'),
           items: [
             '5%',
@@ -137,7 +139,7 @@ class ReportsSettingsScreen extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         TextFormField(
-          initialValue: state.settingsDraft['round_off']?.toString() ?? '0.01',
+          initialValue: state.settingsDraft['round_off']?.toString() ?? '',
           decoration: const InputDecoration(labelText: 'Round Off'),
           onChanged: (value) => state.updateSetting(
             'round_off',

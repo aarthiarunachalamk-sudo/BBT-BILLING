@@ -3,24 +3,7 @@ part of '../admin_screens.dart';
 class SuppliersScreen extends StatelessWidget {
   const SuppliersScreen(this.state, {super.key});
   final AdminState state;
-  static const suppliers = [
-    ['Balaji Distributors', '27AACCB1234F1Z5', '9876543210', 'â‚¹ 24,500.00'],
-    ['Shree Traders', '07CCAZQ0002G2Z1', '9911122233', 'â‚¹ 18,750.00'],
-    ['Fresh Foods Pvt. Ltd.', '01AABCPQ4567H1Z2', '9877754456', 'â‚¹ 9,350.00'],
-    ['Quality Supplies', '19BBRTY9001F2Z3', '9355066670', 'â‚¹ 5,120.00'],
-  ];
-  List<List<String>> get displaySuppliers => state.suppliers.isEmpty
-      ? suppliers
-      : state.suppliers
-            .map(
-              (s) => <String>[
-                s['name'].toString(),
-                s['gstin']?.toString() ?? '',
-                s['phone']?.toString() ?? '',
-                'â‚¹ 0.00',
-              ],
-            )
-            .toList();
+
   @override
   Widget build(BuildContext context) => _AdminPage(
     state: state,
@@ -33,45 +16,53 @@ class SuppliersScreen extends StatelessWidget {
           child: SearchBox('Search suppliers'),
         ),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: displaySuppliers.length,
-            separatorBuilder: (_, _) => const Divider(),
-            itemBuilder: (context, i) {
-              final s = displaySuppliers[i];
-              return ListTile(
-                contentPadding: const EdgeInsets.symmetric(vertical: 5),
-                leading: CircleAvatar(
-                  backgroundColor: const Color(0xFFEAF2FF),
-                  child: Icon(
-                    i.isEven ? Icons.apartment : Icons.storefront,
-                    color: blue,
-                  ),
-                ),
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        s[0],
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                        ),
+          child: state.suppliers.isEmpty
+              ? const _EmptyState(
+                  'No suppliers found.',
+                  icon: Icons.local_shipping_outlined,
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  itemCount: state.suppliers.length,
+                  separatorBuilder: (_, _) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final supplier = state.suppliers[index];
+                    final active = supplier['is_active'] == true;
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(vertical: 5),
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFEAF2FF),
+                        child: Icon(Icons.storefront, color: blue),
                       ),
-                    ),
-                    const Text(
-                      'Active',
-                      style: TextStyle(fontSize: 9, color: green),
-                    ),
-                  ],
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              supplier['name']?.toString() ?? '',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            active ? 'Active' : 'Inactive',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: active ? green : red,
+                            ),
+                          ),
+                        ],
+                      ),
+                      subtitle: Text(
+                        'GSTIN: ${supplier['gstin'] ?? '—'}\n'
+                        'Phone: ${supplier['phone'] ?? '—'}\n'
+                        'Email: ${supplier['email'] ?? '—'}',
+                        style: const TextStyle(fontSize: 9, height: 1.5),
+                      ),
+                    );
+                  },
                 ),
-                subtitle: Text(
-                  'GSTIN: ${s[1]}\nPhone: ${s[2]}\nOutstanding: ${s[3]}',
-                  style: const TextStyle(fontSize: 9, height: 1.5),
-                ),
-              );
-            },
-          ),
         ),
         Padding(
           padding: const EdgeInsets.all(12),
@@ -81,14 +72,13 @@ class SuppliersScreen extends StatelessWidget {
                 child: PrimaryAction(
                   'Add Supplier',
                   icon: Icons.add,
-                  onPressed: () =>
-                      showNotice(context, 'New supplier form opened'),
+                  onPressed: () => _showAddSupplierDialog(context, state),
                 ),
               ),
               const SizedBox(width: 9),
               Expanded(
                 child: PrimaryAction(
-                  'View Ledger',
+                  'View Orders',
                   outlined: true,
                   onPressed: () => state.go(8),
                 ),
@@ -99,4 +89,73 @@ class SuppliersScreen extends StatelessWidget {
       ],
     ),
   );
+}
+
+Future<void> _showAddSupplierDialog(
+  BuildContext context,
+  AdminState state,
+) async {
+  final name = TextEditingController();
+  final gstin = TextEditingController();
+  final phone = TextEditingController();
+  final email = TextEditingController();
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Add Supplier'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: name,
+              decoration: const InputDecoration(labelText: 'Supplier name'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: gstin,
+              decoration: const InputDecoration(labelText: 'GSTIN'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: phone,
+              decoration: const InputDecoration(labelText: 'Phone'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: email,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            try {
+              await state.createSupplier({
+                'name': name.text.trim(),
+                'gstin': gstin.text.trim(),
+                'phone': phone.text.trim(),
+                'email': email.text.trim(),
+                'is_active': true,
+              });
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            } catch (error) {
+              if (context.mounted) showNotice(context, error.toString());
+            }
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+  name.dispose();
+  gstin.dispose();
+  phone.dispose();
+  email.dispose();
 }

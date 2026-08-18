@@ -3,152 +3,184 @@ part of '../admin_screens.dart';
 class SalesDashboardScreen extends StatelessWidget {
   const SalesDashboardScreen(this.state, {super.key});
   final AdminState state;
+
   @override
-  Widget build(BuildContext context) => _AdminPage(
-    state: state,
-    title: '14 May 2025 - 14 May 2025',
-    back: 1,
-    bottom: false,
-    actions: [
-      IconButton(
-        onPressed: () {},
-        icon: const Icon(Icons.calendar_month_outlined),
-      ),
-    ],
-    child: ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-          childAspectRatio: 1.25,
-          children: const [
-            _Metric('Total Sales', 'â‚¹ 45,320', 'â†‘ 8.5%', green),
-            _Metric('Bills', '256', 'â†‘ 6.3%', green),
-            _Metric('Avg. Bill Value', 'â‚¹ 177.03', '', muted),
-            _Metric('Profit', 'â‚¹ 12,850', 'â†‘ 7.2%', green),
-            _Metric('Returns', 'â‚¹ 1,250', 'â†“ 2.1%', red),
-          ],
-        ),
-        const SizedBox(height: 20),
-        const Text(
-          'Sales Trend (Last 7 Days)',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        const SectionCard(
-          child: SizedBox(
-            height: 170,
-            child: CustomPaint(
-              painter: _SalesChartPainter(),
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    '08 May       10 May       12 May       14 May',
-                    style: TextStyle(fontSize: 8, color: muted),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        const Text(
-          'Payment Method Breakup',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: const Row(
+  Widget build(BuildContext context) {
+    final dashboard = state.dashboard;
+    final trend = (dashboard['sales_trend'] as List? ?? const [])
+        .cast<Map<String, dynamic>>();
+    final values = trend
+        .map((row) => double.tryParse(row['total']?.toString() ?? '') ?? 0)
+        .toList();
+    final payments = (dashboard['payment_breakdown'] as List? ?? const [])
+        .cast<Map<String, dynamic>>();
+    final paymentTotal = payments.fold<double>(
+      0,
+      (sum, row) =>
+          sum + (double.tryParse(row['total']?.toString() ?? '') ?? 0),
+    );
+    final rangeStart = _dateText(dashboard['range_start']);
+    final rangeEnd = _dateText(dashboard['range_end']);
+
+    return _AdminPage(
+      state: state,
+      title: '$rangeStart - $rangeEnd',
+      back: 1,
+      bottom: false,
+      child: ListView(
+        padding: const EdgeInsets.all(14),
+        children: [
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.25,
             children: [
-              Expanded(
-                flex: 40,
-                child: ColoredBox(color: blue, child: SizedBox(height: 18)),
+              _Metric(
+                'Total Sales',
+                _money(dashboard['today_sales']),
+                _growth(dashboard['sales_growth']),
+                green,
               ),
-              Expanded(
-                flex: 35,
-                child: ColoredBox(color: green, child: SizedBox(height: 18)),
+              _Metric(
+                'Bills',
+                '${dashboard['total_bills'] ?? 0}',
+                _growth(dashboard['bills_growth']),
+                green,
               ),
-              Expanded(
-                flex: 15,
-                child: ColoredBox(
-                  color: Color(0xFF8B5CC7),
-                  child: SizedBox(height: 18),
-                ),
+              _Metric(
+                'Avg. Bill Value',
+                _money(dashboard['average_bill_value']),
+                '',
+                muted,
               ),
-              Expanded(
-                flex: 10,
-                child: ColoredBox(
-                  color: Colors.orange,
-                  child: SizedBox(height: 18),
-                ),
-              ),
+              _Metric('Profit', _money(dashboard['profit']), '', green),
+              _Metric('Returns', _money(dashboard['returns_total']), '', red),
             ],
           ),
-        ),
-        const SizedBox(height: 8),
-        const Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Text(
-              'Cash\n40%',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10),
+          const SizedBox(height: 20),
+          const Text(
+            'Sales Trend (Last 7 Days)',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            child: SizedBox(
+              height: 170,
+              child: values.isEmpty
+                  ? const _EmptyState('No sales data available.')
+                  : CustomPaint(
+                      painter: _SalesChartPainter(values),
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Text(
+                          trend
+                              .map((row) => _dateText(row['date']))
+                              .join('   '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 8, color: muted),
+                        ),
+                      ),
+                    ),
             ),
-            Text(
-              'UPI\n35%',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Payment Method Breakup',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          if (payments.isEmpty)
+            const _EmptyState('No verified payment data.')
+          else ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Row(
+                children: payments.map((row) {
+                  final total =
+                      double.tryParse(row['total']?.toString() ?? '') ?? 0;
+                  final flex = paymentTotal == 0
+                      ? 1
+                      : ((total / paymentTotal) * 1000).round().clamp(1, 1000);
+                  return Expanded(
+                    flex: flex,
+                    child: ColoredBox(
+                      color: _paymentColor(row['method']?.toString()),
+                      child: const SizedBox(height: 18),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
-            Text(
-              'Card\n15%',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10),
-            ),
-            Text(
-              'Other\n10%',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 18,
+              runSpacing: 8,
+              children: payments.map((row) {
+                final total =
+                    double.tryParse(row['total']?.toString() ?? '') ?? 0;
+                final percent = paymentTotal == 0
+                    ? 0
+                    : total * 100 / paymentTotal;
+                return Text(
+                  '${_statusText(row['method'])}\n${percent.toStringAsFixed(1)}%',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 10),
+                );
+              }).toList(),
             ),
           ],
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
+String _growth(dynamic value) {
+  final number = double.tryParse(value?.toString() ?? '') ?? 0;
+  final arrow = number < 0 ? '↓' : '↑';
+  return '$arrow ${number.abs().toStringAsFixed(1)}%';
+}
+
+Color _paymentColor(String? method) => switch (method) {
+  'cash' => blue,
+  'upi' => green,
+  'card' => const Color(0xFF8B5CC7),
+  _ => Colors.orange,
+};
+
 class _SalesChartPainter extends CustomPainter {
-  const _SalesChartPainter();
+  const _SalesChartPainter(this.values);
+  final List<double> values;
+
   @override
   void paint(Canvas canvas, Size size) {
     final grid = Paint()
       ..color = line
       ..strokeWidth = 1;
-    for (var i = 1; i < 4; i++) {
-      final y = size.height * i / 5;
+    for (var index = 1; index < 4; index++) {
+      final y = size.height * index / 5;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
     }
-    final pts = [
-      const Offset(.02, .76),
-      const Offset(.15, .42),
-      const Offset(.28, .28),
-      const Offset(.41, .48),
-      const Offset(.54, .31),
-      const Offset(.67, .52),
-      const Offset(.80, .39),
-      const Offset(.88, .17),
-      const Offset(.98, .25),
-    ];
+    if (values.isEmpty) return;
+    final maximum = values.reduce((a, b) => a > b ? a : b);
     final path = Path();
-    for (var i = 0; i < pts.length; i++) {
-      final p = Offset(pts[i].dx * size.width, pts[i].dy * size.height);
-      i == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
+    for (var index = 0; index < values.length; index++) {
+      final x = values.length == 1
+          ? size.width / 2
+          : index * size.width / (values.length - 1);
+      final y = maximum <= 0
+          ? size.height * .8
+          : size.height * (.9 - values[index] / maximum * .75);
+      if (index == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+      canvas.drawCircle(Offset(x, y), 3.5, Paint()..color = blue);
     }
     canvas.drawPath(
       path,
@@ -157,20 +189,9 @@ class _SalesChartPainter extends CustomPainter {
         ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke,
     );
-    for (final point in pts) {
-      final p = Offset(point.dx * size.width, point.dy * size.height);
-      canvas.drawCircle(p, 3.5, Paint()..color = Colors.white);
-      canvas.drawCircle(
-        p,
-        3.5,
-        Paint()
-          ..color = blue
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2,
-      );
-    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _SalesChartPainter oldDelegate) =>
+      oldDelegate.values != values;
 }

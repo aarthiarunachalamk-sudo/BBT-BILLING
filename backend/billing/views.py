@@ -1,8 +1,10 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
-from django.db.models import Sum
+from django.db.models import Count, Sum
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -474,8 +476,13 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
 @permission_classes([permissions.IsAuthenticated])
 def dashboard(request):
     today = timezone.localdate()
+    yesterday = today - timedelta(days=1)
+    range_start = today - timedelta(days=6)
     paid_today = Payment.objects.filter(
         status=Payment.Status.VERIFIED, verified_at__date=today
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    paid_yesterday = Payment.objects.filter(
+        status=Payment.Status.VERIFIED, verified_at__date=yesterday
     ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     overdue = Invoice.objects.filter(status=Invoice.Status.OVERDUE)
     low_stock = Item.objects.filter(
@@ -486,15 +493,67 @@ def dashboard(request):
     pending_orders = PurchaseOrder.objects.filter(status=PurchaseOrder.Status.PENDING).count()
     pending_discounts = DiscountApproval.objects.filter(status=DiscountApproval.Status.PENDING).count()
     bills_today = Invoice.objects.filter(invoice_date=today).count()
+    bills_yesterday = Invoice.objects.filter(invoice_date=yesterday).count()
+    average_bill = (
+        Invoice.objects.filter(invoice_date=today).aggregate(total=Sum("total"))["total"]
+        or Decimal("0.00")
+    ) / max(bills_today, 1)
+    approved_returns = ReturnRequest.objects.filter(status=ReturnRequest.Status.APPROVED)
+    returns_total = approved_returns.aggregate(total=Sum("refund_amount"))["total"] or Decimal("0.00")
+    sales_rows = {
+        row["day"]: row["total"]
+        for row in Payment.objects.filter(
+            status=Payment.Status.VERIFIED,
+            verified_at__date__range=(range_start, today),
+        )
+        .annotate(day=TruncDate("verified_at"))
+        .values("day")
+        .annotate(total=Sum("amount"))
+    }
+    sales_trend = [
+        {
+            "date": (range_start + timedelta(days=offset)).isoformat(),
+            "total": sales_rows.get(range_start + timedelta(days=offset), Decimal("0.00")),
+        }
+        for offset in range(7)
+    ]
+    payment_rows = Payment.objects.filter(status=Payment.Status.VERIFIED).values("method").annotate(
+        total=Sum("amount"), count=Count("id")
+    )
+    payment_breakdown = list(payment_rows)
+    profit_today = sum(
+        (
+            (line.unit_price - line.item.purchase_price) * line.quantity
+            for line in InvoiceItem.objects.select_related("item").filter(
+                invoice__invoice_date=today,
+                invoice__status__in=[Invoice.Status.PAID, Invoice.Status.PARTIAL],
+            )
+        ),
+        Decimal("0.00"),
+    )
+
+    def growth(current, previous):
+        if previous == 0:
+            return Decimal("0.00") if current == 0 else Decimal("100.00")
+        return (Decimal(current) - Decimal(previous)) * Decimal("100") / Decimal(previous)
+
     return Response({
         "today_sales": paid_today,
         "paid_today": paid_today,
         "total_bills": bills_today,
-        "profit": paid_today * Decimal("0.28"),
+        "profit": profit_today,
+        "average_bill_value": average_bill,
+        "returns_total": returns_total,
+        "sales_growth": growth(paid_today, paid_yesterday),
+        "bills_growth": growth(bills_today, bills_yesterday),
         "pending_purchase_orders": pending_orders,
         "pending_discount_approvals": pending_discounts,
         "outstanding_total": sum((invoice.balance_due for invoice in Invoice.objects.exclude(status=Invoice.Status.CANCELLED)), Decimal("0.00")),
         "overdue_invoice_count": overdue.count(),
         "low_stock_count": low_stock,
         "recent_invoices": InvoiceSerializer(Invoice.objects.select_related("client").order_by("-created_at")[:5], many=True).data,
+        "sales_trend": sales_trend,
+        "payment_breakdown": payment_breakdown,
+        "range_start": range_start,
+        "range_end": today,
     })

@@ -150,6 +150,10 @@ class QuotationSerializer(serializers.ModelSerializer):
 class DiscountApprovalSerializer(serializers.ModelSerializer):
     requested_by_name = serializers.CharField(source="requested_by.get_full_name", read_only=True)
     reviewed_by_name = serializers.CharField(source="reviewed_by.get_full_name", read_only=True)
+    quotation_number = serializers.CharField(source="quotation.number", read_only=True)
+    customer_name = serializers.CharField(source="quotation.client.name", read_only=True)
+    bill_amount = serializers.DecimalField(source="quotation.total", max_digits=14, decimal_places=2, read_only=True)
+    discount_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = DiscountApproval
@@ -160,6 +164,9 @@ class DiscountApprovalSerializer(serializers.ModelSerializer):
         if value <= 0 or value > Decimal("100"):
             raise serializers.ValidationError("Discount must be between 0 and 100 percent.")
         return value
+
+    def get_discount_amount(self, obj):
+        return obj.quotation.subtotal * obj.requested_percent / Decimal("100")
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
@@ -174,6 +181,7 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True, read_only=True)
     client_name = serializers.CharField(source="client.name", read_only=True)
+    client_mobile = serializers.CharField(source="client.whatsapp_mobile", read_only=True)
     paid_amount = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
     balance_due = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 

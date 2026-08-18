@@ -20,8 +20,11 @@ class RolesScreen extends StatelessWidget {
               ),
               const SizedBox(height: 7),
               DropdownButtonFormField<String>(
-                initialValue: state.selectedRole,
-                items: ['Cashier', 'Admin', 'Inventory Manager']
+                key: ValueKey(state.selectedRole),
+                initialValue: state.availableRoles.contains(state.selectedRole)
+                    ? state.selectedRole
+                    : null,
+                items: state.availableRoles
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
                 onChanged: (v) {

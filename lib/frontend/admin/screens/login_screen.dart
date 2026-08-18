@@ -10,7 +10,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool obscure = true;
   bool remember = false;
-  final emailController = TextEditingController(text: 'aarthi');
+  final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
   @override

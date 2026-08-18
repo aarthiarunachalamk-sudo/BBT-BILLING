@@ -12,7 +12,7 @@ class AdminState extends ChangeNotifier {
   String staffFilter = 'All';
   String inventoryFilter = 'Low Stock';
   String selectedRole = 'Cashier';
-  bool logoutConfirmationVisible = true;
+  bool logoutConfirmationVisible = false;
   bool loading = false;
   String? error;
   Map<String, dynamic> dashboard = {};
@@ -23,37 +23,24 @@ class AdminState extends ChangeNotifier {
   List<Map<String, dynamic>> purchaseOrders = [];
   List<Map<String, dynamic>> discountApprovals = [];
   List<Map<String, dynamic>> invoices = [];
+  List<Map<String, dynamic>> whatsappMessages = [];
   List<Map<String, dynamic>> auditLogs = [];
   List<Map<String, dynamic>> rolePermissions = [];
   Map<String, dynamic> storeSettings = {};
   Map<String, dynamic> settingsDraft = {};
 
   final Map<String, bool> permissions = {
-    'Dashboard': true,
-    'Products': true,
-    'Billing': true,
-    'Inventory': true,
-    'Discounts': true,
-    'Reports': true,
-    'Returns': true,
+    'Dashboard': false,
+    'Products': false,
+    'Billing': false,
+    'Inventory': false,
+    'Discounts': false,
+    'Reports': false,
+    'Returns': false,
     'Settings': false,
   };
-  final Map<String, bool> staffActive = {
-    'Rahul Kumar': true,
-    'Anita Sharma': true,
-    'Vikram Singh': true,
-    'Neha Joshi': true,
-    'Pooja Mehta': false,
-  };
-  final Map<String, bool> categoryActive = {
-    'Grocery & Staples': true,
-    'Fruits & Vegetables': true,
-    'Dairy & Bakery': true,
-    'Beverages': true,
-    'Snacks': true,
-    'Household': true,
-    'Personal Care': true,
-  };
+  final Map<String, bool> staffActive = {};
+  final Map<String, bool> categoryActive = {};
 
   void go(int value) {
     screen = value.clamp(0, 15);
@@ -95,6 +82,7 @@ class AdminState extends ChangeNotifier {
       api.getList('audit-logs'),
       api.getList('role-permissions'),
       api.getList('store-settings'),
+      api.getList('whatsapp-messages'),
     ]);
     dashboard = responses[0];
     users = responses[1];
@@ -107,13 +95,19 @@ class AdminState extends ChangeNotifier {
     auditLogs = responses[8];
     rolePermissions = responses[9];
     final settings = responses[10] as List<Map<String, dynamic>>;
+    whatsappMessages = responses[11];
     storeSettings = settings.isEmpty ? {} : settings.first;
     settingsDraft = Map<String, dynamic>.from(storeSettings);
+    if (rolePermissions.isNotEmpty) {
+      selectedRole = _roleLabel(rolePermissions.first['role'].toString());
+    }
     _hydrateControls();
     notifyListeners();
   }
 
   void _hydrateControls() {
+    staffActive.clear();
+    categoryActive.clear();
     for (final user in users) {
       final name = '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}'
           .trim();
@@ -132,6 +126,18 @@ class AdminState extends ChangeNotifier {
       }
     }
   }
+
+  List<String> get availableRoles =>
+      rolePermissions.map((row) => _roleLabel(row['role'].toString())).toList();
+
+  String _roleLabel(String value) => value
+      .split('_')
+      .map(
+        (word) => word.isEmpty
+            ? word
+            : '${word[0].toUpperCase()}${word.substring(1)}',
+      )
+      .join(' ');
 
   void setNav(int index) {
     navIndex = index;
@@ -252,45 +258,83 @@ class AdminState extends ChangeNotifier {
     settingsDraft[key] = value;
   }
 
-  Future<void> createDemoProduct({required int gst}) async {
-    if (categories.isEmpty) {
-      throw const ApiException('Create a category before adding products.');
-    }
-    await api.create('items', {
-      'item_type': 'material',
-      'name': 'Sunfeast Marie Biscuit 250g',
-      'sku': 'SUN-${DateTime.now().millisecondsSinceEpoch}',
-      'category': categories.first['id'],
-      'unit': 'Pack',
-      'purchase_price': '40.00',
-      'selling_price': '45.00',
-      'tax_percent': '$gst.00',
-      'stock_quantity': 20,
-      'reorder_level': 20,
-      'is_active': true,
-    });
+  Future<void> createProduct(Map<String, dynamic> values) async {
+    await api.create('items', values);
     products = await api.getList('items');
     notifyListeners();
   }
 
-  Future<void> approveReturn(String method) async {
-    if (invoices.isEmpty ||
-        (invoices.first['items'] as List? ?? const []).isEmpty) {
-      throw const ApiException('No invoice item is available to return.');
+  Future<void> createCategory(String name) async {
+    await api.create('categories', {'name': name, 'is_active': true});
+    categories = await api.getList('categories');
+    _hydrateControls();
+    notifyListeners();
+  }
+
+  Future<void> createSupplier(Map<String, dynamic> values) async {
+    await api.create('suppliers', values);
+    suppliers = await api.getList('suppliers');
+    notifyListeners();
+  }
+
+  Future<void> createUser(Map<String, dynamic> values) async {
+    await api.create('users', values);
+    users = await api.getList('users');
+    _hydrateControls();
+    notifyListeners();
+  }
+
+  Future<void> adjustStock(int itemId, int quantity) async {
+    await api.action('items', itemId, 'adjust_stock', {
+      'quantity': quantity,
+      'transaction_type': 'adjustment',
+    });
+    products = await api.getList('items');
+    dashboard = await api.getMap('dashboard');
+    notifyListeners();
+  }
+
+  Future<void> createReorder(int itemId) async {
+    final matches = products.where((product) => product['id'] == itemId);
+    if (matches.isEmpty) throw const ApiException('Product not found.');
+    final product = matches.first;
+    final supplierId = product['supplier'];
+    if (supplierId == null) {
+      throw const ApiException('Assign a supplier to this product first.');
     }
-    final invoice = invoices.first;
-    final item = (invoice['items'] as List).first as Map<String, dynamic>;
-    final returned = await api.create('returns', {
-      'invoice': invoice['id'],
-      'reason': 'Wrong item purchased',
-      'refund_method': switch (method) {
-        'Original Payment' => 'original',
-        'Store Credit' => 'credit',
-        'Replacement' => 'replacement',
-        _ => 'cash',
-      },
+    final stock = int.tryParse(product['stock_quantity'].toString()) ?? 0;
+    final reorder = int.tryParse(product['reorder_level'].toString()) ?? 1;
+    final required = reorder - stock;
+    await api.create('purchase-orders', {
+      'supplier': supplierId,
+      'status': 'pending',
       'items': [
-        {'invoice_item': item['id'], 'quantity': 1},
+        {
+          'item': itemId,
+          'quantity': required > 0 ? required : reorder,
+          'unit_cost': product['purchase_price'],
+          'tax_percent': product['tax_percent'],
+        },
+      ],
+    });
+    purchaseOrders = await api.getList('purchase-orders');
+    dashboard = await api.getMap('dashboard');
+    notifyListeners();
+  }
+
+  Future<void> approveReturn({
+    required int invoiceId,
+    required int invoiceItemId,
+    required int quantity,
+    required String reason,
+    required String method,
+  }) async {
+    final returned = await api.create('returns', {
+      'invoice': invoiceId,
+      'reason': reason,
+      'refund_method': method,
+      'items': [
+        {'invoice_item': invoiceItemId, 'quantity': quantity},
       ],
     });
     await api.action('returns', returned['id'] as int, 'decide', {
@@ -300,16 +344,25 @@ class AdminState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> resendInvoice() async {
+  Future<void> resendInvoice([Map<String, dynamic>? selectedInvoice]) async {
     if (invoices.isEmpty) {
       throw const ApiException('No invoice is available to send.');
     }
+    final invoice = selectedInvoice ?? invoices.first;
+    final recipient = invoice['client_mobile']?.toString() ?? '';
+    if (recipient.isEmpty) {
+      throw const ApiException(
+        'The selected invoice has no customer mobile number.',
+      );
+    }
     await api.create('whatsapp-messages', {
-      'invoice': invoices.first['id'],
-      'recipient': '+919876543210',
-      'message': 'Your invoice ${invoices.first['number']} is ready.',
+      'invoice': invoice['id'],
+      'recipient': recipient,
+      'message': 'Your invoice ${invoice['number']} is ready.',
       'message_type': 'invoice',
     });
+    whatsappMessages = await api.getList('whatsapp-messages');
+    notifyListeners();
   }
 
   Map<String, dynamic> _captureError(Object exception) {
@@ -329,7 +382,7 @@ class AdminState extends ChangeNotifier {
   }
 
   void showLogoutConfirmation() {
-    logoutConfirmationVisible = true;
+    logoutConfirmationVisible = false;
     notifyListeners();
   }
 

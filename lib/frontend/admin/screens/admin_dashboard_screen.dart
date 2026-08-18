@@ -39,7 +39,7 @@ class DashboardScreen extends StatelessWidget {
             _Metric(
               'Profit',
               _money(state.dashboard['profit']),
-              'Estimated margin',
+              'From invoice costs',
               green,
             ),
             _Metric(
@@ -134,7 +134,7 @@ class _Metric extends StatelessWidget {
 
 String _money(dynamic value) {
   final amount = double.tryParse(value?.toString() ?? '') ?? 0;
-  return 'â‚¹ ${amount.toStringAsFixed(2)}';
+  return '₹ ${amount.toStringAsFixed(2)}';
 }
 
 String _percent(dynamic value, int fallback) {

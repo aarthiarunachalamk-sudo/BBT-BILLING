@@ -124,6 +124,7 @@ class Item(TimeStampedModel):
     )
     stock_quantity = models.IntegerField(default=0)
     reorder_level = models.PositiveIntegerField(default=5)
+    expiry_date = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
