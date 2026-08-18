@@ -21,8 +21,21 @@ class AdminApi {
           );
 
   final http.Client _client;
-  final String baseUrl;
+  String baseUrl;
   String? _accessToken;
+
+  void setBaseUrl(String value) {
+    var normalized = value.trim();
+    while (normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    if (!normalized.endsWith('/api')) normalized = '$normalized/api';
+    final uri = Uri.tryParse(normalized);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      throw const ApiException('Enter a valid backend URL, including https://');
+    }
+    baseUrl = normalized;
+  }
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',

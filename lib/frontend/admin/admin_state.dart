@@ -27,6 +27,7 @@ class AdminState extends ChangeNotifier {
   List<Map<String, dynamic>> rolePermissions = [];
   Map<String, dynamic> storeSettings = {};
   Map<String, dynamic> settingsDraft = {};
+  String get serverUrl => api.baseUrl;
 
   final Map<String, bool> permissions = {
     'Dashboard': true,
@@ -60,11 +61,12 @@ class AdminState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String serverUrl, String email, String password) async {
     loading = true;
     error = null;
     notifyListeners();
     try {
+      api.setBaseUrl(serverUrl);
       await api.login(email, password);
       loggedIn = true;
       screen = 1;
@@ -74,7 +76,7 @@ class AdminState extends ChangeNotifier {
       error = exception.message;
       return false;
     } catch (_) {
-      error = 'Cannot reach the billing server.';
+      error = 'Cannot reach ${api.baseUrl}';
       return false;
     } finally {
       loading = false;
