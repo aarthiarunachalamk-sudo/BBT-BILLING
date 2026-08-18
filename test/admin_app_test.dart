@@ -97,4 +97,25 @@ void main() {
     expect(state.screen, 1);
     expect(find.text('Admin Dashboard'), findsOneWidget);
   });
+
+  testWidgets('empty add product screen offers category creation', (
+    tester,
+  ) async {
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 5;
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    expect(
+      find.text('Create a category before adding a product.'),
+      findsOneWidget,
+    );
+    expect(find.text('Add Category'), findsOneWidget);
+
+    await tester.tap(find.text('Add Category'));
+    await tester.pumpAndSettle();
+    expect(find.text('Category name'), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+  });
 }

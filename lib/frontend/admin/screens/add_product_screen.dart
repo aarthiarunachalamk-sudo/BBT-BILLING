@@ -54,9 +54,48 @@ class _AddProductScreenState extends State<AddProductScreen> {
       children: [
         Expanded(
           child: widget.state.categories.isEmpty
-              ? const _EmptyState(
-                  'Create a category before adding a product.',
-                  icon: Icons.category_outlined,
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.category_outlined,
+                          size: 52,
+                          color: muted,
+                        ),
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Create a category before adding a product.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: muted),
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: 260,
+                          child: PrimaryAction(
+                            'Add Category',
+                            icon: Icons.add,
+                            onPressed: () async {
+                              await _showAddCategoryDialog(
+                                context,
+                                widget.state,
+                              );
+                              if (mounted &&
+                                  widget.state.categories.isNotEmpty) {
+                                setState(() {
+                                  categoryId =
+                                      widget.state.categories.first['id']
+                                          as int?;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 )
               : Form(
                   key: formKey,
