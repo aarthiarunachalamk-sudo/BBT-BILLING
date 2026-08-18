@@ -72,14 +72,21 @@ class AuditScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         'Confirm Logout',
                         style: TextStyle(fontWeight: FontWeight.w800),
                       ),
-                      Icon(Icons.close, size: 17),
+                      IconButton(
+                        onPressed: state.loggingOut
+                            ? null
+                            : state.hideLogoutConfirmation,
+                        tooltip: 'Close',
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.close, size: 17),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -94,15 +101,21 @@ class AuditScreen extends StatelessWidget {
                         child: PrimaryAction(
                           'Cancel',
                           outlined: true,
-                          onPressed: state.hideLogoutConfirmation,
+                          onPressed: state.loggingOut
+                              ? () {}
+                              : state.hideLogoutConfirmation,
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: PrimaryAction(
-                          'Logout',
+                          state.loggingOut ? 'Logging out...' : 'Logout',
                           color: red,
-                          onPressed: state.logout,
+                          onPressed: state.loggingOut
+                              ? () {}
+                              : () async {
+                                  await state.logout();
+                                },
                         ),
                       ),
                     ],

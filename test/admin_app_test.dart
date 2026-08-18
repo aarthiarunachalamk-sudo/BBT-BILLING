@@ -209,4 +209,50 @@ void main() {
     expect(state.products, hasLength(1));
     expect(state.products.first['category_name'], 'Spices');
   });
+
+  test(
+    'logout confirms, calls backend, and clears dynamic session data',
+    () async {
+      var logoutRequests = 0;
+      final api = AdminApi(
+        baseUrl: 'https://example.com/api',
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path.endsWith('/auth/logout/')) {
+            logoutRequests += 1;
+            return http.Response(
+              jsonEncode({'detail': 'Logged out successfully.'}),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('{}', 404);
+        }),
+      );
+      final state = AdminState(api: api)
+        ..loggedIn = true
+        ..screen = 15
+        ..dashboard = {'today_sales': '100.00'}
+        ..products = [
+          {'id': 1, 'name': 'Turmeric Powder'},
+        ]
+        ..categories = [
+          {'id': 1, 'name': 'Spices'},
+        ];
+      addTearDown(state.dispose);
+
+      state.showLogoutConfirmation();
+      expect(state.logoutConfirmationVisible, isTrue);
+
+      await state.logout();
+
+      expect(logoutRequests, 1);
+      expect(state.loggedIn, isFalse);
+      expect(state.screen, 0);
+      expect(state.logoutConfirmationVisible, isFalse);
+      expect(state.dashboard, isEmpty);
+      expect(state.products, isEmpty);
+      expect(state.categories, isEmpty);
+    },
+  );
 }

@@ -14,6 +14,7 @@ class AdminState extends ChangeNotifier {
   String productQuery = '';
   String selectedRole = 'Cashier';
   bool logoutConfirmationVisible = false;
+  bool loggingOut = false;
   bool loading = false;
   String? error;
   String passwordChangeIdentifier = '';
@@ -469,17 +470,48 @@ class AdminState extends ChangeNotifier {
   }
 
   void showLogoutConfirmation() {
-    logoutConfirmationVisible = false;
+    logoutConfirmationVisible = true;
     notifyListeners();
   }
 
-  void logout() {
-    api.clearSession();
-    loggedIn = false;
-    screen = 0;
-    navIndex = 0;
-    logoutConfirmationVisible = true;
+  Future<void> logout() async {
+    if (loggingOut) return;
+    loggingOut = true;
+    error = null;
     notifyListeners();
+    try {
+      await api.logout();
+    } catch (_) {
+      // Local logout must still complete if the server is temporarily offline.
+    } finally {
+      api.clearSession();
+      loggedIn = false;
+      screen = 0;
+      navIndex = 0;
+      logoutConfirmationVisible = false;
+      loggingOut = false;
+      staffFilter = 'All';
+      inventoryFilter = 'Low Stock';
+      productQuery = '';
+      selectedRole = 'Cashier';
+      dashboard.clear();
+      users.clear();
+      products.clear();
+      categories.clear();
+      suppliers.clear();
+      purchaseOrders.clear();
+      discountApprovals.clear();
+      invoices.clear();
+      whatsappMessages.clear();
+      auditLogs.clear();
+      rolePermissions.clear();
+      storeSettings.clear();
+      settingsDraft.clear();
+      permissions.updateAll((key, value) => false);
+      staffActive.clear();
+      categoryActive.clear();
+      notifyListeners();
+    }
   }
 
   @override

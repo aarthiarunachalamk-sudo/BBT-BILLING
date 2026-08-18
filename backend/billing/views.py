@@ -113,6 +113,13 @@ def change_password(request):
     return Response({"detail": "Password changed successfully."})
 
 
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def logout_view(request):
+    record_audit(request, "Logout", "Auth")
+    return Response({"detail": "Logged out successfully."})
+
+
 def record_audit(request, action, module, instance=None, metadata=None):
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
     AuditLog.objects.create(

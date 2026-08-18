@@ -69,6 +69,20 @@ class AdminApi {
     ),
   );
 
+  Future<void> logout() async {
+    try {
+      _decodeMap(
+        await _client.post(
+          Uri.parse('$baseUrl/auth/logout/'),
+          headers: _headers,
+          body: jsonEncode({}),
+        ),
+      );
+    } finally {
+      clearSession();
+    }
+  }
+
   Future<Map<String, dynamic>> getMap(String path) async => _decodeMap(
     await _client.get(Uri.parse('$baseUrl/$path/'), headers: _headers),
   );

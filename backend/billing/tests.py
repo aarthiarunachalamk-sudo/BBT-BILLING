@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import (
+    AuditLog,
     Category,
     Client,
     DiscountApproval,
@@ -72,6 +73,18 @@ class AdminLoginTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("Aarthi@123"))
+
+    def test_authenticated_logout_is_audited(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.post(reverse("logout"), format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                user=self.user,
+                action="Logout",
+                module="Auth",
+            ).exists()
+        )
 
 
 class AdminFlowTests(APITestCase):
