@@ -1,9 +1,21 @@
 from django.urls import reverse
-from django.core.management import call_command
+from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import DiscountApproval, PurchaseOrder, StoreSettings, User
+from .models import (
+    Category,
+    Client,
+    DiscountApproval,
+    Item,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    Quotation,
+    RolePermission,
+    StoreSettings,
+    Supplier,
+    User,
+)
 
 
 class AdminLoginTests(APITestCase):
@@ -40,7 +52,44 @@ class AdminFlowTests(APITestCase):
             email="aarthi@gmail.com",
             password="Aarthi@123",
         )
-        call_command("seed_admin_flow", verbosity=0)
+        category = Category.objects.create(name="Test Category")
+        supplier = Supplier.objects.create(name="Test Supplier")
+        item = Item.objects.create(
+            item_type=Item.ItemType.MATERIAL,
+            name="Test Item",
+            sku="TEST-ITEM",
+            category=category,
+            supplier=supplier,
+            purchase_price=Decimal("10.00"),
+            selling_price=Decimal("15.00"),
+            stock_quantity=2,
+            reorder_level=5,
+        )
+        customer = Client.objects.create(
+            name="Test Customer",
+            contact_person="Customer",
+            whatsapp_mobile="9999999999",
+            billing_address="Test address",
+        )
+        quotation = Quotation.objects.create(client=customer, created_by=self.user)
+        DiscountApproval.objects.create(
+            quotation=quotation,
+            requested_percent=Decimal("5.00"),
+            requested_by=self.user,
+        )
+        order = PurchaseOrder.objects.create(
+            supplier=supplier,
+            created_by=self.user,
+        )
+        PurchaseOrderItem.objects.create(
+            purchase_order=order,
+            item=item,
+            quantity=3,
+            unit_cost=Decimal("10.00"),
+        )
+        order.recalculate()
+        StoreSettings.objects.create()
+        RolePermission.objects.create(role="admin", settings=True)
         self.client.force_authenticate(self.user)
 
     def test_all_admin_screen_collections_are_available(self):
