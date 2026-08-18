@@ -52,16 +52,17 @@ class Command(BaseCommand):
         for username, first, last, email, role, active in staff:
             user, created = User.objects.get_or_create(
                 username=username,
-                defaults={"email": email},
+                defaults={
+                    "email": email,
+                    "first_name": first,
+                    "last_name": last,
+                    "role": role,
+                    "is_active": active,
+                },
             )
-            user.email = email
-            user.first_name = first
-            user.last_name = last
-            user.role = role
-            user.is_active = active
             if created:
                 user.set_unusable_password()
-            user.save()
+                user.save(update_fields=["password"])
 
         permission_rows = {
             "admin": {name: True for name in ("products", "billing", "inventory", "discounts", "reports", "returns", "settings")},
@@ -69,8 +70,8 @@ class Command(BaseCommand):
             "inventory_manager": {"products": True, "inventory": True, "reports": True},
         }
         for role, values in permission_rows.items():
-            RolePermission.objects.update_or_create(role=role, defaults=values)
-        StoreSettings.objects.update_or_create(
+            RolePermission.objects.get_or_create(role=role, defaults=values)
+        StoreSettings.objects.get_or_create(
             pk=1,
             defaults={
                 "store_name": "Supermarket",
@@ -104,7 +105,7 @@ class Command(BaseCommand):
         ]
         suppliers = {}
         for name, gstin, phone in supplier_rows:
-            suppliers[name], _ = Supplier.objects.update_or_create(
+            suppliers[name], _ = Supplier.objects.get_or_create(
                 name=name,
                 defaults={"gstin": gstin, "phone": phone, "is_active": True},
             )
@@ -118,7 +119,7 @@ class Command(BaseCommand):
         ]
         items = {}
         for sku, name, category, selling, purchase, stock, reorder in product_rows:
-            items[sku], _ = Item.objects.update_or_create(
+            items[sku], _ = Item.objects.get_or_create(
                 sku=sku,
                 defaults={
                     "item_type": Item.ItemType.MATERIAL,
@@ -135,7 +136,7 @@ class Command(BaseCommand):
                 },
             )
 
-        customer, _ = Client.objects.update_or_create(
+        customer, _ = Client.objects.get_or_create(
             name="Walk-in Customer",
             defaults={
                 "contact_person": "Walk-in Customer",
@@ -161,7 +162,6 @@ class Command(BaseCommand):
         quotation.recalculate()
         DiscountApproval.objects.get_or_create(
             quotation=quotation,
-            status=DiscountApproval.Status.PENDING,
             defaults={
                 "requested_percent": Decimal("18.00"),
                 "requested_by": User.objects.get(username="anita"),
@@ -169,7 +169,7 @@ class Command(BaseCommand):
             },
         )
 
-        invoice, _ = Invoice.objects.update_or_create(
+        invoice, _ = Invoice.objects.get_or_create(
             number="BILL-2025-0145",
             defaults={
                 "client": customer,
@@ -185,7 +185,7 @@ class Command(BaseCommand):
                 "total": Decimal("3650.00"),
             },
         )
-        InvoiceItem.objects.update_or_create(
+        InvoiceItem.objects.get_or_create(
             invoice=invoice,
             item=items["AASH5000"],
             defaults={
@@ -195,7 +195,7 @@ class Command(BaseCommand):
                 "unit_price": Decimal("215.00"),
             },
         )
-        Payment.objects.update_or_create(
+        Payment.objects.get_or_create(
             receipt_number="RCPT-2025-0145",
             defaults={
                 "invoice": invoice,
@@ -218,7 +218,7 @@ class Command(BaseCommand):
                 "status": PurchaseOrder.Status.PENDING,
             },
         )
-        PurchaseOrderItem.objects.update_or_create(
+        PurchaseOrderItem.objects.get_or_create(
             purchase_order=order,
             item=items["AASH5000"],
             defaults={"quantity": 50, "unit_cost": Decimal("210.00"), "tax_percent": Decimal("6.00")},
@@ -241,6 +241,11 @@ class Command(BaseCommand):
             ("Product catalogue prepared", "Products"),
             ("Purchase order created", "Purchase"),
         ]:
-            AuditLog.objects.get_or_create(user=admin, action=action, module=module)
+            if not AuditLog.objects.filter(
+                user=admin,
+                action=action,
+                module=module,
+            ).exists():
+                AuditLog.objects.create(user=admin, action=action, module=module)
 
         self.stdout.write(self.style.SUCCESS("Admin flow starter data is ready."))
