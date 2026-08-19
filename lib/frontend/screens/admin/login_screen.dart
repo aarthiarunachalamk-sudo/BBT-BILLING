@@ -134,7 +134,24 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 10),
           ],
           widget.state.loading
-              ? const Center(child: CircularProgressIndicator())
+              ? Semantics(
+                  liveRegion: true,
+                  label: 'Signing in',
+                  child: const Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 12),
+                      Text(
+                        'Signing in securely…',
+                        style: TextStyle(
+                          color: muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
               : PrimaryAction(
                   'Login',
                   onPressed: () async {

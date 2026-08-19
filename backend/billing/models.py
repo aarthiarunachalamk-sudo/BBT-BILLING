@@ -119,6 +119,12 @@ class Item(TimeStampedModel):
     unit = models.CharField(max_length=30, default="unit")
     selling_price = models.DecimalField(**MONEY)
     purchase_price = models.DecimalField(**MONEY)
+    mrp = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
+    )
+    image = models.ImageField(upload_to="products/%Y/%m/", blank=True)
+    price_source_url = models.URLField(blank=True)
+    price_verified_at = models.DateField(null=True, blank=True)
     tax_percent = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal("18.00")
     )

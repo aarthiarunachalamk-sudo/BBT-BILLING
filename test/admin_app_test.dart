@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:bbt_billing/main.dart' as app;
 import 'package:bbt_billing/frontend/screens/admin/admin_api.dart';
@@ -76,6 +78,47 @@ void main() {
     expect(find.text('12'), findsOneWidget);
     expect(find.text('7'), findsOneWidget);
     expect(find.text('↑ 8.5% vs yesterday'), findsOneWidget);
+  });
+
+  test('login opens dashboard before workspace hydration completes', () async {
+    final hydrationGate = Completer<void>();
+    var hydrationRequests = 0;
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/auth/login/')) {
+          return http.Response(
+            jsonEncode({'access': 'token'}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        hydrationRequests += 1;
+        await hydrationGate.future;
+        return http.Response(
+          '{}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    final state = AdminState(api: api);
+    addTearDown(state.dispose);
+
+    final success = await state
+        .login('admin', 'password')
+        .timeout(const Duration(seconds: 1));
+
+    expect(success, isTrue);
+    expect(state.loggedIn, isTrue);
+    expect(state.screen, 1);
+    expect(state.refreshing, isTrue);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(hydrationRequests, 12);
+
+    hydrationGate.complete();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(state.refreshing, isFalse);
   });
 
   testWidgets('Android back returns an admin sub-screen to dashboard', (
@@ -396,6 +439,66 @@ void main() {
     expect(state.products, hasLength(1));
     expect(state.products.first['category_name'], 'Spices');
   });
+
+  test(
+    'product image is sent with catalog pricing as multipart data',
+    () async {
+      late http.Request captured;
+      final api = AdminApi(
+        baseUrl: 'https://example.com/api',
+        client: MockClient((request) async {
+          if (request.method == 'POST' &&
+              request.url.path.endsWith('/items/')) {
+            captured = request;
+            return http.Response(
+              jsonEncode({
+                'id': 20,
+                'name': 'Fortune Sunlite Refined Sunflower Oil 840 g',
+                'sku': 'FORTUNE-SUNLITE-840G',
+                'selling_price': '145.50',
+                'mrp': '190.00',
+                'image': '/media/products/sunflower-oil.jpg',
+              }),
+              201,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response(
+            '{}',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      final state = AdminState(api: api);
+      addTearDown(state.dispose);
+
+      final product = await state.createProduct(
+        {
+          'name': 'Fortune Sunlite Refined Sunflower Oil 840 g',
+          'sku': 'FORTUNE-SUNLITE-840G',
+          'selling_price': '145.50',
+          'mrp': '190.00',
+        },
+        imageBytes: Uint8List.fromList([1, 2, 3]),
+        imageName: 'sunflower-oil.jpg',
+      );
+
+      expect(captured.method, 'POST');
+      expect(
+        captured.headers['content-type'],
+        startsWith('multipart/form-data'),
+      );
+      final multipartBody = latin1.decode(captured.bodyBytes);
+      expect(multipartBody, contains('name="selling_price"'));
+      expect(multipartBody, contains('145.50'));
+      expect(multipartBody, contains('name="mrp"'));
+      expect(multipartBody, contains('190.00'));
+      expect(multipartBody, contains('name="image"'));
+      expect(multipartBody, contains('filename="sunflower-oil.jpg"'));
+      expect(product['image'], contains('sunflower-oil.jpg'));
+    },
+  );
 
   test(
     'logout confirms, calls backend, and clears dynamic session data',

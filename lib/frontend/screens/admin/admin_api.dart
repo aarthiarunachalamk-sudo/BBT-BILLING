@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -109,6 +110,55 @@ class AdminApi {
       body: jsonEncode(body),
     ),
   );
+
+  Future<Map<String, dynamic>> createWithImage(
+    String path,
+    Map<String, dynamic> body, {
+    required Uint8List imageBytes,
+    required String imageName,
+  }) => _multipart(
+    'POST',
+    '$baseUrl/$path/',
+    body,
+    imageBytes: imageBytes,
+    imageName: imageName,
+  );
+
+  Future<Map<String, dynamic>> updateWithImage(
+    String path,
+    int id, {
+    required Uint8List imageBytes,
+    required String imageName,
+  }) => _multipart(
+    'PATCH',
+    '$baseUrl/$path/$id/',
+    const {},
+    imageBytes: imageBytes,
+    imageName: imageName,
+  );
+
+  Future<Map<String, dynamic>> _multipart(
+    String method,
+    String url,
+    Map<String, dynamic> body, {
+    required Uint8List imageBytes,
+    required String imageName,
+  }) async {
+    final request = http.MultipartRequest(method, Uri.parse(url));
+    if (_accessToken != null) {
+      request.headers['Authorization'] = 'Bearer $_accessToken';
+    }
+    for (final entry in body.entries) {
+      if (entry.value != null) {
+        request.fields[entry.key] = entry.value.toString();
+      }
+    }
+    request.files.add(
+      http.MultipartFile.fromBytes('image', imageBytes, filename: imageName),
+    );
+    final streamed = await _client.send(request);
+    return _decodeMap(await http.Response.fromStream(streamed));
+  }
 
   Future<Map<String, dynamic>> update(
     String path,

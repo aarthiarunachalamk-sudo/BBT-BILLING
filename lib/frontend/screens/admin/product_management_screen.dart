@@ -66,17 +66,43 @@ class ProductsScreen extends StatelessWidget {
                       final out = status == 'out_of_stock';
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                        leading: Container(
-                          width: 44,
-                          height: 54,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: page,
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: const Icon(
-                            Icons.inventory_2_outlined,
-                            color: blue,
+                        leading: Tooltip(
+                          message: 'Add or replace product image',
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () =>
+                                _replaceProductImage(context, state, product),
+                            child: SizedBox(
+                              width: 52,
+                              height: 58,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: _ProductImage(
+                                      url: _productImageUrl(
+                                        state,
+                                        product['image'],
+                                      ),
+                                    ),
+                                  ),
+                                  const Positioned(
+                                    right: 2,
+                                    bottom: 2,
+                                    child: CircleAvatar(
+                                      radius: 9,
+                                      backgroundColor: blue,
+                                      child: Icon(
+                                        Icons.camera_alt_outlined,
+                                        size: 10,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                         title: Text(
@@ -88,8 +114,10 @@ class ProductsScreen extends StatelessWidget {
                         ),
                         subtitle: Text(
                           'SKU: ${product['sku'] ?? ''} · ${product['category_name'] ?? ''}\n'
-                          'GST: ${product['tax_percent'] ?? 0}%     Stock: ${product['stock_quantity'] ?? 0}',
-                          style: const TextStyle(fontSize: 9, height: 1.5),
+                          'GST: ${product['tax_percent'] ?? 0}% · Stock: ${product['stock_quantity'] ?? 0}'
+                          '${product['mrp'] == null ? '' : ' · MRP ${_money(product['mrp'])}'}'
+                          '${product['price_verified_at'] == null ? '' : '\nPrice verified ${_dateText(product['price_verified_at'])}'}',
+                          style: const TextStyle(fontSize: 9, height: 1.45),
                         ),
                         trailing: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -125,6 +153,62 @@ class ProductsScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+String? _productImageUrl(AdminState state, dynamic rawValue) {
+  final value = rawValue?.toString() ?? '';
+  if (value.isEmpty) return null;
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  final origin = state.api.baseUrl.replaceFirst(RegExp(r'/api$'), '');
+  return '$origin${value.startsWith('/') ? '' : '/'}$value';
+}
+
+Future<void> _replaceProductImage(
+  BuildContext context,
+  AdminState state,
+  Map<String, dynamic> product,
+) async {
+  final image = await ImagePicker().pickImage(
+    source: ImageSource.gallery,
+    maxWidth: 1600,
+    imageQuality: 85,
+    requestFullMetadata: false,
+  );
+  if (image == null) return;
+  try {
+    await state.updateProductImage(
+      product['id'] as int,
+      await image.readAsBytes(),
+      image.name,
+    );
+    if (context.mounted) showNotice(context, 'Product image updated');
+  } catch (error) {
+    if (context.mounted) showNotice(context, error.toString());
+  }
+}
+
+class _ProductImage extends StatelessWidget {
+  const _ProductImage({required this.url});
+
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null) {
+      return const ColoredBox(
+        color: page,
+        child: Icon(Icons.inventory_2_outlined, color: blue),
+      );
+    }
+    return Image.network(
+      url!,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const ColoredBox(
+        color: page,
+        child: Icon(Icons.broken_image_outlined, color: muted),
       ),
     );
   }

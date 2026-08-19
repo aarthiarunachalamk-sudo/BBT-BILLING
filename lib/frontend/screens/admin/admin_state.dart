@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'admin_api.dart';
@@ -112,7 +114,10 @@ class AdminState extends ChangeNotifier {
       loggedIn = true;
       passwordChangeIdentifier = email;
       screen = 1;
-      await refreshAll();
+      notifyListeners();
+      // Authentication should not be blocked by the twelve independent
+      // workspace endpoints. The dashboard opens now and hydrates in place.
+      unawaited(reloadAll());
       return true;
     } on ApiException catch (exception) {
       error = exception.message;
@@ -385,9 +390,18 @@ class AdminState extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> createProduct(
-    Map<String, dynamic> values,
-  ) async {
-    final created = await api.create('items', values);
+    Map<String, dynamic> values, {
+    Uint8List? imageBytes,
+    String? imageName,
+  }) async {
+    final created = imageBytes == null || imageName == null
+        ? await api.create('items', values)
+        : await api.createWithImage(
+            'items',
+            values,
+            imageBytes: imageBytes,
+            imageName: imageName,
+          );
     products = [
       created,
       ...products.where((product) => product['id'] != created['id']),
@@ -400,6 +414,23 @@ class AdminState extends ChangeNotifier {
     }
     notifyListeners();
     return created;
+  }
+
+  Future<void> updateProductImage(
+    int productId,
+    Uint8List imageBytes,
+    String imageName,
+  ) async {
+    final updated = await api.updateWithImage(
+      'items',
+      productId,
+      imageBytes: imageBytes,
+      imageName: imageName,
+    );
+    products = products
+        .map((product) => product['id'] == productId ? updated : product)
+        .toList();
+    notifyListeners();
   }
 
   Future<Map<String, dynamic>> createCategory(String name) async {

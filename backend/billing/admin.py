@@ -60,7 +60,7 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 @admin.register(Item)
 class ItemAdmin(admin.ModelAdmin):
-    list_display = ("name", "sku", "item_type", "category", "selling_price", "stock_quantity", "is_active")
+    list_display = ("name", "sku", "item_type", "category", "mrp", "selling_price", "stock_quantity", "is_active")
     list_filter = ("item_type", "category", "is_active")
     search_fields = ("name", "sku")
 

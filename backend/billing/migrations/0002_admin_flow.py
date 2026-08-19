@@ -11,6 +11,10 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
 
+    # Compatibility with local/early deployments where this same migration
+    # shipped under its original filename before being renamed.
+    replaces = [('billing', '0002_admin_flow_models')]
+
     dependencies = [
         ('billing', '0001_initial'),
     ]

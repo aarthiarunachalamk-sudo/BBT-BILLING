@@ -32,6 +32,7 @@ migrate_working_dir/
 # Django backend local/private files
 backend/.env
 backend/db.sqlite3
+backend/db.sqlite3*.bak
 backend/media/
 backend/staticfiles/
 **/__pycache__/

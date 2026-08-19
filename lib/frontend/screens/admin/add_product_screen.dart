@@ -17,9 +17,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final stock = TextEditingController(text: '0');
   final reorderLevel = TextEditingController(text: '5');
   final expiryDate = TextEditingController();
+  final mrp = TextEditingController();
+  final priceSource = TextEditingController();
+  final priceVerifiedAt = TextEditingController();
   int gst = 0;
   int? categoryId;
   String? unit;
+  XFile? selectedImage;
+  Uint8List? selectedImageBytes;
   bool saving = false;
 
   @override
@@ -39,7 +44,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
     stock.dispose();
     reorderLevel.dispose();
     expiryDate.dispose();
+    mrp.dispose();
+    priceSource.dispose();
+    priceVerifiedAt.dispose();
     super.dispose();
+  }
+
+  Future<void> pickImage() async {
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+      requestFullMetadata: false,
+    );
+    if (image == null) return;
+    final bytes = await image.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      selectedImage = image;
+      selectedImageBytes = bytes;
+    });
   }
 
   String? requiredText(String? value) =>
@@ -73,6 +97,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
     return null;
   }
 
+  String? dateValidator(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    return DateTime.tryParse(value.trim()) == null ? 'Use YYYY-MM-DD' : null;
+  }
+
   Future<void> addCategory() async {
     final category = await _showAddCategoryDialog(context, widget.state);
     if (!mounted || category == null) return;
@@ -87,22 +116,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
     setState(() => saving = true);
     try {
-      final product = await widget.state.createProduct({
-        'item_type': 'material',
-        'name': name.text.trim(),
-        'sku': sku.text.trim(),
-        'category': categoryId,
-        'unit': unit,
-        'purchase_price': purchasePrice.text.trim(),
-        'selling_price': sellingPrice.text.trim(),
-        'tax_percent': gst.toString(),
-        'stock_quantity': int.parse(stock.text.trim()),
-        'reorder_level': int.parse(reorderLevel.text.trim()),
-        'expiry_date': expiryDate.text.trim().isEmpty
-            ? null
-            : expiryDate.text.trim(),
-        'is_active': true,
-      });
+      final product = await widget.state.createProduct(
+        {
+          'item_type': 'material',
+          'name': name.text.trim(),
+          'sku': sku.text.trim(),
+          'category': categoryId,
+          'unit': unit,
+          'purchase_price': purchasePrice.text.trim(),
+          'selling_price': sellingPrice.text.trim(),
+          'mrp': mrp.text.trim().isEmpty ? null : mrp.text.trim(),
+          'price_source_url': priceSource.text.trim(),
+          'price_verified_at': priceVerifiedAt.text.trim().isEmpty
+              ? null
+              : priceVerifiedAt.text.trim(),
+          'tax_percent': gst.toString(),
+          'stock_quantity': int.parse(stock.text.trim()),
+          'reorder_level': int.parse(reorderLevel.text.trim()),
+          'expiry_date': expiryDate.text.trim().isEmpty
+              ? null
+              : expiryDate.text.trim(),
+          'is_active': true,
+        },
+        imageBytes: selectedImageBytes,
+        imageName: selectedImage?.name,
+      );
       if (!mounted) return;
       setState(() => saving = false);
       showNotice(
@@ -162,12 +200,106 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      SectionCard(
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: SizedBox.square(
+                                dimension: 82,
+                                child: selectedImageBytes == null
+                                    ? const ColoredBox(
+                                        color: page,
+                                        child: Icon(
+                                          Icons.add_photo_alternate_outlined,
+                                          color: muted,
+                                          size: 30,
+                                        ),
+                                      )
+                                    : Image.memory(
+                                        selectedImageBytes!,
+                                        fit: BoxFit.cover,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Product image',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'JPG or PNG. Use a clear front-facing pack image.',
+                                    style: TextStyle(
+                                      color: muted,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OutlinedButton.icon(
+                                    onPressed: saving ? null : pickImage,
+                                    icon: const Icon(
+                                      Icons.photo_library_outlined,
+                                      size: 17,
+                                    ),
+                                    label: Text(
+                                      selectedImage == null
+                                          ? 'Choose image'
+                                          : 'Replace image',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
                       TextFormField(
                         controller: name,
                         validator: requiredText,
                         decoration: const InputDecoration(
                           labelText: 'Product Name *',
                           hintText: 'Example: Turmeric Powder 250g',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: mrp,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? null
+                            : moneyValidator(value, allowZero: false),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'MRP (optional)',
+                          helperText: 'Maximum retail price printed on pack',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: priceSource,
+                        keyboardType: TextInputType.url,
+                        decoration: const InputDecoration(
+                          labelText: 'Price source URL (optional)',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: priceVerifiedAt,
+                        validator: dateValidator,
+                        keyboardType: TextInputType.datetime,
+                        decoration: const InputDecoration(
+                          labelText: 'Price verified date (optional)',
+                          hintText: 'YYYY-MM-DD',
                         ),
                       ),
                       const SizedBox(height: 14),
