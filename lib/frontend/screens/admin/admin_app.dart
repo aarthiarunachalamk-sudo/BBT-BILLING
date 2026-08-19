@@ -21,7 +21,9 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
     state.addListener(_refresh);
   }
 
-  void _refresh() => setState(() {});
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
   @override
   void dispose() {
     state.removeListener(_refresh);

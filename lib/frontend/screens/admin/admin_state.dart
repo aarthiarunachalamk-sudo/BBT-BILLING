@@ -7,6 +7,13 @@ import 'admin_api.dart';
 class AdminState extends ChangeNotifier {
   AdminState({AdminApi? api}) : api = api ?? AdminApi();
 
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   final AdminApi api;
   int screen = 0;
   int navIndex = 0;
@@ -651,6 +658,7 @@ class AdminState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     api.dispose();
     super.dispose();
   }
