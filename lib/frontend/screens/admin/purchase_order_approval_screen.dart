@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class PurchaseOrderScreen extends StatelessWidget {
   const PurchaseOrderScreen(this.state, {super.key});
@@ -14,7 +14,7 @@ class PurchaseOrderScreen extends StatelessWidget {
 
     return _AdminPage(
       state: state,
-      title: 'PO Approval',
+      title: 'PO Approval${pending.isEmpty ? '' : ' (${pending.length})'}',
       back: 7,
       bottom: false,
       child: order == null
@@ -70,9 +70,13 @@ class PurchaseOrderScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: PrimaryAction(
-                          'Approve',
+                          state.decidingPurchaseOrder
+                              ? 'Processing…'
+                              : 'Approve',
                           color: green,
-                          onPressed: () => _decideOrder(context, state, true),
+                          onPressed: state.decidingPurchaseOrder
+                              ? null
+                              : () => _decideOrder(context, state, true),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -80,7 +84,9 @@ class PurchaseOrderScreen extends StatelessWidget {
                         child: PrimaryAction(
                           'Reject',
                           color: red,
-                          onPressed: () => _decideOrder(context, state, false),
+                          onPressed: state.decidingPurchaseOrder
+                              ? null
+                              : () => _decideOrder(context, state, false),
                         ),
                       ),
                     ],

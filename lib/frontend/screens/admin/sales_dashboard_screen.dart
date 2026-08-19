@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class SalesDashboardScreen extends StatelessWidget {
   const SalesDashboardScreen(this.state, {super.key});

@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class StaffScreen extends StatelessWidget {
   const StaffScreen(this.state, {super.key});
@@ -14,8 +14,16 @@ class StaffScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final filtered = state.users.where((user) {
       final active = user['is_active'] == true;
-      return state.staffFilter == 'All' ||
+      final matchesStatus =
+          state.staffFilter == 'All' ||
           (state.staffFilter == 'Active' ? active : !active);
+      final searchable = [
+        userName(user),
+        user['email'],
+        user['username'],
+        user['role'],
+      ].join(' ').toLowerCase();
+      return matchesStatus && searchable.contains(state.staffQuery);
     }).toList();
     final activeCount = state.users
         .where((user) => user['is_active'] == true)
@@ -39,9 +47,12 @@ class StaffScreen extends StatelessWidget {
       ],
       child: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.all(14),
-            child: SearchBox('Search users by name, role or email'),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: SearchBox(
+              'Search users by name, role or email',
+              onChanged: state.setStaffQuery,
+            ),
           ),
           Row(
             children: counts.entries

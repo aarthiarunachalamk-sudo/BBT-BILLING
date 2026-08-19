@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class DiscountApprovalScreen extends StatelessWidget {
   const DiscountApprovalScreen(this.state, {super.key});
@@ -14,7 +14,8 @@ class DiscountApprovalScreen extends StatelessWidget {
 
     return _AdminPage(
       state: state,
-      title: 'Discount Approval',
+      title:
+          'Discount Approval${pending.isEmpty ? '' : ' (${pending.length})'}',
       back: 1,
       bottom: false,
       child: approval == null
@@ -89,10 +90,11 @@ class DiscountApprovalScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: PrimaryAction(
-                          'Approve',
+                          state.decidingDiscount ? 'Processing…' : 'Approve',
                           color: green,
-                          onPressed: () =>
-                              _decideDiscount(context, state, true),
+                          onPressed: state.decidingDiscount
+                              ? null
+                              : () => _decideDiscount(context, state, true),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -100,8 +102,9 @@ class DiscountApprovalScreen extends StatelessWidget {
                         child: PrimaryAction(
                           'Reject',
                           color: red,
-                          onPressed: () =>
-                              _decideDiscount(context, state, false),
+                          onPressed: state.decidingDiscount
+                              ? null
+                              : () => _decideDiscount(context, state, false),
                         ),
                       ),
                     ],

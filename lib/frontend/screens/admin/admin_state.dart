@@ -12,10 +12,17 @@ class AdminState extends ChangeNotifier {
   String staffFilter = 'All';
   String inventoryFilter = 'Low Stock';
   String productQuery = '';
+  String productStockFilter = 'All';
+  String staffQuery = '';
+  String categoryQuery = '';
+  String supplierQuery = '';
   String selectedRole = 'Cashier';
   bool logoutConfirmationVisible = false;
   bool loggingOut = false;
   bool loading = false;
+  bool refreshing = false;
+  bool decidingPurchaseOrder = false;
+  bool decidingDiscount = false;
   String? error;
   String passwordChangeIdentifier = '';
   Map<String, dynamic> dashboard = {};
@@ -46,7 +53,19 @@ class AdminState extends ChangeNotifier {
   final Map<String, bool> categoryActive = {};
 
   void go(int value) {
-    screen = value.clamp(0, 16);
+    var destination = value.clamp(0, 16);
+    if (!loggedIn && destination != 0 && destination != 16) {
+      destination = 0;
+    }
+    screen = destination;
+    navIndex = switch (destination) {
+      1 => 0,
+      2 || 3 => 1,
+      >= 4 && <= 9 => 2,
+      >= 10 && <= 13 => 3,
+      >= 14 => 4,
+      _ => navIndex,
+    };
     notifyListeners();
   }
 
@@ -91,6 +110,7 @@ class AdminState extends ChangeNotifier {
     try {
       await api.login(email, password);
       loggedIn = true;
+      passwordChangeIdentifier = email;
       screen = 1;
       await refreshAll();
       return true;
@@ -139,6 +159,32 @@ class AdminState extends ChangeNotifier {
       selectedRole = _roleLabel(rolePermissions.first['role'].toString());
     }
     _hydrateControls();
+    notifyListeners();
+  }
+
+  Future<bool> reloadAll() async {
+    if (refreshing) return false;
+    refreshing = true;
+    error = null;
+    notifyListeners();
+    try {
+      await refreshAll();
+      return true;
+    } on ApiException catch (exception) {
+      error = exception.message;
+      return false;
+    } catch (_) {
+      error = 'Cannot reach ${api.baseUrl}';
+      return false;
+    } finally {
+      refreshing = false;
+      notifyListeners();
+    }
+  }
+
+  void clearError() {
+    if (error == null) return;
+    error = null;
     notifyListeners();
   }
 
@@ -206,29 +252,43 @@ class AdminState extends ChangeNotifier {
   }
 
   void toggleStaff(String name, bool value) {
-    staffActive[name] = value;
-    notifyListeners();
     final matching = users.where(
       (row) =>
           '${row['first_name'] ?? ''} ${row['last_name'] ?? ''}'.trim() == name,
     );
     if (matching.isNotEmpty) {
-      api
-          .update('users', matching.first['id'] as int, {'is_active': value})
-          .catchError(_captureError);
+      final user = matching.first;
+      final previous = user['is_active'] == true;
+      staffActive[name] = value;
+      user['is_active'] = value;
+      error = null;
+      notifyListeners();
+      api.update('users', user['id'] as int, {'is_active': value}).catchError((
+        Object exception,
+      ) {
+        staffActive[name] = previous;
+        user['is_active'] = previous;
+        return _captureError(exception);
+      });
     }
   }
 
   void toggleCategory(String name, bool value) {
-    categoryActive[name] = value;
-    notifyListeners();
     final matching = categories.where((row) => row['name'] == name);
     if (matching.isNotEmpty) {
+      final category = matching.first;
+      final previous = category['is_active'] == true;
+      categoryActive[name] = value;
+      category['is_active'] = value;
+      error = null;
+      notifyListeners();
       api
-          .update('categories', matching.first['id'] as int, {
-            'is_active': value,
-          })
-          .catchError(_captureError);
+          .update('categories', category['id'] as int, {'is_active': value})
+          .catchError((Object exception) {
+            categoryActive[name] = previous;
+            category['is_active'] = previous;
+            return _captureError(exception);
+          });
     }
   }
 
@@ -260,34 +320,51 @@ class AdminState extends ChangeNotifier {
   }
 
   Future<void> decidePurchaseOrder(bool approved) async {
+    if (decidingPurchaseOrder) return;
     final pending = purchaseOrders.where((row) => row['status'] == 'pending');
     if (pending.isEmpty) {
       throw const ApiException('No pending purchase order is available.');
     }
-    await api.action('purchase-orders', pending.first['id'] as int, 'decide', {
-      'decision': approved ? 'approved' : 'rejected',
-    });
-    purchaseOrders = await api.getList('purchase-orders');
-    dashboard = await api.getMap('dashboard');
+    decidingPurchaseOrder = true;
     notifyListeners();
+    try {
+      await api.action(
+        'purchase-orders',
+        pending.first['id'] as int,
+        'decide',
+        {'decision': approved ? 'approved' : 'rejected'},
+      );
+      purchaseOrders = await api.getList('purchase-orders');
+      dashboard = await api.getMap('dashboard');
+    } finally {
+      decidingPurchaseOrder = false;
+      notifyListeners();
+    }
   }
 
   Future<void> decideDiscount(bool approved) async {
+    if (decidingDiscount) return;
     final pending = discountApprovals.where(
       (row) => row['status'] == 'pending',
     );
     if (pending.isEmpty) {
       throw const ApiException('No pending discount approval is available.');
     }
-    await api.action(
-      'discount-approvals',
-      pending.first['id'] as int,
-      'decide',
-      {'decision': approved ? 'approved' : 'rejected'},
-    );
-    discountApprovals = await api.getList('discount-approvals');
-    dashboard = await api.getMap('dashboard');
+    decidingDiscount = true;
     notifyListeners();
+    try {
+      await api.action(
+        'discount-approvals',
+        pending.first['id'] as int,
+        'decide',
+        {'decision': approved ? 'approved' : 'rejected'},
+      );
+      discountApprovals = await api.getList('discount-approvals');
+      dashboard = await api.getMap('dashboard');
+    } finally {
+      decidingDiscount = false;
+      notifyListeners();
+    }
   }
 
   Future<void> saveStoreSettings(Map<String, dynamic> values) async {
@@ -464,6 +541,26 @@ class AdminState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setProductStockFilter(String value) {
+    productStockFilter = value;
+    notifyListeners();
+  }
+
+  void setStaffQuery(String value) {
+    staffQuery = value.trim().toLowerCase();
+    notifyListeners();
+  }
+
+  void setCategoryQuery(String value) {
+    categoryQuery = value.trim().toLowerCase();
+    notifyListeners();
+  }
+
+  void setSupplierQuery(String value) {
+    supplierQuery = value.trim().toLowerCase();
+    notifyListeners();
+  }
+
   void hideLogoutConfirmation() {
     logoutConfirmationVisible = false;
     notifyListeners();
@@ -490,9 +587,16 @@ class AdminState extends ChangeNotifier {
       navIndex = 0;
       logoutConfirmationVisible = false;
       loggingOut = false;
+      refreshing = false;
+      decidingPurchaseOrder = false;
+      decidingDiscount = false;
       staffFilter = 'All';
       inventoryFilter = 'Low Stock';
       productQuery = '';
+      productStockFilter = 'All';
+      staffQuery = '';
+      categoryQuery = '';
+      supplierQuery = '';
       selectedRole = 'Cashier';
       dashboard.clear();
       users.clear();

@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen(this.state, {super.key});
@@ -67,8 +67,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
     if (!mounted) return;
     if (success) {
-      showNotice(context, 'Password changed successfully. Please log in.');
-      widget.state.go(0);
+      showNotice(context, 'Password changed successfully.');
+      widget.state.go(widget.state.loggedIn ? 15 : 0);
     } else {
       showNotice(context, widget.state.error ?? 'Unable to change password.');
     }
@@ -78,7 +78,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) => _AdminPage(
     state: widget.state,
     title: 'Change Password',
-    back: 0,
+    back: widget.state.loggedIn ? 15 : 0,
     bottom: false,
     child: SingleChildScrollView(
       padding: const EdgeInsets.all(24),

@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class ReturnsScreen extends StatefulWidget {
   const ReturnsScreen(this.state, {super.key});
@@ -171,10 +171,11 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                     onPressed: () async {
                       if (invoiceId == null ||
                           invoiceItemId == null ||
+                          returnQuantity <= 0 ||
                           reason.text.trim().isEmpty) {
                         showNotice(
                           context,
-                          'Select invoice/item and enter a return reason.',
+                          'Select an item, enter a valid quantity and a return reason.',
                         );
                         return;
                       }

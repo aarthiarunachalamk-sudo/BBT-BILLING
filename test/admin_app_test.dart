@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:bbt_billing/main.dart' as app;
-import 'package:bbt_billing/frontend/admin/admin_api.dart';
-import 'package:bbt_billing/frontend/admin/admin_app.dart';
-import 'package:bbt_billing/frontend/admin/admin_state.dart';
+import 'package:bbt_billing/frontend/screens/admin/admin_api.dart';
+import 'package:bbt_billing/frontend/screens/admin/admin_app.dart';
+import 'package:bbt_billing/frontend/screens/admin/admin_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -72,7 +72,7 @@ void main() {
     expect(find.text('₹ 45320.00'), findsOneWidget);
     expect(find.text('256'), findsOneWidget);
     expect(find.text('₹ 12850.00'), findsOneWidget);
-    expect(find.text('23'), findsOneWidget);
+    expect(find.text('23'), findsWidgets);
     expect(find.text('12'), findsOneWidget);
     expect(find.text('7'), findsOneWidget);
     expect(find.text('↑ 8.5% vs yesterday'), findsOneWidget);
@@ -101,6 +101,193 @@ void main() {
 
     expect(state.screen, 1);
     expect(find.text('Admin Dashboard'), findsOneWidget);
+  });
+
+  test('logged-out users cannot open protected admin screens', () {
+    final state = AdminState();
+    addTearDown(state.dispose);
+
+    state.go(4);
+
+    expect(state.screen, 0);
+    expect(state.loggedIn, isFalse);
+  });
+
+  testWidgets('desktop navigation opens the complete admin flow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 1;
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedBuilder(
+          animation: state,
+          builder: (context, child) => AdminViewport(state: state),
+        ),
+      ),
+    );
+
+    expect(find.text('BBT BILLING'), findsOneWidget);
+    expect(find.byTooltip('Open navigation'), findsNothing);
+    expect(find.text('Staff Management'), findsOneWidget);
+    expect(find.text('Discount Approvals'), findsOneWidget);
+
+    await tester.tap(find.text('Staff Management'));
+    await tester.pumpAndSettle();
+
+    expect(state.screen, 2);
+    expect(state.navIndex, 1);
+    expect(find.text('Staff Management'), findsWidgets);
+
+    await tester.drag(
+      find.byKey(const Key('admin-navigation-list')),
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Audit Log & Logout'), findsOneWidget);
+  });
+
+  testWidgets('account actions and persistent error feedback are reachable', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 4
+      ..passwordChangeIdentifier = 'admin'
+      ..error = 'Unable to update the product';
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedBuilder(
+          animation: state,
+          builder: (context, child) => AdminViewport(state: state),
+        ),
+      ),
+    );
+
+    expect(find.text('Unable to update the product'), findsOneWidget);
+    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.pump();
+    expect(state.error, isNull);
+
+    await tester.tap(find.byTooltip('Account menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Change password'));
+    await tester.pumpAndSettle();
+
+    expect(state.screen, 16);
+    expect(find.text('Change your password'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(find.byType(TextFormField).first)
+          .controller
+          ?.text,
+      'admin',
+    );
+  });
+
+  testWidgets('category search and product filter buttons update results', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 6
+      ..categories = [
+        {'id': 1, 'name': 'Spices', 'is_active': true},
+        {'id': 2, 'name': 'Fruit', 'is_active': true},
+      ]
+      ..products = [
+        {'id': 1, 'name': 'Rice', 'stock_status': 'in_stock'},
+        {'id': 2, 'name': 'Salt', 'stock_status': 'out_of_stock'},
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedBuilder(
+          animation: state,
+          builder: (context, child) => AdminViewport(state: state),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'fruit');
+    await tester.pump();
+    expect(find.text('Fruit'), findsOneWidget);
+    expect(find.text('Spices'), findsNothing);
+
+    state.go(4);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Out of Stock'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Salt'), findsOneWidget);
+    expect(find.text('Rice'), findsNothing);
+  });
+
+  testWidgets('GST report button opens a calculated report', (tester) async {
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 14
+      ..invoices = [
+        {
+          'id': 1,
+          'number': 'INV-001',
+          'taxable_amount': '100.00',
+          'cgst_amount': '9.00',
+          'sgst_amount': '9.00',
+          'total': '118.00',
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.tap(find.text('GST Report'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Taxable Amount:'), findsOneWidget);
+    expect(find.textContaining('CGST Collected:'), findsOneWidget);
+    expect(find.text('Copy'), findsOneWidget);
+  });
+
+  test('staff toggle immediately updates the rendered user data', () async {
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient(
+        (_) async => http.Response(
+          '{}',
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      ),
+    );
+    final state = AdminState(api: api)
+      ..users = [
+        {'id': 1, 'first_name': 'Asha', 'last_name': 'Rao', 'is_active': true},
+      ];
+    addTearDown(state.dispose);
+
+    state.toggleStaff('Asha Rao', false);
+
+    expect(state.users.first['is_active'], isFalse);
   });
 
   testWidgets('empty add product screen offers category creation', (

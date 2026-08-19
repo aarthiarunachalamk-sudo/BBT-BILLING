@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class AuditScreen extends StatelessWidget {
   const AuditScreen(this.state, {super.key});
@@ -102,7 +102,7 @@ class AuditScreen extends StatelessWidget {
                           'Cancel',
                           outlined: true,
                           onPressed: state.loggingOut
-                              ? () {}
+                              ? null
                               : state.hideLogoutConfirmation,
                         ),
                       ),
@@ -112,7 +112,7 @@ class AuditScreen extends StatelessWidget {
                           state.loggingOut ? 'Logging out...' : 'Logout',
                           color: red,
                           onPressed: state.loggingOut
-                              ? () {}
+                              ? null
                               : () async {
                                   await state.logout();
                                 },

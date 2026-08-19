@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class ReportsSettingsScreen extends StatelessWidget {
   const ReportsSettingsScreen(this.state, {super.key});
@@ -28,7 +28,8 @@ class ReportsSettingsScreen extends StatelessWidget {
             _ReportTile(
               Icons.receipt_long_outlined,
               'GST Report',
-              () => showNotice(context, 'GST report opened'),
+              () =>
+                  _showReportPreview(context, 'GST Report', _gstReport(state)),
             ),
             _ReportTile(
               Icons.inventory_outlined,
@@ -64,8 +65,12 @@ class ReportsSettingsScreen extends StatelessWidget {
               child: _ExportButton(
                 Icons.picture_as_pdf,
                 red,
-                'Export PDF',
-                () => showNotice(context, 'PDF export started'),
+                'Report Preview',
+                () => _showReportPreview(
+                  context,
+                  'Admin Report Summary',
+                  _reportSummary(state),
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -73,8 +78,8 @@ class ReportsSettingsScreen extends StatelessWidget {
               child: _ExportButton(
                 Icons.table_chart,
                 green,
-                'Export Excel',
-                () => showNotice(context, 'Excel export started'),
+                'Copy CSV',
+                () => _copyInvoiceCsv(context, state),
               ),
             ),
           ],
@@ -150,8 +155,14 @@ class ReportsSettingsScreen extends StatelessWidget {
         PrimaryAction(
           'Save Settings',
           onPressed: () async {
-            await state.saveStoreSettings(state.settingsDraft);
-            if (context.mounted) showNotice(context, 'Store settings saved');
+            try {
+              await state.saveStoreSettings(state.settingsDraft);
+              if (context.mounted) {
+                showNotice(context, 'Store settings saved');
+              }
+            } catch (error) {
+              if (context.mounted) showNotice(context, error.toString());
+            }
           },
         ),
         const SizedBox(height: 8),
@@ -173,6 +184,113 @@ class ReportsSettingsScreen extends StatelessWidget {
       ],
     ),
   );
+}
+
+String _reportSummary(AdminState state) => [
+  'BBT Billing - Admin Report Summary',
+  'Generated: ${_dateText(DateTime.now())}',
+  '',
+  'Today Sales: ${_money(state.dashboard['today_sales'])}',
+  'Total Bills: ${state.dashboard['total_bills'] ?? 0}',
+  'Profit: ${_money(state.dashboard['profit'])}',
+  'Low Stock Items: ${state.dashboard['low_stock_count'] ?? 0}',
+  'Products: ${state.products.length}',
+  'Suppliers: ${state.suppliers.length}',
+  'Invoices: ${state.invoices.length}',
+  'Pending Purchase Orders: ${state.purchaseOrders.where((row) => row['status'] == 'pending').length}',
+  'Pending Discount Approvals: ${state.discountApprovals.where((row) => row['status'] == 'pending').length}',
+].join('\n');
+
+String _gstReport(AdminState state) {
+  double total(String key) => state.invoices.fold<double>(
+    0,
+    (sum, invoice) =>
+        sum + (double.tryParse(invoice[key]?.toString() ?? '') ?? 0),
+  );
+  return [
+    'BBT Billing - GST Report',
+    'Generated: ${_dateText(DateTime.now())}',
+    '',
+    'Invoices: ${state.invoices.length}',
+    'Taxable Amount: ${_money(total('taxable_amount'))}',
+    'CGST Collected: ${_money(total('cgst_amount'))}',
+    'SGST Collected: ${_money(total('sgst_amount'))}',
+    'Invoice Total: ${_money(total('total'))}',
+  ].join('\n');
+}
+
+Future<void> _showReportPreview(
+  BuildContext context,
+  String title,
+  String report,
+) async {
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SingleChildScrollView(child: SelectableText(report)),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Close'),
+        ),
+        FilledButton.icon(
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: report));
+            if (dialogContext.mounted) Navigator.pop(dialogContext);
+            if (context.mounted) showNotice(context, 'Report copied');
+          },
+          icon: const Icon(Icons.copy_outlined, size: 17),
+          label: const Text('Copy'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _copyInvoiceCsv(BuildContext context, AdminState state) async {
+  String csvCell(dynamic value) {
+    final text = value?.toString() ?? '';
+    return '"${text.replaceAll('"', '""')}"';
+  }
+
+  final rows = <List<dynamic>>[
+    [
+      'Invoice',
+      'Date',
+      'Customer',
+      'Status',
+      'Taxable',
+      'CGST',
+      'SGST',
+      'Total',
+    ],
+    ...state.invoices.map(
+      (invoice) => [
+        invoice['number'],
+        invoice['invoice_date'],
+        invoice['client_name'],
+        invoice['status'],
+        invoice['taxable_amount'],
+        invoice['cgst_amount'],
+        invoice['sgst_amount'],
+        invoice['total'],
+      ],
+    ),
+  ];
+  final csv = rows.map((row) => row.map(csvCell).join(',')).join('\n');
+  await Clipboard.setData(ClipboardData(text: csv));
+  if (context.mounted) {
+    showNotice(
+      context,
+      state.invoices.isEmpty
+          ? 'CSV headers copied; no invoices are available.'
+          : '${state.invoices.length} invoice rows copied as CSV',
+    );
+  }
 }
 
 class _ReportTile extends StatelessWidget {

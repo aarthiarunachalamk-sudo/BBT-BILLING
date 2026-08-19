@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen(this.state, {super.key});

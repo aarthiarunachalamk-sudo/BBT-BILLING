@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class WhatsAppScreen extends StatelessWidget {
   const WhatsAppScreen(this.state, {super.key});

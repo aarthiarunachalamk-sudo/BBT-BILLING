@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class AddProductScreen extends StatefulWidget {
   const AddProductScreen(this.state, {super.key});

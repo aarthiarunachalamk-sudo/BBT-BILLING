@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class ProductsScreen extends StatelessWidget {
   const ProductsScreen(this.state, {super.key});
@@ -7,16 +7,21 @@ class ProductsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final query = state.productQuery.trim().toLowerCase();
-    final visibleProducts = query.isEmpty
-        ? state.products
-        : state.products.where((product) {
-            final searchable = [
-              product['name'],
-              product['sku'],
-              product['category_name'],
-            ].map((value) => value?.toString().toLowerCase() ?? '').join(' ');
-            return searchable.contains(query);
-          }).toList();
+    final visibleProducts = state.products.where((product) {
+      final searchable = [
+        product['name'],
+        product['sku'],
+        product['category_name'],
+      ].map((value) => value?.toString().toLowerCase() ?? '').join(' ');
+      final status = product['stock_status']?.toString();
+      final matchesStock = switch (state.productStockFilter) {
+        'In Stock' => status == 'in_stock',
+        'Low Stock' => status == 'low_stock',
+        'Out of Stock' => status == 'out_of_stock',
+        _ => true,
+      };
+      return searchable.contains(query) && matchesStock;
+    }).toList();
     return _AdminPage(
       state: state,
       title: 'Product Management',
@@ -39,6 +44,7 @@ class ProductsScreen extends StatelessWidget {
             child: SearchBox(
               'Search by name, SKU or barcode',
               trailing: Icons.filter_alt_outlined,
+              onTrailingTap: () => _showProductFilters(context, state),
               onChanged: state.setProductQuery,
             ),
           ),
@@ -122,4 +128,43 @@ class ProductsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _showProductFilters(BuildContext context, AdminState state) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Filter products by stock',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ['All', 'In Stock', 'Low Stock', 'Out of Stock']
+                  .map(
+                    (filter) => ChoiceChip(
+                      label: Text(filter),
+                      selected: state.productStockFilter == filter,
+                      onSelected: (_) {
+                        state.setProductStockFilter(filter);
+                        Navigator.pop(sheetContext);
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

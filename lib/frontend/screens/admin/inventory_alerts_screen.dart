@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class InventoryAlertsScreen extends StatefulWidget {
   const InventoryAlertsScreen(this.state, {super.key});

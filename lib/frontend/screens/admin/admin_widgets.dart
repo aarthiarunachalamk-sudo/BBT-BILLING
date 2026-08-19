@@ -10,29 +10,55 @@ const green = Color(0xFF0A9B58);
 const red = Color(0xFFE51F2B);
 
 class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
-  const AdminTopBar({super.key, required this.title, this.back, this.actions});
+  const AdminTopBar({
+    super.key,
+    required this.title,
+    this.back,
+    this.actions,
+    this.showLeading = true,
+  });
   final String title;
   final VoidCallback? back;
   final List<Widget>? actions;
+  final bool showLeading;
   @override
-  Size get preferredSize => const Size.fromHeight(54);
+  Size get preferredSize => const Size.fromHeight(62);
   @override
-  Widget build(BuildContext context) => AppBar(
-    backgroundColor: navy,
-    foregroundColor: Colors.white,
-    elevation: 0,
-    centerTitle: false,
-    leading: IconButton(
-      icon: Icon(back == null ? Icons.menu_rounded : Icons.arrow_back_rounded),
-      onPressed: back ?? () {},
-    ),
-    titleSpacing: 0,
-    title: Text(
-      title,
-      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-    ),
-    actions: actions,
-  );
+  Widget build(BuildContext context) {
+    final desktop = MediaQuery.sizeOf(context).width >= 1000;
+    final foreground = desktop ? ink : Colors.white;
+    return AppBar(
+      automaticallyImplyLeading: false,
+      backgroundColor: desktop ? Colors.white : navy,
+      foregroundColor: foreground,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: desktop ? const Border(bottom: BorderSide(color: line)) : null,
+      centerTitle: false,
+      leading: showLeading
+          ? Builder(
+              builder: (context) => IconButton(
+                tooltip: back == null ? 'Open navigation' : 'Back',
+                icon: Icon(
+                  back == null ? Icons.menu_rounded : Icons.arrow_back_rounded,
+                ),
+                onPressed:
+                    back ?? () => Scaffold.maybeOf(context)?.openDrawer(),
+              ),
+            )
+          : null,
+      titleSpacing: showLeading ? 0 : 24,
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: desktop ? 18 : 16,
+          fontWeight: FontWeight.w800,
+          color: foreground,
+        ),
+      ),
+      actions: actions,
+    );
+  }
 }
 
 class AdminBottomBar extends StatelessWidget {
@@ -92,7 +118,7 @@ class PrimaryAction extends StatelessWidget {
     this.outlined = false,
   });
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final IconData? icon;
   final Color color;
   final bool outlined;
@@ -134,9 +160,16 @@ class PrimaryAction extends StatelessWidget {
 }
 
 class SearchBox extends StatelessWidget {
-  const SearchBox(this.hint, {super.key, this.trailing, this.onChanged});
+  const SearchBox(
+    this.hint, {
+    super.key,
+    this.trailing,
+    this.onTrailingTap,
+    this.onChanged,
+  });
   final String hint;
   final IconData? trailing;
+  final VoidCallback? onTrailingTap;
   final ValueChanged<String>? onChanged;
   @override
   Widget build(BuildContext context) => TextField(
@@ -145,7 +178,13 @@ class SearchBox extends StatelessWidget {
       hintText: hint,
       hintStyle: const TextStyle(fontSize: 12, color: muted),
       prefixIcon: const Icon(Icons.search, size: 19),
-      suffixIcon: trailing == null ? null : Icon(trailing, size: 19),
+      suffixIcon: trailing == null
+          ? null
+          : IconButton(
+              tooltip: 'Filter',
+              onPressed: onTrailingTap,
+              icon: Icon(trailing, size: 19),
+            ),
       contentPadding: const EdgeInsets.symmetric(vertical: 10),
       isDense: true,
     ),
@@ -167,8 +206,15 @@ class SectionCard extends StatelessWidget {
     padding: padding,
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       border: Border.all(color: line),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0A10264D),
+          blurRadius: 14,
+          offset: Offset(0, 4),
+        ),
+      ],
     ),
     child: child,
   );

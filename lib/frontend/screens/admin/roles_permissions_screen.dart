@@ -1,4 +1,4 @@
-part of '../admin_screens.dart';
+part of 'admin_screens.dart';
 
 class RolesScreen extends StatelessWidget {
   const RolesScreen(this.state, {super.key});
