@@ -261,6 +261,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
+                      const _ProductFormSectionHeader(
+                        icon: Icons.sell_outlined,
+                        title: 'Catalog & price verification',
+                        caption:
+                            'Customer-facing identity and verified retail pricing.',
+                      ),
+                      const SizedBox(height: 12),
                       TextFormField(
                         controller: name,
                         validator: requiredText,
@@ -270,6 +277,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
+                      const _ProductFormSectionHeader(
+                        icon: Icons.category_outlined,
+                        title: 'Classification',
+                        caption: 'SKU, category and catalog organization.',
+                      ),
+                      const SizedBox(height: 12),
                       TextFormField(
                         controller: mrp,
                         validator: (value) =>
@@ -312,6 +325,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
+                      const _ProductFormSectionHeader(
+                        icon: Icons.currency_rupee_rounded,
+                        title: 'Commercial pricing',
+                        caption: 'Internal acquisition cost and selling price.',
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -386,6 +405,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ],
                       ),
                       const SizedBox(height: 14),
+                      const _ProductFormSectionHeader(
+                        icon: Icons.inventory_2_outlined,
+                        title: 'Tax & inventory',
+                        caption: 'GST, unit, shelf life and reorder controls.',
+                      ),
+                      const SizedBox(height: 12),
                       TextFormField(
                         controller: expiryDate,
                         validator: expiryValidator,
@@ -478,14 +503,83 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
         ),
         if (widget.state.categories.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: PrimaryAction(
-              saving ? 'Saving Product...' : 'Save Product',
-              onPressed: saveProduct,
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: line)),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x0D10264D),
+                  blurRadius: 18,
+                  offset: Offset(0, -4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: PrimaryAction(
+                    'Cancel',
+                    outlined: true,
+                    onPressed: saving ? null : () => widget.state.go(4),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: PrimaryAction(
+                    saving ? 'Saving to catalog…' : 'Save Product',
+                    icon: saving ? null : Icons.check_rounded,
+                    onPressed: saving ? null : saveProduct,
+                  ),
+                ),
+              ],
             ),
           ),
       ],
     ),
+  );
+}
+
+class _ProductFormSectionHeader extends StatelessWidget {
+  const _ProductFormSectionHeader({
+    required this.icon,
+    required this.title,
+    required this.caption,
+  });
+
+  final IconData icon;
+  final String title;
+  final String caption;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF2FF),
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Icon(icon, size: 18, color: blue),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 2),
+            Text(caption, style: const TextStyle(fontSize: 9, color: muted)),
+          ],
+        ),
+      ),
+      const Expanded(child: Divider()),
+    ],
   );
 }

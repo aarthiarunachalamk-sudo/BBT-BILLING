@@ -286,6 +286,42 @@ void main() {
     expect(find.text('Rice'), findsNothing);
   });
 
+  testWidgets('product catalog presents pricing and stock hierarchy', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 4
+      ..products = [
+        {
+          'id': 1,
+          'name': 'Fortune Sunlite Refined Sunflower Oil 840 g',
+          'sku': 'FORTUNE-SUNLITE-840G',
+          'category_name': 'Edible Oils',
+          'purchase_price': '145.50',
+          'selling_price': '145.50',
+          'mrp': '190.00',
+          'tax_percent': '5.00',
+          'stock_quantity': 24,
+          'stock_status': 'in_stock',
+          'price_verified_at': '2026-08-19',
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+
+    expect(find.text('Product catalog'), findsOneWidget);
+    expect(find.text('Inventory cost'), findsOneWidget);
+    expect(find.text('23% OFF'), findsOneWidget);
+    expect(find.text('24 in stock'), findsOneWidget);
+    expect(find.byTooltip('Add or replace product image'), findsOneWidget);
+  });
+
   testWidgets('GST report button opens a calculated report', (tester) async {
     final state = AdminState()
       ..loggedIn = true
