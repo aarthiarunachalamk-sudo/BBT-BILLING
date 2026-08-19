@@ -47,6 +47,7 @@ class AdminState extends ChangeNotifier {
   List<Map<String, dynamic>> rolePermissions = [];
   Map<String, dynamic> storeSettings = {};
   Map<String, dynamic> settingsDraft = {};
+  int? pendingCategoryId; // pre-selects a category when navigating to Add Product
 
   final Map<String, bool> permissions = {
     'Dashboard': false,

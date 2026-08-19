@@ -1,19 +1,66 @@
 part of 'admin_screens.dart';
 
-class ProductsScreen extends StatelessWidget {
+class ProductsScreen extends StatefulWidget {
   const ProductsScreen(this.state, {super.key});
-
   final AdminState state;
 
   @override
+  State<ProductsScreen> createState() => _ProductsScreenState();
+}
+
+class _ProductsScreenState extends State<ProductsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  List<String> _categoryTabs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _categoryTabs = ['All'];
+    for (final c in widget.state.categories) {
+      final name = c['name']?.toString() ?? '';
+      if (name.isNotEmpty) _categoryTabs.add(name);
+    }
+    _tabController = TabController(length: _categoryTabs.length, vsync: this);
+  }
+
+  @override
+  void didUpdateWidget(covariant ProductsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _buildTabs();
+  }
+
+  void _buildTabs() {
+    final cats = <String>['All'];
+    for (final c in widget.state.categories) {
+      final name = c['name']?.toString() ?? '';
+      if (name.isNotEmpty) cats.add(name);
+    }
+    if (_categoryTabs.length != cats.length ||
+        !_categoryTabs.every((t) => cats.contains(t))) {
+      _tabController.dispose();
+      _categoryTabs = cats;
+      _tabController = TabController(length: cats.length, vsync: this);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
     final query = state.productQuery.trim().toLowerCase();
-    final visibleProducts = state.products.where((product) {
+
+    final allProducts = state.products.where((product) {
       final searchable = [
         product['name'],
         product['sku'],
         product['category_name'],
-      ].map((value) => value?.toString().toLowerCase() ?? '').join(' ');
+      ].map((v) => v?.toString().toLowerCase() ?? '').join(' ');
       final status = product['stock_status']?.toString();
       final matchesStock = switch (state.productStockFilter) {
         'In Stock' => status == 'in_stock',
@@ -23,17 +70,17 @@ class ProductsScreen extends StatelessWidget {
       };
       return searchable.contains(query) && matchesStock;
     }).toList();
+
     final lowStockCount = state.products
-        .where((product) => product['stock_status'] == 'low_stock')
+        .where((p) => p['stock_status'] == 'low_stock')
         .length;
     final outOfStockCount = state.products
-        .where((product) => product['stock_status'] == 'out_of_stock')
+        .where((p) => p['stock_status'] == 'out_of_stock')
         .length;
-    final inventoryValue = state.products.fold<double>(0, (sum, product) {
+    final inventoryValue = state.products.fold<double>(0, (sum, p) {
       final cost =
-          double.tryParse(product['purchase_price']?.toString() ?? '') ?? 0;
-      final stock =
-          int.tryParse(product['stock_quantity']?.toString() ?? '') ?? 0;
+          double.tryParse(p['purchase_price']?.toString() ?? '') ?? 0;
+      final stock = int.tryParse(p['stock_quantity']?.toString() ?? '') ?? 0;
       return sum + cost * stock;
     });
 
@@ -52,88 +99,146 @@ class ProductsScreen extends StatelessWidget {
           ],
         ),
       ],
-      child: CustomScrollView(
-        slivers: [
-          SliverPadding(
+      child: Column(
+        children: [
+          // ── Stats + search ───────────────────────────────────────────────
+          Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-            sliver: SliverToBoxAdapter(
-              child: _CatalogHeader(
-                totalProducts: state.products.length,
-                lowStockCount: lowStockCount,
-                outOfStockCount: outOfStockCount,
-                inventoryValue: inventoryValue,
-                onAddProduct: () => state.go(5),
-              ),
+            child: _CatalogHeader(
+              totalProducts: state.products.length,
+              lowStockCount: lowStockCount,
+              outOfStockCount: outOfStockCount,
+              inventoryValue: inventoryValue,
+              onAddProduct: () => state.go(5),
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
-            sliver: SliverToBoxAdapter(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SearchBox(
-                      'Search by product name, SKU or category',
-                      trailing: Icons.tune_rounded,
-                      onTrailingTap: () => _showProductFilters(context, state),
-                      onChanged: state.setProductQuery,
-                    ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SearchBox(
+                    'Search by name, SKU or category',
+                    trailing: Icons.tune_rounded,
+                    onTrailingTap: () => _showProductFilters(context, state),
+                    onChanged: state.setProductQuery,
                   ),
-                  if (state.productStockFilter != 'All') ...[
-                    const SizedBox(width: 10),
-                    InputChip(
-                      avatar: const Icon(Icons.filter_alt, size: 16),
-                      label: Text(state.productStockFilter),
-                      onDeleted: () => state.setProductStockFilter('All'),
-                    ),
-                  ],
+                ),
+                if (state.productStockFilter != 'All') ...[
+                  const SizedBox(width: 10),
+                  InputChip(
+                    avatar: const Icon(Icons.filter_alt, size: 16),
+                    label: Text(state.productStockFilter),
+                    onDeleted: () => state.setProductStockFilter('All'),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
-          if (visibleProducts.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _EmptyState(
-                state.products.isEmpty
-                    ? 'No products found. Add your first product.'
-                    : 'No products match the selected filters.',
-                icon: Icons.inventory_2_outlined,
+
+          // ── Category tabs ────────────────────────────────────────────────
+          if (_categoryTabs.length > 1)
+            TabBar(
+              controller: _tabController,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-              sliver: SliverLayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.crossAxisExtent;
-                  final columns = width >= 1060
-                      ? 3
-                      : width >= 680
-                      ? 2
-                      : 1;
-                  return SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      crossAxisSpacing: 14,
-                      mainAxisSpacing: 14,
-                      mainAxisExtent: 238,
-                    ),
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      final product = visibleProducts[index];
-                      return _ProductCatalogCard(
-                        state: state,
-                        product: product,
-                        onImageTap: () =>
-                            _replaceProductImage(context, state, product),
-                      );
-                    }, childCount: visibleProducts.length),
-                  );
-                },
-              ),
+              unselectedLabelStyle: const TextStyle(fontSize: 12),
+              tabs: _categoryTabs
+                  .map((t) => Tab(text: t))
+                  .toList(),
             ),
+
+          // ── Product grid per tab ─────────────────────────────────────────
+          Expanded(
+            child: _categoryTabs.length > 1
+                ? TabBarView(
+                    controller: _tabController,
+                    children: _categoryTabs.map((tab) {
+                      final products = tab == 'All'
+                          ? allProducts
+                          : allProducts
+                                .where(
+                                  (p) =>
+                                      p['category_name']
+                                          ?.toString()
+                                          .toLowerCase() ==
+                                      tab.toLowerCase(),
+                                )
+                                .toList();
+                      return _ProductGrid(
+                        state: state,
+                        products: products,
+                        categoryName: tab == 'All' ? null : tab,
+                      );
+                    }).toList(),
+                  )
+                : _ProductGrid(
+                    state: state,
+                    products: allProducts,
+                  ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// A scrollable grid of product cards, with an empty state and an
+/// "Add Product" FAB when a [categoryName] is specified.
+class _ProductGrid extends StatelessWidget {
+  const _ProductGrid({
+    required this.state,
+    required this.products,
+    this.categoryName,
+  });
+
+  final AdminState state;
+  final List<Map<String, dynamic>> products;
+  final String? categoryName;
+
+  @override
+  Widget build(BuildContext context) {
+    if (products.isEmpty) {
+      return _EmptyState(
+        categoryName != null
+            ? 'No products in $categoryName yet.\nTap + to add one.'
+            : state.products.isEmpty
+            ? 'No products yet. Add your first product.'
+            : 'No products match the selected filters.',
+        icon: Icons.inventory_2_outlined,
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 1060
+            ? 3
+            : constraints.maxWidth >= 680
+            ? 2
+            : 1;
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            mainAxisExtent: 238,
+          ),
+          itemCount: products.length,
+          itemBuilder: (context, index) {
+            final product = products[index];
+            return _ProductCatalogCard(
+              state: state,
+              product: product,
+              onImageTap: () =>
+                  _replaceProductImage(context, state, product),
+            );
+          },
+        );
+      },
     );
   }
 }

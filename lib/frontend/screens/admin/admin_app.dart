@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 import 'admin_screens.dart';
 import 'admin_state.dart';
@@ -17,26 +16,7 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
   final state = AdminState();
 
   @override
-  void initState() {
-    super.initState();
-    state.addListener(_refresh);
-  }
-
-  void _refresh() {
-    if (!mounted) return;
-    // Guard against setState being called during an active build phase,
-    // which causes the _dependents.isEmpty assertion crash in ChangeNotifier.
-    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {});
-      });
-    } else {
-      setState(() {});
-    }
-  }
-  @override
   void dispose() {
-    state.removeListener(_refresh);
     state.dispose();
     super.dispose();
   }
@@ -100,41 +80,44 @@ class AdminViewport extends StatelessWidget {
   final AdminState state;
 
   @override
-  Widget build(BuildContext context) {
-    final screen = buildAdminScreen(state);
-    final canExitApp = state.screen == 0 || state.screen == 1;
-    return PopScope(
-      canPop: canExitApp,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        if (state.loggedIn) {
-          state.setNav(0);
-        } else {
-          state.go(0);
-        }
-      },
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 1000) return screen;
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: state,
+    builder: (context, _) {
+      final screen = buildAdminScreen(state);
+      final canExitApp = state.screen == 0 || state.screen == 1;
+      return PopScope(
+        canPop: canExitApp,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
           if (state.loggedIn) {
-            return Material(
-              color: page,
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 270,
-                    child: AdminNavigationPanel(state: state),
-                  ),
-                  Expanded(child: screen),
-                ],
-              ),
-            );
+            state.setNav(0);
+          } else {
+            state.go(0);
           }
-          return _AdminAuthWorkspace(screen: screen);
         },
-      ),
-    );
-  }
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 1000) return screen;
+            if (state.loggedIn) {
+              return Material(
+                color: page,
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 270,
+                      child: AdminNavigationPanel(state: state),
+                    ),
+                    Expanded(child: screen),
+                  ],
+                ),
+              );
+            }
+            return _AdminAuthWorkspace(screen: screen);
+          },
+        ),
+      );
+    },
+  );
 }
 
 class _AdminAuthWorkspace extends StatelessWidget {
