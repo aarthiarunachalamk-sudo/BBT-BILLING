@@ -53,7 +53,7 @@ In Render, create or open the web service and use:
 
 - Root Directory: `backend`
 - Build Command: `bash build.sh`
-- Start Command: `gunicorn config.wsgi:application`
+- Start Command: `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers $WEB_CONCURRENCY --timeout 120 --access-logfile - --error-logfile -`
 - Health Check Path: `/health/`
 - Python version: `3.13` (already pinned in `.python-version`)
 
