@@ -122,20 +122,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
           'name': name.text.trim(),
           'sku': sku.text.trim(),
           'category': categoryId,
-          'unit': unit,
+          'unit': unit ?? 'Pack',
           'purchase_price': purchasePrice.text.trim(),
           'selling_price': sellingPrice.text.trim(),
-          'mrp': mrp.text.trim().isEmpty ? null : mrp.text.trim(),
-          'price_source_url': priceSource.text.trim(),
-          'price_verified_at': priceVerifiedAt.text.trim().isEmpty
-              ? null
-              : priceVerifiedAt.text.trim(),
+          if (mrp.text.trim().isNotEmpty) 'mrp': mrp.text.trim(),
+          if (priceSource.text.trim().isNotEmpty)
+            'price_source_url': priceSource.text.trim(),
+          if (priceVerifiedAt.text.trim().isNotEmpty)
+            'price_verified_at': priceVerifiedAt.text.trim(),
           'tax_percent': gst.toString(),
           'stock_quantity': int.parse(stock.text.trim()),
           'reorder_level': int.parse(reorderLevel.text.trim()),
-          'expiry_date': expiryDate.text.trim().isEmpty
-              ? null
-              : expiryDate.text.trim(),
+          if (expiryDate.text.trim().isNotEmpty)
+            'expiry_date': expiryDate.text.trim(),
           'is_active': true,
         },
         imageBytes: selectedImageBytes,

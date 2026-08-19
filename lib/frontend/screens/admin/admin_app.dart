@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'admin_screens.dart';
 import 'admin_state.dart';
@@ -22,7 +23,16 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
   }
 
   void _refresh() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // Guard against setState being called during an active build phase,
+    // which causes the _dependents.isEmpty assertion crash in ChangeNotifier.
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
   }
   @override
   void dispose() {

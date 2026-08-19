@@ -84,19 +84,33 @@ Future<Map<String, dynamic>?> _showAddCategoryDialog(
 ) async {
   final controller = TextEditingController();
   var saving = false;
+  String? errorText;
   final result = await showDialog<Map<String, dynamic>>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setDialogState) => AlertDialog(
         title: const Text('Add Category'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          enabled: !saving,
-          decoration: const InputDecoration(
-            labelText: 'Category name',
-            hintText: 'Example: Spices, Snacks, Beverages',
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              enabled: !saving,
+              decoration: const InputDecoration(
+                labelText: 'Category name',
+                hintText: 'Example: Spices, Snacks, Beverages',
+              ),
+            ),
+            if (errorText != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                errorText!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
@@ -109,7 +123,10 @@ Future<Map<String, dynamic>?> _showAddCategoryDialog(
                 : () async {
                     final name = controller.text.trim();
                     if (name.isEmpty) return;
-                    setDialogState(() => saving = true);
+                    setDialogState(() {
+                      saving = true;
+                      errorText = null;
+                    });
                     try {
                       final category = await state.createCategory(name);
                       if (dialogContext.mounted) {
@@ -117,10 +134,10 @@ Future<Map<String, dynamic>?> _showAddCategoryDialog(
                       }
                     } catch (error) {
                       if (dialogContext.mounted) {
-                        setDialogState(() => saving = false);
-                      }
-                      if (context.mounted) {
-                        showNotice(context, error.toString());
+                        setDialogState(() {
+                          saving = false;
+                          errorText = error.toString();
+                        });
                       }
                     }
                   },

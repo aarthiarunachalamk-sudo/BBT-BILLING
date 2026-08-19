@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class ApiException implements Exception {
   const ApiException(this.message, [this.statusCode]);
@@ -89,15 +90,26 @@ class AdminApi {
   );
 
   Future<List<Map<String, dynamic>>> getList(String path) async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl/$path/'),
-      headers: _headers,
-    );
-    final decoded = _decode(response);
-    final values = decoded is Map<String, dynamic>
-        ? decoded['results']
-        : decoded;
-    return (values as List<dynamic>? ?? const []).cast<Map<String, dynamic>>();
+    final results = <Map<String, dynamic>>[];
+    String? url = '$baseUrl/$path/?page_size=200';
+    while (url != null) {
+      final response = await _client.get(Uri.parse(url), headers: _headers);
+      final decoded = _decode(response);
+      if (decoded is Map<String, dynamic>) {
+        final items = decoded['results'];
+        if (items is List) {
+          results.addAll(items.cast<Map<String, dynamic>>());
+        }
+        final next = decoded['next'];
+        url = (next is String && next.isNotEmpty) ? next : null;
+      } else if (decoded is List) {
+        results.addAll((decoded).cast<Map<String, dynamic>>());
+        url = null;
+      } else {
+        url = null;
+      }
+    }
+    return results;
   }
 
   Future<Map<String, dynamic>> create(
@@ -153,8 +165,21 @@ class AdminApi {
         request.fields[entry.key] = entry.value.toString();
       }
     }
+    // Derive MIME type from file extension so Django ImageField validates it.
+    final ext = imageName.split('.').last.toLowerCase();
+    final mime = switch (ext) {
+      'png' => 'image/png',
+      'gif' => 'image/gif',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
     request.files.add(
-      http.MultipartFile.fromBytes('image', imageBytes, filename: imageName),
+      http.MultipartFile.fromBytes(
+        'image',
+        imageBytes,
+        filename: imageName,
+        contentType: MediaType.parse(mime),
+      ),
     );
     final streamed = await _client.send(request);
     return _decodeMap(await http.Response.fromStream(streamed));
