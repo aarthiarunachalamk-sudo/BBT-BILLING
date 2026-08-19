@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -26,6 +27,9 @@ class AdminApi {
   String baseUrl;
   String? _accessToken;
 
+  /// Origin without the /api suffix — used for health checks.
+  String get _origin => baseUrl.replaceFirst(RegExp(r'/api$'), '');
+
   void setBaseUrl(String value) {
     var normalized = value.trim();
     while (normalized.endsWith('/')) {
@@ -43,6 +47,38 @@ class AdminApi {
     'Content-Type': 'application/json',
     if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
   };
+
+  // ── Wake-up / health-check ────────────────────────────────────────────────
+
+  /// Pings the health endpoint repeatedly until the server responds or
+  /// [maxAttempts] is exhausted.  Returns true when reachable.
+  Future<bool> waitForServer({
+    int maxAttempts = 10,
+    Duration initialDelay = const Duration(seconds: 3),
+    void Function(int attempt, int max)? onAttempt,
+  }) async {
+    final healthUrl = Uri.parse('$_origin/health/');
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      onAttempt?.call(attempt, maxAttempts);
+      try {
+        final response = await _client
+            .get(healthUrl)
+            .timeout(const Duration(seconds: 10));
+        if (response.statusCode < 500) return true;
+      } on SocketException {
+        // Network is unreachable — no point retrying.
+        return false;
+      } catch (_) {
+        // Timeout or transient error — keep retrying.
+      }
+      if (attempt < maxAttempts) {
+        await Future<void>.delayed(initialDelay * attempt);
+      }
+    }
+    return false;
+  }
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _client.post(
@@ -84,6 +120,8 @@ class AdminApi {
       clearSession();
     }
   }
+
+  // ── Data access ───────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getMap(String path) async => _decodeMap(
     await _client.get(Uri.parse('$baseUrl/$path/'), headers: _headers),
@@ -165,7 +203,6 @@ class AdminApi {
         request.fields[entry.key] = entry.value.toString();
       }
     }
-    // Derive MIME type from file extension so Django ImageField validates it.
     final ext = imageName.split('.').last.toLowerCase();
     final mime = switch (ext) {
       'png' => 'image/png',
@@ -196,7 +233,6 @@ class AdminApi {
       body: jsonEncode(body),
     ),
   );
-
   Future<Map<String, dynamic>> action(
     String path,
     int id,
@@ -209,6 +245,8 @@ class AdminApi {
       body: jsonEncode(body),
     ),
   );
+
+  // ── Response handling ─────────────────────────────────────────────────────
 
   dynamic _decode(http.Response response) {
     final dynamic data = response.body.isEmpty
@@ -228,7 +266,7 @@ class AdminApi {
 
   String _errorMessage(dynamic detail) {
     if (detail is List) {
-      return detail.map((value) => value.toString()).join(' ');
+      return detail.map((v) => v.toString()).join(' ');
     }
     if (detail is Map) {
       return detail.values.map(_errorMessage).join(' ');

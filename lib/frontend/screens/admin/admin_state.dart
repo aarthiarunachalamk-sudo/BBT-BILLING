@@ -118,13 +118,31 @@ class AdminState extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
+      // Render free tier: server may be sleeping — wake it up first.
+      final alive = await api.waitForServer(
+        maxAttempts: 10,
+        onAttempt: (attempt, max) {
+          if (attempt == 1) {
+            error = 'Waking up server… this may take up to 30 seconds.';
+          } else {
+            error = 'Waking up server… attempt $attempt/$max';
+          }
+          notifyListeners();
+        },
+      );
+      if (!alive) {
+        error =
+            'Cannot reach ${api.baseUrl}\n'
+            'Check your internet connection or the server URL.';
+        return false;
+      }
+      error = null;
+      notifyListeners();
       await api.login(email, password);
       loggedIn = true;
       passwordChangeIdentifier = email;
       screen = 1;
       notifyListeners();
-      // Authentication should not be blocked by the twelve independent
-      // workspace endpoints. The dashboard opens now and hydrates in place.
       unawaited(reloadAll());
       return true;
     } on ApiException catch (exception) {
@@ -438,6 +456,26 @@ class AdminState extends ChangeNotifier {
     products = products
         .map((product) => product['id'] == productId ? updated : product)
         .toList();
+    notifyListeners();
+  }
+
+  /// Patches price / GST / MRP fields on a product and refreshes
+  /// quotations so open bills always reflect the latest price.
+  Future<void> updateProduct(
+    int productId,
+    Map<String, dynamic> fields,
+  ) async {
+    final updated = await api.update('items', productId, fields);
+    products = products
+        .map((p) => p['id'] == productId ? updated : p)
+        .toList();
+    // Reload quotations because the backend may have recalculated open ones.
+    try {
+      purchaseOrders = await api.getList('purchase-orders');
+      dashboard = await api.getMap('dashboard');
+    } on ApiException {
+      // Non-fatal — the product update already succeeded.
+    }
     notifyListeners();
   }
 

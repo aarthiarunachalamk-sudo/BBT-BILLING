@@ -13,21 +13,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool obscure = true;
   bool remember = false;
+  bool showServerUrl = false;
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final serverUrlController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    serverUrlController.text = widget.state.api.baseUrl;
     _loadRememberedLogin();
   }
 
   Future<void> _loadRememberedLogin() async {
     final preferences = await SharedPreferences.getInstance();
     final shouldRemember = preferences.getBool(_rememberKey) ?? false;
-    final identifier = shouldRemember
-        ? preferences.getString(_identifierKey) ?? ''
-        : '';
+    final identifier =
+        shouldRemember ? preferences.getString(_identifierKey) ?? '' : '';
     if (!mounted) return;
     setState(() {
       remember = shouldRemember;
@@ -49,7 +51,30 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
+    serverUrlController.dispose();
     super.dispose();
+  }
+
+  bool get _isWakingUp =>
+      widget.state.loading &&
+      (widget.state.error?.contains('Waking up') ?? false);
+
+  Future<void> _doLogin() async {
+    // Apply any server URL change before logging in.
+    final urlText = serverUrlController.text.trim();
+    if (urlText.isNotEmpty && urlText != widget.state.api.baseUrl) {
+      try {
+        widget.state.api.setBaseUrl(urlText);
+      } catch (e) {
+        if (mounted) showNotice(context, e.toString());
+        return;
+      }
+    }
+    final success = await widget.state.login(
+      emailController.text.trim(),
+      passwordController.text,
+    );
+    if (success) await _saveRememberedLogin();
   }
 
   @override
@@ -59,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
       child: Column(
         children: [
+          // ── Logo ────────────────────────────────────────────────────────
           Container(
             width: 70,
             height: 70,
@@ -67,33 +93,40 @@ class _LoginScreenState extends State<LoginScreen> {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.lock_rounded,
+              Icons.storefront_rounded,
               color: Colors.white,
               size: 34,
             ),
           ),
           const SizedBox(height: 18),
           const Text(
-            'Welcome Admin',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            'BBT Billing',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 7),
+          const SizedBox(height: 5),
           const Text(
-            'Sign in to access admin panel',
+            'Sign in to access the admin panel',
             style: TextStyle(color: muted, fontSize: 13),
           ),
           const SizedBox(height: 30),
+
+          // ── Credentials ─────────────────────────────────────────────────
           TextFormField(
             controller: emailController,
             autocorrect: false,
-            decoration: const InputDecoration(labelText: 'Username or Email'),
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Username or Email',
+              prefixIcon: Icon(Icons.person_outline, size: 18),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           TextFormField(
             controller: passwordController,
             obscureText: obscure,
             decoration: InputDecoration(
               labelText: 'Password',
+              prefixIcon: const Icon(Icons.lock_outline, size: 18),
               suffixIcon: IconButton(
                 onPressed: () => setState(() => obscure = !obscure),
                 icon: Icon(
@@ -104,6 +137,8 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+
+          // ── Remember me / forgot ─────────────────────────────────────────
           Row(
             children: [
               Checkbox(
@@ -126,48 +161,128 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
           ),
-          if (widget.state.error != null) ...[
-            Text(
-              widget.state.error!,
-              style: const TextStyle(color: red, fontSize: 12),
-            ),
-            const SizedBox(height: 10),
-          ],
-          widget.state.loading
-              ? Semantics(
-                  liveRegion: true,
-                  label: 'Signing in',
-                  child: const Column(
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 12),
-                      Text(
-                        'Signing in securely…',
-                        style: TextStyle(
-                          color: muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+
+          // ── Server URL (collapsible) ──────────────────────────────────────
+          GestureDetector(
+            onTap: () => setState(() => showServerUrl = !showServerUrl),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.dns_outlined, size: 15, color: muted),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      widget.state.api.baseUrl,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, color: muted),
+                    ),
                   ),
-                )
-              : PrimaryAction(
-                  'Login',
-                  onPressed: () async {
-                    final success = await widget.state.login(
-                      emailController.text.trim(),
-                      passwordController.text,
-                    );
-                    if (success) await _saveRememberedLogin();
-                    if (!success && context.mounted) {
-                      showNotice(context, widget.state.error ?? 'Login failed');
-                    }
-                  },
+                  Icon(
+                    showServerUrl
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    size: 18,
+                    color: muted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (showServerUrl) ...[
+            TextFormField(
+              controller: serverUrlController,
+              autocorrect: false,
+              keyboardType: TextInputType.url,
+              style: const TextStyle(fontSize: 12),
+              decoration: InputDecoration(
+                labelText: 'Server URL',
+                hintText: 'https://bbt-billing.onrender.com',
+                prefixIcon: const Icon(Icons.link, size: 18),
+                suffixIcon: IconButton(
+                  tooltip: 'Reset to default',
+                  icon: const Icon(Icons.refresh, size: 18),
+                  onPressed: () => setState(() {
+                    serverUrlController.text =
+                        'https://bbt-billing.onrender.com/api';
+                  }),
                 ),
-          const SizedBox(height: 40),
-          const Icon(Icons.lock, color: green, size: 25),
-          const SizedBox(height: 7),
+                helperText: 'Must start with https://',
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          const SizedBox(height: 12),
+
+          // ── Error / wakeup status ────────────────────────────────────────
+          if (widget.state.error != null && !_isWakingUp)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFECEE),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFFCDD2)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: red,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.state.error!,
+                      style: const TextStyle(
+                        color: Color(0xFF8A1720),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // ── Login button / wakeup progress ──────────────────────────────
+          if (widget.state.loading)
+            Column(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 14),
+                Text(
+                  _isWakingUp
+                      ? (widget.state.error ?? 'Connecting to server…')
+                      : 'Signing in securely…',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _isWakingUp ? Colors.orange.shade700 : muted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (_isWakingUp) ...[
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Render free tier wakes up in ~30 seconds on first use.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 10, color: muted),
+                  ),
+                ],
+              ],
+            )
+          else
+            PrimaryAction('Sign In', onPressed: _doLogin),
+
+          const SizedBox(height: 32),
+
+          // ── Footer ───────────────────────────────────────────────────────
+          const Icon(Icons.lock, color: green, size: 22),
+          const SizedBox(height: 6),
           const Text(
             'Secure admin access',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),

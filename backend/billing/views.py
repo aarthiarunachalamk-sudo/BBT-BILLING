@@ -200,6 +200,38 @@ class ItemViewSet(SearchableModelViewSet):
             )
         record_audit(self.request, "Item created", "Item", item)
 
+    def perform_update(self, serializer):
+        old_price = serializer.instance.selling_price
+        item = serializer.save()
+        # If the selling price changed, update all open quotation lines that
+        # reference this item so the cashier always sees the current price.
+        if item.selling_price != old_price:
+            open_statuses = {
+                Quotation.Status.DRAFT,
+                Quotation.Status.PENDING_APPROVAL,
+                Quotation.Status.APPROVED,
+            }
+            from .models import QuotationItem  # local import avoids circular
+            affected_quotation_ids = set()
+            for line in QuotationItem.objects.filter(
+                item=item,
+                quotation__status__in=open_statuses,
+            ).select_related("quotation"):
+                line.unit_price = item.selling_price
+                line.amount = line.unit_price * line.quantity
+                line.save(update_fields=["unit_price", "amount", "updated_at"])
+                affected_quotation_ids.add(line.quotation_id)
+            # Recalculate totals on each affected quotation.
+            for quotation in Quotation.objects.filter(pk__in=affected_quotation_ids):
+                quotation.recalculate()
+        record_audit(
+            self.request,
+            "Item updated",
+            "Item",
+            item,
+            metadata={"price_cascaded": item.selling_price != old_price},
+        )
+
     def get_queryset(self):
         queryset = super().get_queryset()
         item_type = self.request.query_params.get("type")
