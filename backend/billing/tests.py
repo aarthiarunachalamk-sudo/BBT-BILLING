@@ -211,6 +211,15 @@ class AdminFlowTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("sku", response.data)
 
+    def test_products_can_be_filtered_by_category(self):
+        category = Category.objects.get(name="Test Category")
+        response = self.client.get(f"/api/items/?category={category.pk}")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        products = response.data["results"]
+        self.assertEqual(len(products), 1)
+        self.assertEqual(products[0]["category_name"], "Test Category")
+
     def test_admin_can_complete_connected_actions(self):
         order = PurchaseOrder.objects.get(status=PurchaseOrder.Status.PENDING)
         response = self.client.post(

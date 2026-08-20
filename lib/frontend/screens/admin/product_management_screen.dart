@@ -427,170 +427,180 @@ class _ProductCatalogCard extends StatelessWidget {
 
     return SectionCard(
       padding: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Tooltip(
-                  message: 'Add or replace product image',
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: onImageTap,
-                    child: SizedBox.square(
-                      dimension: 76,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: _ProductImage(
-                              url: _productImageUrl(state, product['image']),
-                            ),
-                          ),
-                          const Positioned(
-                            right: 4,
-                            bottom: 4,
-                            child: CircleAvatar(
-                              radius: 11,
-                              backgroundColor: blue,
-                              child: Icon(
-                                Icons.camera_alt_outlined,
-                                size: 12,
-                                color: Colors.white,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showEditPriceSheet(context, state, product),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Tooltip(
+                    message: 'Add or replace product image',
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: onImageTap,
+                      child: SizedBox.square(
+                        dimension: 76,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: _ProductImage(
+                                url: _productImageUrl(state, product['image']),
                               ),
                             ),
-                          ),
-                        ],
+                            const Positioned(
+                              right: 4,
+                              bottom: 4,
+                              child: CircleAvatar(
+                                radius: 11,
+                                backgroundColor: blue,
+                                child: Icon(
+                                  Icons.camera_alt_outlined,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product['category_name']?.toString().toUpperCase() ??
-                            'UNCATEGORIZED',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: blue,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: .7,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product['category_name']?.toString().toUpperCase() ??
+                              'UNCATEGORIZED',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: blue,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .7,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        product['name']?.toString() ?? '',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          height: 1.25,
-                          fontWeight: FontWeight.w800,
+                        const SizedBox(height: 4),
+                        Text(
+                          product['name']?.toString() ?? '',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.25,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        product['sku']?.toString() ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        const SizedBox(height: 6),
+                        Text(
+                          product['sku']?.toString() ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: muted,
+                            fontSize: 9,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _money(selling),
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  if (mrp != null) ...[
+                    const SizedBox(width: 7),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        _money(mrp),
                         style: const TextStyle(
                           color: muted,
-                          fontSize: 9,
-                          fontFamily: 'monospace',
+                          fontSize: 10,
+                          decoration: TextDecoration.lineThrough,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  _money(selling),
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                if (mrp != null) ...[
-                  const SizedBox(width: 7),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(
-                      _money(mrp),
-                      style: const TextStyle(
-                        color: muted,
-                        fontSize: 10,
-                        decoration: TextDecoration.lineThrough,
+                    ),
+                  ],
+                  if (discount != null) ...[
+                    const SizedBox(width: 7),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE7F7EF),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        '$discount% OFF',
+                        style: const TextStyle(
+                          color: green,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-                if (discount != null) ...[
-                  const SizedBox(width: 7),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE7F7EF),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Text(
-                      '$discount% OFF',
-                      style: const TextStyle(
+              ),
+              const SizedBox(height: 11),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _StockBadge(status: status),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${product['stock_quantity'] ?? 0} in stock',
+                    style: const TextStyle(fontSize: 9, color: muted),
+                  ),
+                  const Spacer(),
+                  if (verified)
+                    Tooltip(
+                      message:
+                          'Price verified ${_dateText(product['price_verified_at'])}',
+                      child: const Icon(
+                        Icons.verified_outlined,
+                        size: 17,
                         color: green,
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
                       ),
                     ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'GST ${product['tax_percent'] ?? 0}%',
+                    style: const TextStyle(fontSize: 9, color: muted),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.edit_outlined,
+                    size: 13,
+                    color: muted.withValues(alpha: .6),
                   ),
                 ],
-              ],
-            ),
-            const SizedBox(height: 11),
-            const Divider(height: 1),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _StockBadge(status: status),
-                const SizedBox(width: 8),
-                Text(
-                  '${product['stock_quantity'] ?? 0} in stock',
-                  style: const TextStyle(fontSize: 9, color: muted),
-                ),
-                const Spacer(),
-                if (verified)
-                  Tooltip(
-                    message:
-                        'Price verified ${_dateText(product['price_verified_at'])}',
-                    child: const Icon(
-                      Icons.verified_outlined,
-                      size: 17,
-                      color: green,
-                    ),
-                  ),
-                const SizedBox(width: 6),
-                Text(
-                  'GST ${product['tax_percent'] ?? 0}%',
-                  style: const TextStyle(fontSize: 9, color: muted),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -681,6 +691,228 @@ class _ProductImage extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _showEditPriceSheet(
+  BuildContext context,
+  AdminState state,
+  Map<String, dynamic> product,
+) async {
+  final productId = product['id'] as int;
+  final sellingCtrl = TextEditingController(
+    text: product['selling_price']?.toString() ?? '',
+  );
+  final purchaseCtrl = TextEditingController(
+    text: product['purchase_price']?.toString() ?? '',
+  );
+  final mrpCtrl = TextEditingController(
+    text: product['mrp']?.toString() ?? '',
+  );
+  var gst = int.tryParse(
+        double.tryParse(
+              product['tax_percent']?.toString() ?? '',
+            )?.toStringAsFixed(0) ??
+            '0',
+      ) ??
+      0;
+  // Snap to a valid slab
+  const slabs = [0, 5, 12, 18, 28];
+  if (!slabs.contains(gst)) gst = 18;
+
+  var saving = false;
+  String? errorText;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (sheetCtx) => StatefulBuilder(
+      builder: (sheetCtx, setSheet) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 4,
+          bottom: MediaQuery.viewInsetsOf(sheetCtx).bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Header ──────────────────────────────────────────────────
+            Row(
+              children: [
+                const Icon(Icons.edit_outlined, color: blue, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    product['name']?.toString() ?? 'Edit Prices',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Changes apply to the catalog and all open quotations instantly.',
+              style: const TextStyle(fontSize: 11, color: muted),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Price fields ─────────────────────────────────────────────
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: sellingCtrl,
+                    enabled: !saving,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Selling Price (₹) *',
+                      prefixText: '₹ ',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: purchaseCtrl,
+                    enabled: !saving,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Purchase Price (₹)',
+                      prefixText: '₹ ',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: mrpCtrl,
+              enabled: !saving,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'MRP (optional)',
+                prefixText: '₹ ',
+                helperText: 'Maximum retail price printed on pack',
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // ── GST slab ─────────────────────────────────────────────────
+            const Text(
+              'GST Slab',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: slabs
+                  .map(
+                    (slab) => Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 5),
+                        child: ChoiceChip(
+                          label: Text(
+                            '$slab%',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          selected: gst == slab,
+                          onSelected: saving
+                              ? null
+                              : (_) => setSheet(() => gst = slab),
+                          selectedColor: blue,
+                          labelStyle: TextStyle(
+                            color: gst == slab ? Colors.white : ink,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+
+            // ── Error ────────────────────────────────────────────────────
+            if (errorText != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                errorText!,
+                style: const TextStyle(color: red, fontSize: 12),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            // ── Save button ──────────────────────────────────────────────
+            PrimaryAction(
+              saving ? 'Updating prices…' : 'Update Prices',
+              icon: saving ? null : Icons.check_rounded,
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final sp = double.tryParse(sellingCtrl.text.trim());
+                      if (sp == null || sp <= 0) {
+                        setSheet(
+                          () => errorText = 'Enter a valid selling price.',
+                        );
+                        return;
+                      }
+                      setSheet(() {
+                        saving = true;
+                        errorText = null;
+                      });
+                      try {
+                        final body = <String, dynamic>{
+                          'selling_price': sellingCtrl.text.trim(),
+                          'tax_percent': gst.toString(),
+                        };
+                        final pp = purchaseCtrl.text.trim();
+                        if (pp.isNotEmpty) body['purchase_price'] = pp;
+                        final mrp = mrpCtrl.text.trim();
+                        if (mrp.isNotEmpty) {
+                          body['mrp'] = mrp;
+                        } else {
+                          // Explicitly clear MRP if field was wiped
+                          body['mrp'] = null;
+                        }
+                        await state.updateProduct(productId, body);
+                        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                        if (context.mounted) {
+                          showNotice(
+                            context,
+                            'Prices updated — open quotations recalculated.',
+                          );
+                        }
+                      } catch (e) {
+                        setSheet(() {
+                          saving = false;
+                          errorText = e.toString();
+                        });
+                      }
+                    },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  sellingCtrl.dispose();
+  purchaseCtrl.dispose();
+  mrpCtrl.dispose();
 }
 
 Future<void> _showProductFilters(BuildContext context, AdminState state) async {

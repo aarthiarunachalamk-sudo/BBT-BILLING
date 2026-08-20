@@ -37,6 +37,9 @@ python manage.py seed_demo
 python manage.py runserver
 ```
 
+`seed_demo` is safe to run more than once. It creates or updates the demo admin
+account and adds starter settings, roles, catalog, supplier, and customer data.
+
 Then open:
 
 - Admin: `http://127.0.0.1:8000/admin/`
@@ -103,6 +106,7 @@ POST /api/auth/refresh/
 - `/api/categories/`
 - `/api/suppliers/`
 - `/api/items/`
+- `/api/items/?category={category_id}`
 - `/api/items/{id}/adjust_stock/`
 - `/api/inventory-transactions/`
 - `/api/quotations/`

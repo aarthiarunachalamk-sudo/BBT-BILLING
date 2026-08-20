@@ -236,10 +236,13 @@ class ItemViewSet(SearchableModelViewSet):
         queryset = super().get_queryset()
         item_type = self.request.query_params.get("type")
         active = self.request.query_params.get("active")
+        category = self.request.query_params.get("category")
         if item_type:
             queryset = queryset.filter(item_type=item_type)
         if active in {"true", "false"}:
             queryset = queryset.filter(is_active=active == "true")
+        if category:
+            queryset = queryset.filter(category_id=category)
         return queryset
 
     @action(detail=True, methods=["post"])
