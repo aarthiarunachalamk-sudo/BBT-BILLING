@@ -15,16 +15,29 @@ class ApiException implements Exception {
 class AdminApi {
   AdminApi({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
-      baseUrl =
-          baseUrl ??
-          const String.fromEnvironment(
-            'API_BASE_URL',
-            defaultValue: 'https://bbt-billing-api.onrender.com/api',
-          );
+      baseUrl = _canonicalBaseUrl(
+        baseUrl ??
+            const String.fromEnvironment(
+              'API_BASE_URL',
+              defaultValue: 'https://bbt-billing-api.onrender.com/api',
+            ),
+      );
 
   final http.Client _client;
   String baseUrl;
   String? _accessToken;
+
+  static String _canonicalBaseUrl(String value) {
+    var normalized = value.trim().replaceFirst(
+      'bbt-billing.onrender.com',
+      'bbt-billing-api.onrender.com',
+    );
+    while (normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    if (!normalized.endsWith('/api')) normalized = '$normalized/api';
+    return normalized;
+  }
 
   List<String> get _candidateBaseUrls {
     final candidates = <String>[baseUrl];
@@ -47,11 +60,7 @@ class AdminApi {
   }
 
   void setBaseUrl(String value) {
-    var normalized = value.trim();
-    while (normalized.endsWith('/')) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    if (!normalized.endsWith('/api')) normalized = '$normalized/api';
+    final normalized = _canonicalBaseUrl(value);
     final uri = Uri.tryParse(normalized);
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
       throw const ApiException('Enter a valid backend URL, including https://');
