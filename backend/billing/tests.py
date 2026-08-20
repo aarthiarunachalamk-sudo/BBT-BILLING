@@ -172,6 +172,10 @@ class AdminFlowTests(APITestCase):
                 "name": "Turmeric Powder",
                 "sku": "TURMERIC-001",
                 "category": category.pk,
+                "manual_details": {
+                    "brand": "Sample Brand",
+                    "net_weight": "250 g",
+                },
                 "unit": "Pack",
                 "purchase_price": "40.00",
                 "selling_price": "55.00",
@@ -184,6 +188,7 @@ class AdminFlowTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         product = Item.objects.get(sku="TURMERIC-001")
+        self.assertEqual(product.manual_details["net_weight"], "250 g")
         opening = InventoryTransaction.objects.get(item=product)
         self.assertEqual(opening.quantity, 20)
         self.assertEqual(opening.previous_stock, 0)

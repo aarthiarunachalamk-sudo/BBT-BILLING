@@ -77,7 +77,6 @@ class Client(TimeStampedModel):
 class Category(TimeStampedModel):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
-    manual_details = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -113,6 +112,7 @@ class Item(TimeStampedModel):
     name = models.CharField(max_length=200)
     sku = models.CharField(max_length=50, unique=True)
     description = models.TextField(blank=True)
+    manual_details = models.JSONField(default=dict, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="items")
     supplier = models.ForeignKey(
         Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
