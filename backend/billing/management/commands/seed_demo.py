@@ -1,12 +1,38 @@
+from io import BytesIO
 from decimal import Decimal
 
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
+from PIL import Image, ImageDraw, ImageFont
 
 from billing.models import Category, Client, Item, RolePermission, StoreSettings, Supplier, User
 
 
 class Command(BaseCommand):
     help = "Create or update the demo admin account and starter billing data."
+
+    @staticmethod
+    def _product_image(name, category):
+        colors = {
+            "Groceries": (31, 96, 168),
+            "Beverages": (14, 137, 109),
+            "Snacks": (224, 132, 32),
+            "Household": (113, 82, 164),
+        }
+        background = colors.get(category, (31, 96, 168))
+        image = Image.new("RGB", (800, 600), (246, 249, 253))
+        draw = ImageDraw.Draw(image)
+        draw.rounded_rectangle((30, 30, 770, 570), radius=36, fill=background)
+        draw.ellipse((250, 85, 550, 385), fill=(255, 255, 255))
+        draw.rounded_rectangle((315, 150, 485, 320), radius=24, fill=background)
+        draw.rectangle((340, 180, 460, 290), fill=(255, 255, 255))
+        font = ImageFont.load_default(size=32)
+        small_font = ImageFont.load_default(size=24)
+        draw.text((70, 420), name, fill=(255, 255, 255), font=font)
+        draw.text((70, 480), category.upper(), fill=(220, 235, 250), font=small_font)
+        output = BytesIO()
+        image.save(output, format="PNG", optimize=True)
+        return output.getvalue()
 
     def handle(self, *args, **options):
         admin, created = User.objects.get_or_create(
@@ -97,7 +123,7 @@ class Command(BaseCommand):
             ("DEMO-DETERGENT-010", "Laundry Detergent 2kg", "Household", "Pack", "150.00", "195.00", "215.00", 22),
         ]
         for sku, name, category_name, unit, purchase, selling, mrp, stock in products:
-            Item.objects.get_or_create(
+            item, _ = Item.objects.get_or_create(
                 sku=sku,
                 defaults={
                     "item_type": Item.ItemType.MATERIAL,
@@ -113,6 +139,12 @@ class Command(BaseCommand):
                     "reorder_level": 5,
                 },
             )
+            if not item.image:
+                item.image.save(
+                    f"{sku.lower()}.png",
+                    ContentFile(self._product_image(name, category_name)),
+                    save=True,
+                )
         Client.objects.get_or_create(
             name="Walk-in Customer",
             defaults={

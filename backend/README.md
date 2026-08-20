@@ -39,6 +39,9 @@ python manage.py runserver
 
 `seed_demo` is safe to run more than once. It creates or updates the demo admin
 account and adds starter settings, roles, catalog, supplier, and customer data.
+It also generates a branded PNG image for each seeded product when the product
+does not already have an image. With Cloudinary variables configured, those
+images are uploaded to Cloudinary automatically.
 
 Then open:
 

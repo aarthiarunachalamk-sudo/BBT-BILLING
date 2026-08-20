@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -20,7 +19,7 @@ class AdminApi {
           baseUrl ??
           const String.fromEnvironment(
             'API_BASE_URL',
-            defaultValue: 'https://bbt-billing.onrender.com/api',
+            defaultValue: 'https://bbt-billing-api.onrender.com/api',
           );
 
   final http.Client _client;
@@ -63,11 +62,8 @@ class AdminApi {
       try {
         final response = await _client
             .get(healthUrl)
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 15));
         if (response.statusCode < 500) return true;
-      } on SocketException {
-        // Network is unreachable — no point retrying.
-        return false;
       } catch (_) {
         // Timeout or transient error — keep retrying.
       }
@@ -81,11 +77,13 @@ class AdminApi {
   // ── Auth ──────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl/auth/login/'),
-      headers: _headers,
-      body: jsonEncode({'username': email, 'password': password}),
-    );
+    final response = await _client
+        .post(
+          Uri.parse('$baseUrl/auth/login/'),
+          headers: _headers,
+          body: jsonEncode({'username': email, 'password': password}),
+        )
+        .timeout(const Duration(seconds: 30));
     final data = _decodeMap(response);
     _accessToken = data['access'] as String?;
     return data;

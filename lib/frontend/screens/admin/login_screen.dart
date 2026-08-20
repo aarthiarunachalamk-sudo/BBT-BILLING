@@ -205,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   icon: const Icon(Icons.refresh, size: 18),
                   onPressed: () => setState(() {
                     serverUrlController.text =
-                        'https://bbt-billing.onrender.com/api';
+                        'https://bbt-billing-api.onrender.com/api';
                   }),
                 ),
                 helperText: 'Must start with https://',
