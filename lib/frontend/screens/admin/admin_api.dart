@@ -26,8 +26,25 @@ class AdminApi {
   String baseUrl;
   String? _accessToken;
 
-  /// Origin without the /api suffix — used for health checks.
-  String get _origin => baseUrl.replaceFirst(RegExp(r'/api$'), '');
+  List<String> get _candidateBaseUrls {
+    final candidates = <String>[baseUrl];
+    if (baseUrl.contains('bbt-billing-api.onrender.com')) {
+      candidates.add(
+        baseUrl.replaceFirst(
+          'bbt-billing-api.onrender.com',
+          'bbt-billing.onrender.com',
+        ),
+      );
+    } else if (baseUrl.contains('bbt-billing.onrender.com')) {
+      candidates.add(
+        baseUrl.replaceFirst(
+          'bbt-billing.onrender.com',
+          'bbt-billing-api.onrender.com',
+        ),
+      );
+    }
+    return candidates;
+  }
 
   void setBaseUrl(String value) {
     var normalized = value.trim();
@@ -56,16 +73,21 @@ class AdminApi {
     Duration initialDelay = const Duration(seconds: 3),
     void Function(int attempt, int max)? onAttempt,
   }) async {
-    final healthUrl = Uri.parse('$_origin/health/');
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       onAttempt?.call(attempt, maxAttempts);
-      try {
+      for (final candidate in _candidateBaseUrls) {
+        final origin = candidate.replaceFirst(RegExp(r'/api$'), '');
+        try {
         final response = await _client
-            .get(healthUrl)
+            .get(Uri.parse('$origin/health/'))
             .timeout(const Duration(seconds: 15));
-        if (response.statusCode < 500) return true;
+        if (response.statusCode >= 200 && response.statusCode < 400) {
+          baseUrl = candidate;
+          return true;
+        }
       } catch (_) {
         // Timeout or transient error — keep retrying.
+      }
       }
       if (attempt < maxAttempts) {
         await Future<void>.delayed(initialDelay * attempt);
