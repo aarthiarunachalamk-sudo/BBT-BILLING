@@ -19,7 +19,7 @@ class AdminApi {
         baseUrl ??
             const String.fromEnvironment(
               'API_BASE_URL',
-              defaultValue: 'https://bbt-billing-api.onrender.com/api',
+              defaultValue: 'https://bbt-billing.onrender.com/api',
             ),
       );
 
@@ -29,8 +29,8 @@ class AdminApi {
 
   static String _canonicalBaseUrl(String value) {
     var normalized = value.trim().replaceFirst(
-      'bbt-billing.onrender.com',
       'bbt-billing-api.onrender.com',
+      'bbt-billing.onrender.com',
     );
     while (normalized.endsWith('/')) {
       normalized = normalized.substring(0, normalized.length - 1);

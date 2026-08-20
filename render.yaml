@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: bbt-billing-api
+    name: bbt-billing
     runtime: python
     rootDir: backend
     buildCommand: bash build.sh
