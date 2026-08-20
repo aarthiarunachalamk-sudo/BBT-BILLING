@@ -60,6 +60,16 @@ In Render, create or open the web service and use:
 - Health Check Path: `/health/`
 - Python version: `3.13` (already pinned in `.python-version`)
 
+Important: the Render service must use `backend` as its Root Directory. If the
+service was created manually, replace any old Start Command containing
+`your_application` with:
+
+```text
+gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile -
+```
+
+The repository also includes `Procfile` with the same valid WSGI entry point.
+
 Add these Render environment variables:
 
 - `DATABASE_URL`: the Neon pooled connection string
