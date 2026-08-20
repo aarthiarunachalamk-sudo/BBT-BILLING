@@ -26,5 +26,6 @@ for attempt in $(seq 1 "$MAX_INSTALL_ATTEMPTS"); do
   sleep "$retry_delay"
 done
 
+mkdir -p staticfiles
 python manage.py collectstatic --no-input
 python manage.py migrate
