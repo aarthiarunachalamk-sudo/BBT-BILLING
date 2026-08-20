@@ -494,6 +494,8 @@ class AdminState extends ChangeNotifier {
       if (!exception.message.toLowerCase().contains('already exists')) {
         rethrow;
       }
+    } catch (_) {
+      throw ApiException('Cannot reach ${api.baseUrl}. Check the backend URL.');
     }
     categories = await api.getList('categories');
     _hydrateControls();
