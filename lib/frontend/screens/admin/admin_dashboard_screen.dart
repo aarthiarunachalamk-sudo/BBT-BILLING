@@ -98,10 +98,78 @@ class _SalesChart extends StatelessWidget {
 class _Mini extends StatelessWidget { const _Mini(this.label, this.value); final String label, value; @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(fontSize: 9, color: muted)), Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800))]); }
 
 class _QuickActions extends StatelessWidget {
-  const _QuickActions(this.state); final AdminState state;
-  @override Widget build(BuildContext context) {
-    final items = [(Icons.receipt_long_outlined, 'Sales', 10), (Icons.add_box_outlined, 'Add product', 5), (Icons.qr_code_scanner_rounded, 'Scan', 4), (Icons.local_shipping_outlined, 'Supplier', 7), (Icons.shopping_cart_checkout_rounded, 'Purchase', 8), (Icons.person_add_alt_1_outlined, 'Add user', 2)];
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const _DashTitle('Quick actions', 'Everything important, one tap away'), const SizedBox(height: 10), SizedBox(height: 96, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: items.length, separatorBuilder: (_, _) => const SizedBox(width: 10), itemBuilder: (_, i) => InkWell(onTap: () => state.go(items[i].$3), borderRadius: BorderRadius.circular(17), child: Container(width: 88, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), boxShadow: const [BoxShadow(color: Color(0x0D0F172A), blurRadius: 12, offset: Offset(0, 5))]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(9)), child: Icon(items[i].$1, color: blue, size: 18)), const Spacer(), Text(items[i].$2, maxLines: 1, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700))]))))]);
+  const _QuickActions(this.state);
+  final AdminState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (Icons.receipt_long_outlined, 'Sales', 10),
+      (Icons.add_box_outlined, 'Add product', 5),
+      (Icons.qr_code_scanner_rounded, 'Scan', 4),
+      (Icons.local_shipping_outlined, 'Supplier', 7),
+      (Icons.shopping_cart_checkout_rounded, 'Purchase', 8),
+      (Icons.person_add_alt_1_outlined, 'Add user', 2),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _DashTitle(
+          'Quick actions',
+          'Everything important, one tap away',
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 96,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (_, i) => InkWell(
+              onTap: () => state.go(items[i].$3),
+              borderRadius: BorderRadius.circular(17),
+              child: Container(
+                width: 88,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(17),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0D0F172A),
+                      blurRadius: 12,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Icon(items[i].$1, color: blue, size: 18),
+                    ),
+                    const Spacer(),
+                    Text(
+                      items[i].$2,
+                      maxLines: 1,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -154,9 +222,5 @@ class _Metric extends StatelessWidget {
 }
 
 String _money(dynamic value) { final amount = double.tryParse(value?.toString() ?? '') ?? 0; return '₹ ${amount.toStringAsFixed(2)}'; }
-String _growth(dynamic value) {
-  final amount = double.tryParse(value?.toString() ?? '') ?? 0;
-  return '${amount >= 0 ? '+' : ''}${amount.toStringAsFixed(1)}%';
-}
 Color _growthTone(dynamic value) => (double.tryParse(value?.toString() ?? '') ?? 0) < 0 ? red : green;
 String _percent(dynamic value, int fallback) => '${double.tryParse(value?.toString() ?? '')?.round() ?? fallback}%';
