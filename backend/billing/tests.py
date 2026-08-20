@@ -162,6 +162,10 @@ class AdminFlowTests(APITestCase):
         self.assertIn("sales_growth", response.data)
         self.assertIn("bills_growth", response.data)
         self.assertIn("profit_growth", response.data)
+        self.assertIn("sales_trend", response.data)
+        self.assertIn("low_stock_products", response.data)
+        self.assertIn("top_products", response.data)
+        self.assertIn("payment_breakdown", response.data)
 
     def test_product_creation_records_opening_inventory(self):
         category = Category.objects.get(name="Test Category")

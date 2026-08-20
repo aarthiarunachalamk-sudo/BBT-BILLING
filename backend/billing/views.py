@@ -626,6 +626,23 @@ def dashboard(request):
         total=Sum("amount"), count=Count("id")
     )
     payment_breakdown = list(payment_rows)
+    low_stock_products = list(
+        Item.objects.filter(
+            item_type=Item.ItemType.MATERIAL,
+            stock_quantity__lte=models.F("reorder_level"),
+        )
+        .select_related("category")
+        .values("id", "name", "sku", "stock_quantity", "reorder_level", "category__name")[:3]
+    )
+    top_products = list(
+        InvoiceItem.objects.filter(
+            invoice__invoice_date__range=(range_start, today),
+            invoice__status__in=[Invoice.Status.PAID, Invoice.Status.PARTIAL],
+        )
+        .values("item_id", "name")
+        .annotate(quantity=Sum("quantity"), revenue=Sum("amount"))
+        .order_by("-quantity")[:5]
+    )
     def profit_for(day):
         return sum(
             (
@@ -661,6 +678,13 @@ def dashboard(request):
         "outstanding_total": sum((invoice.balance_due for invoice in Invoice.objects.exclude(status=Invoice.Status.CANCELLED)), Decimal("0.00")),
         "overdue_invoice_count": overdue.count(),
         "low_stock_count": low_stock,
+        "customer_count": Client.objects.filter(is_active=True).count(),
+        "products_sold": InvoiceItem.objects.filter(
+            invoice__invoice_date=today,
+            invoice__status__in=[Invoice.Status.PAID, Invoice.Status.PARTIAL],
+        ).aggregate(total=Sum("quantity"))["total"] or 0,
+        "low_stock_products": low_stock_products,
+        "top_products": top_products,
         "recent_invoices": InvoiceSerializer(Invoice.objects.select_related("client").order_by("-created_at")[:5], many=True).data,
         "sales_trend": sales_trend,
         "payment_breakdown": payment_breakdown,

@@ -3,296 +3,160 @@ part of 'admin_screens.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen(this.state, {super.key});
   final AdminState state;
+
   @override
   Widget build(BuildContext context) => _AdminPage(
     state: state,
-    title: 'Admin Dashboard',
-    actions: [
-      IconButton(
-        onPressed: () => state.go(9),
-        icon: const Icon(Icons.notifications_none),
-      ),
-    ],
+    title: 'Dashboard',
+    actions: [IconButton(onPressed: () => state.go(9), icon: const Icon(Icons.notifications_none_rounded))],
     child: RefreshIndicator(
-      onRefresh: () async {
-        await state.refreshDashboard();
-        if (context.mounted && state.error != null) {
-          showNotice(context, state.error!);
-        }
-      },
+      onRefresh: state.refreshDashboard,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
         children: [
-          const Text(
-            'Store overview',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Monitor today’s performance and resolve operational exceptions.',
-            style: TextStyle(color: muted, fontSize: 13),
-          ),
-          const SizedBox(height: 18),
-          LayoutBuilder(
-            builder: (context, constraints) => GridView.count(
-              crossAxisCount: constraints.maxWidth >= 900 ? 4 : 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              mainAxisExtent: 150,
-              children: [
-                _Metric(
-                  'Today Sales',
-                  _money(state.dashboard['today_sales']),
-                  '${_growth(state.dashboard['sales_growth'])} vs yesterday',
-                  _growthTone(state.dashboard['sales_growth']),
-                ),
-                _Metric(
-                  'Total Bills',
-                  '${state.dashboard['total_bills'] ?? 0}',
-                  '${_growth(state.dashboard['bills_growth'])} vs yesterday',
-                  _growthTone(state.dashboard['bills_growth']),
-                ),
-                _Metric(
-                  'Profit',
-                  _money(state.dashboard['profit']),
-                  '${_growth(state.dashboard['profit_growth'])} vs yesterday',
-                  _growthTone(state.dashboard['profit_growth']),
-                ),
-                _Metric(
-                  'Low Stock',
-                  '${state.dashboard['low_stock_count'] ?? 0}',
-                  'Items requiring attention',
-                  muted,
-                  const Color(0xFFFF3B18),
-                ),
-              ],
-            ),
-          ),
+          _Welcome(state),
           const SizedBox(height: 16),
-          _DashboardOperations(state),
+          _Revenue(state.dashboard, () => state.go(10)),
+          const SizedBox(height: 24),
+          const _DashTitle('Store pulse', 'Live operational metrics'),
+          const SizedBox(height: 10),
+          _Kpis(state.dashboard),
+          const SizedBox(height: 24),
+          _SalesChart(state.dashboard),
+          const SizedBox(height: 24),
+          _QuickActions(state),
+          const SizedBox(height: 24),
+          _Approvals(state),
+          const SizedBox(height: 24),
+          _LowStock(state),
+          const SizedBox(height: 24),
+          _TopProducts(state.dashboard),
+          const SizedBox(height: 24),
+          _PaymentAnalysis(state.dashboard),
+          const SizedBox(height: 24),
+          _RecentBills(state.dashboard),
         ],
       ),
     ),
   );
 }
 
-class _DashboardOperations extends StatelessWidget {
-  const _DashboardOperations(this.state);
-
-  final AdminState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final attention = SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Needs attention',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 10),
-          _AlertRow(
-            Icons.warning_amber_rounded,
-            Colors.orange,
-            'Pending Discount Approvals',
-            '${state.dashboard['pending_discount_approvals'] ?? 0}',
-            () => state.go(11),
-          ),
-          const Divider(),
-          _AlertRow(
-            Icons.shopping_bag_outlined,
-            blue,
-            'Pending Purchase Orders',
-            '${state.dashboard['pending_purchase_orders'] ?? 0}',
-            () => state.go(8),
-          ),
-          const Divider(),
-          _AlertRow(
-            Icons.inventory_outlined,
-            red,
-            'Inventory Exceptions',
-            '${state.dashboard['low_stock_count'] ?? 0}',
-            () => state.go(9),
-          ),
-        ],
-      ),
-    );
-    final quickActions = SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Quick actions',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            alignment: WrapAlignment.spaceAround,
-            spacing: 14,
-            runSpacing: 16,
-            children: [
-              _Quick(Icons.add_box_outlined, 'Add Product', () => state.go(5)),
-              _Quick(Icons.person_add_alt, 'Add User', () => state.go(2)),
-              _Quick(
-                Icons.shopping_cart_outlined,
-                'Purchase Orders',
-                () => state.go(8),
-              ),
-              _Quick(
-                Icons.analytics_outlined,
-                'Sales Report',
-                () => state.go(10),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 820) {
-          return Column(
-            children: [attention, const SizedBox(height: 12), quickActions],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: attention),
-            const SizedBox(width: 12),
-            Expanded(child: quickActions),
-          ],
-        );
-      },
-    );
+class _Welcome extends StatelessWidget {
+  const _Welcome(this.state); final AdminState state;
+  @override Widget build(BuildContext context) {
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    return Row(children: [
+      Container(width: 50, height: 50, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF06B6D4)]), borderRadius: BorderRadius.circular(16)), child: const Icon(Icons.storefront_rounded, color: Colors.white)),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$greeting 👋', style: const TextStyle(color: muted, fontSize: 12)), const Text('Admin', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))), Text(state.storeSettings['store_name']?.toString() ?? 'BBT Supermarket', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: muted, fontSize: 11))])),
+      Stack(children: [IconButton.filledTonal(onPressed: () => state.go(9), icon: const Icon(Icons.notifications_none_rounded)), Positioned(right: 7, top: 7, child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: red, shape: BoxShape.circle)))]),
+    ]);
   }
 }
 
+class _Revenue extends StatelessWidget {
+  const _Revenue(this.data, this.tap); final Map<String, dynamic> data; final VoidCallback tap;
+  @override Widget build(BuildContext context) {
+    final growth = double.tryParse('${data['sales_growth'] ?? 0}') ?? 0;
+    return InkWell(onTap: tap, borderRadius: BorderRadius.circular(24), child: Container(height: 190, padding: const EdgeInsets.all(22), decoration: BoxDecoration(gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0F172A), Color(0xFF164E8C), Color(0xFF2563EB)]), borderRadius: BorderRadius.circular(24), boxShadow: const [BoxShadow(color: Color(0x302563EB), blurRadius: 26, offset: Offset(0, 12))]), child: Stack(children: [
+      Positioned(right: -8, bottom: 0, width: 160, height: 85, child: CustomPaint(painter: _TrendPainter(_trend(data), Colors.white.withValues(alpha: .75)))),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.payments_outlined, color: Colors.white, size: 19)), const SizedBox(width: 9), const Text("TODAY'S REVENUE", style: TextStyle(color: Color(0xFFBFDBFE), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: .8))]), const SizedBox(height: 18), Text(_money(data['today_sales']), style: const TextStyle(color: Colors.white, fontSize: 31, fontWeight: FontWeight.w900)), const Spacer(), Row(children: [Icon(growth < 0 ? Icons.trending_down_rounded : Icons.trending_up_rounded, color: growth < 0 ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC), size: 18), const SizedBox(width: 5), Text('${growth.abs().toStringAsFixed(1)}% compared with yesterday', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700))])])
+    ])));
+  }
+}
+
+class _DashTitle extends StatelessWidget {
+  const _DashTitle(this.title, this.subtitle, {this.action, this.tap}); final String title, subtitle; final String? action; final VoidCallback? tap;
+  @override Widget build(BuildContext context) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))), Text(subtitle, style: const TextStyle(fontSize: 11, color: muted))])), if (action != null) TextButton(onPressed: tap, child: Text(action!))]);
+}
+
+class _Kpis extends StatelessWidget {
+  const _Kpis(this.data); final Map<String, dynamic> data;
+  @override Widget build(BuildContext context) {
+    final values = [
+      ('Bills', '${data['total_bills'] ?? 0}', Icons.receipt_long_outlined, blue, _growth(data['bills_growth'])),
+      ('Profit', _money(data['profit']), Icons.account_balance_wallet_outlined, green, _growth(data['profit_growth'])),
+      ('Customers', '${data['customer_count'] ?? 0}', Icons.groups_2_outlined, const Color(0xFF7C3AED), 'Active'),
+      ('Products sold', '${data['products_sold'] ?? 0}', Icons.shopping_bag_outlined, const Color(0xFF0891B2), 'Today'),
+      ('Avg. bill', _money(data['average_bill_value']), Icons.analytics_outlined, const Color(0xFFEA580C), 'Today'),
+      ('Low stock', '${data['low_stock_count'] ?? 0}', Icons.warning_amber_rounded, red, 'Needs action'),
+    ];
+    return LayoutBuilder(builder: (_, box) => GridView.builder(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: values.length, gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: box.maxWidth >= 850 ? 3 : 2, mainAxisSpacing: 10, crossAxisSpacing: 10, mainAxisExtent: 128), itemBuilder: (_, i) {
+      final item = values[i];
+      return Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(color: Color(0x0D0F172A), blurRadius: 18, offset: Offset(0, 6))]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: item.$4.withValues(alpha: .1), borderRadius: BorderRadius.circular(10)), child: Icon(item.$3, color: item.$4, size: 18)), const Spacer(), Text(item.$5, style: TextStyle(color: item.$4, fontSize: 9, fontWeight: FontWeight.w700))]), const Spacer(), FittedBox(child: Text(item.$2, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900))), Text(item.$1, style: const TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600))]));
+    }));
+  }
+}
+
+class _SalesChart extends StatelessWidget {
+  const _SalesChart(this.data); final Map<String, dynamic> data;
+  @override Widget build(BuildContext context) => SectionCard(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const _DashTitle('Sales overview', 'Last 7 days'), const SizedBox(height: 18), SizedBox(height: 150, width: double.infinity, child: CustomPaint(painter: _TrendPainter(_trend(data), blue, fill: true))), const SizedBox(height: 14), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_Mini('Revenue', _money(data['today_sales'])), _Mini('Profit', _money(data['profit'])), _Mini('Bills', '${data['total_bills'] ?? 0}')]) ]));
+}
+
+class _Mini extends StatelessWidget { const _Mini(this.label, this.value); final String label, value; @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(fontSize: 9, color: muted)), Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800))]); }
+
+class _QuickActions extends StatelessWidget {
+  const _QuickActions(this.state); final AdminState state;
+  @override Widget build(BuildContext context) {
+    final items = [(Icons.receipt_long_outlined, 'Sales', 10), (Icons.add_box_outlined, 'Add product', 5), (Icons.qr_code_scanner_rounded, 'Scan', 4), (Icons.local_shipping_outlined, 'Supplier', 7), (Icons.shopping_cart_checkout_rounded, 'Purchase', 8), (Icons.person_add_alt_1_outlined, 'Add user', 2)];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const _DashTitle('Quick actions', 'Everything important, one tap away'), const SizedBox(height: 10), SizedBox(height: 96, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: items.length, separatorBuilder: (_, _) => const SizedBox(width: 10), itemBuilder: (_, i) => InkWell(onTap: () => state.go(items[i].$3), borderRadius: BorderRadius.circular(17), child: Container(width: 88, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(17), boxShadow: const [BoxShadow(color: Color(0x0D0F172A), blurRadius: 12, offset: Offset(0, 5))]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(9)), child: Icon(items[i].$1, color: blue, size: 18)), const Spacer(), Text(items[i].$2, maxLines: 1, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700))]))))]);
+  }
+}
+
+class _Approvals extends StatelessWidget {
+  const _Approvals(this.state); final AdminState state;
+  @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const _DashTitle('Approvals', 'Items waiting for your decision'), const SizedBox(height: 10), _Action(Icons.percent_rounded, const Color(0xFFF59E0B), 'Discount requests', '${state.dashboard['pending_discount_approvals'] ?? 0} pending', () => state.go(11)), const SizedBox(height: 10), _Action(Icons.shopping_cart_checkout_rounded, blue, 'Purchase orders', '${state.dashboard['pending_purchase_orders'] ?? 0} pending', () => state.go(8))]);
+}
+
+class _Action extends StatelessWidget {
+  const _Action(this.icon, this.color, this.title, this.subtitle, this.tap); final IconData icon; final Color color; final String title, subtitle; final VoidCallback tap;
+  @override Widget build(BuildContext context) => Material(color: Colors.white, borderRadius: BorderRadius.circular(17), child: InkWell(onTap: tap, borderRadius: BorderRadius.circular(17), child: Padding(padding: const EdgeInsets.all(15), child: Row(children: [Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withValues(alpha: .1), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w800)), Text(subtitle, style: const TextStyle(fontSize: 11, color: muted))])), Icon(Icons.arrow_forward_ios_rounded, size: 14, color: color)]))));
+}
+
+class _LowStock extends StatelessWidget {
+  const _LowStock(this.state); final AdminState state;
+  @override Widget build(BuildContext context) {
+    final items = (state.dashboard['low_stock_products'] as List? ?? const []).cast<Map>();
+    return Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFFDE68A))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_DashTitle('Low stock alert', '${state.dashboard['low_stock_count'] ?? 0} products need attention', action: 'View all', tap: () => state.go(9)), const SizedBox(height: 8), if (items.isEmpty) const _Empty('All products have sufficient stock') else for (final item in items) Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [const Icon(Icons.inventory_2_outlined, size: 18, color: Color(0xFFD97706)), const SizedBox(width: 9), Expanded(child: Text('${item['name']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))), Text('${item['stock_quantity']} left', style: const TextStyle(color: Color(0xFFB45309), fontSize: 10, fontWeight: FontWeight.w700))]))]));
+  }
+}
+
+class _TopProducts extends StatelessWidget {
+  const _TopProducts(this.data); final Map<String, dynamic> data;
+  @override Widget build(BuildContext context) { final items = (data['top_products'] as List? ?? const []).cast<Map>(); return SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const _DashTitle('Top products', 'Best sellers this week'), const SizedBox(height: 8), if (items.isEmpty) const _Empty('Sales will appear here') else for (var i = 0; i < items.length; i++) ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: CircleAvatar(backgroundColor: const Color(0xFFEFF6FF), child: Text('${i + 1}', style: const TextStyle(color: blue, fontWeight: FontWeight.w800))), title: Text('${items[i]['name']}', maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text('${items[i]['quantity']} units sold'), trailing: Text(_money(items[i]['revenue']), style: const TextStyle(fontWeight: FontWeight.w800)))])); }
+}
+
+class _PaymentAnalysis extends StatelessWidget {
+  const _PaymentAnalysis(this.data); final Map<String, dynamic> data;
+  @override Widget build(BuildContext context) { final rows = (data['payment_breakdown'] as List? ?? const []).cast<Map>(); return SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const _DashTitle('Payment analysis', 'Verified collections by mode'), const SizedBox(height: 12), if (rows.isEmpty) const _Empty('No payment data yet') else Wrap(spacing: 18, runSpacing: 12, children: [for (var i = 0; i < rows.length; i++) Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 10, height: 10, decoration: BoxDecoration(color: [blue, const Color(0xFF06B6D4), const Color(0xFF7C3AED), green][i % 4], shape: BoxShape.circle)), const SizedBox(width: 6), Text('${rows[i]['method']}'.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)), const SizedBox(width: 5), Text(_money(rows[i]['total']), style: const TextStyle(fontSize: 10, color: muted))])])])); }
+}
+
+class _RecentBills extends StatelessWidget {
+  const _RecentBills(this.data); final Map<String, dynamic> data;
+  @override Widget build(BuildContext context) { final bills = (data['recent_invoices'] as List? ?? const []).cast<Map>(); return SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const _DashTitle('Recent bills', 'Latest customer transactions'), const SizedBox(height: 8), if (bills.isEmpty) const _Empty('No bills created yet') else for (final bill in bills.take(4)) ListTile(contentPadding: EdgeInsets.zero, dense: true, leading: const CircleAvatar(backgroundColor: Color(0xFFECFDF5), child: Icon(Icons.receipt_outlined, color: green, size: 19)), title: Text('${bill['number']}', style: const TextStyle(fontWeight: FontWeight.w700)), subtitle: Text('${bill['client_name'] ?? 'Walk-in customer'}', maxLines: 1, overflow: TextOverflow.ellipsis), trailing: Text(_money(bill['total']), style: const TextStyle(fontWeight: FontWeight.w800)))])); }
+}
+
+class _Empty extends StatelessWidget { const _Empty(this.text); final String text; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 20), child: Center(child: Text(text, style: const TextStyle(color: muted)))); }
+
+List<double> _trend(Map<String, dynamic> data) => (data['sales_trend'] as List? ?? const []).map((row) => double.tryParse('${(row as Map)['total']}') ?? 0).toList();
+
+class _TrendPainter extends CustomPainter {
+  const _TrendPainter(this.values, this.color, {this.fill = false}); final List<double> values; final Color color; final bool fill;
+  @override void paint(Canvas canvas, Size size) { final data = values.isEmpty ? <double>[1, 3, 2, 5, 4, 8, 7] : values; final maxValue = data.reduce((a, b) => a > b ? a : b); final path = Path(); for (var i = 0; i < data.length; i++) { final x = data.length == 1 ? 0.0 : size.width * i / (data.length - 1); final y = size.height - (maxValue == 0 ? size.height / 2 : data[i] / maxValue * (size.height - 12)) - 6; if (i == 0) { path.moveTo(x, y); } else { path.lineTo(x, y); } } if (fill) { final area = Path.from(path)..lineTo(size.width, size.height)..lineTo(0, size.height)..close(); canvas.drawPath(area, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [color.withValues(alpha: .2), color.withValues(alpha: 0)]).createShader(Offset.zero & size)); } canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 3..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round); }
+  @override bool shouldRepaint(covariant _TrendPainter oldDelegate) => oldDelegate.values != values;
+}
+
 class _Metric extends StatelessWidget {
-  const _Metric(
-    this.title,
-    this.value,
-    this.note,
-    this.noteColor, [
-    this.valueColor = ink,
-  ]);
-  final String title, value, note;
-  final Color valueColor, noteColor;
-  @override
-  Widget build(BuildContext context) => SectionCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 11,
-            color: muted,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const Spacer(),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: valueColor,
-            ),
-          ),
-        ),
-        Text(
-          note,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 9, color: noteColor),
-        ),
-      ],
-    ),
-  );
+  const _Metric(this.title, this.value, this.note, this.noteColor, [this.valueColor = ink]); final String title, value, note; final Color valueColor, noteColor;
+  @override Widget build(BuildContext context) => SectionCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontSize: 11, color: muted)), const Spacer(), FittedBox(child: Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: valueColor))), Text(note, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9, color: noteColor))]));
 }
 
-String _money(dynamic value) {
+String _money(dynamic value) { final amount = double.tryParse(value?.toString() ?? '') ?? 0; return '₹ ${amount.toStringAsFixed(2)}'; }
+String _growth(dynamic value) {
   final amount = double.tryParse(value?.toString() ?? '') ?? 0;
-  return '₹ ${amount.toStringAsFixed(2)}';
+  return '${amount >= 0 ? '+' : ''}${amount.toStringAsFixed(1)}%';
 }
-
-Color _growthTone(dynamic value) {
-  final amount = double.tryParse(value?.toString() ?? '') ?? 0;
-  return amount < 0 ? red : green;
-}
-
-String _percent(dynamic value, int fallback) {
-  final amount = double.tryParse(value?.toString() ?? '');
-  return '${amount?.round() ?? fallback}%';
-}
-
-class _AlertRow extends StatelessWidget {
-  const _AlertRow(this.icon, this.color, this.label, this.count, this.tap);
-  final IconData icon;
-  final Color color;
-  final String label, count;
-  final VoidCallback tap;
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: tap,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 21),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ),
-          Text(count, style: const TextStyle(fontWeight: FontWeight.w700)),
-        ],
-      ),
-    ),
-  );
-}
-
-class _Quick extends StatelessWidget {
-  const _Quick(this.icon, this.label, this.tap);
-  final IconData icon;
-  final String label;
-  final VoidCallback tap;
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: tap,
-    borderRadius: BorderRadius.circular(8),
-    child: SizedBox(
-      width: 76,
-      child: Column(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              border: Border.all(color: line),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: blue),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+Color _growthTone(dynamic value) => (double.tryParse(value?.toString() ?? '') ?? 0) < 0 ? red : green;
+String _percent(dynamic value, int fallback) => '${double.tryParse(value?.toString() ?? '')?.round() ?? fallback}%';
