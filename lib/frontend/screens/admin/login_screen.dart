@@ -55,21 +55,9 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  bool get _isWakingUp =>
-      widget.state.loading &&
-      (widget.state.error?.contains('Waking up') ?? false);
+  bool get _isWakingUp => false;
 
   Future<void> _doLogin() async {
-    // Apply any server URL change before logging in.
-    final urlText = serverUrlController.text.trim();
-    if (urlText.isNotEmpty && urlText != widget.state.api.baseUrl) {
-      try {
-        widget.state.api.setBaseUrl(urlText);
-      } catch (e) {
-        if (mounted) showNotice(context, e.toString());
-        return;
-      }
-    }
     final success = await widget.state.login(
       emailController.text.trim(),
       passwordController.text,
@@ -163,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
 
           // ── Server URL (collapsible) ──────────────────────────────────────
-          GestureDetector(
+          if (false) GestureDetector(
             onTap: () => setState(() => showServerUrl = !showServerUrl),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -217,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 12),
 
           // ── Error / wakeup status ────────────────────────────────────────
-          if (widget.state.error != null && !_isWakingUp)
+          if (widget.state.error != null && !widget.state.loading)
             Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
@@ -257,10 +245,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   _isWakingUp
                       ? (widget.state.error ?? 'Connecting to server…')
-                      : 'Signing in securely…',
+                      : 'Logging in...',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: _isWakingUp ? Colors.orange.shade700 : muted,
+                    color: muted,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -276,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             )
           else
-            PrimaryAction('Sign In', onPressed: _doLogin),
+            PrimaryAction('Login', onPressed: _doLogin),
 
           const SizedBox(height: 32),
 
