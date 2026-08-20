@@ -77,6 +77,7 @@ class Client(TimeStampedModel):
 class Category(TimeStampedModel):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
+    manual_details = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:

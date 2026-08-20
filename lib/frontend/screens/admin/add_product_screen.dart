@@ -20,6 +20,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final mrp = TextEditingController();
   final priceSource = TextEditingController();
   final priceVerifiedAt = TextEditingController();
+  final Map<String, TextEditingController> manualDetails = {};
   int gst = 0;
   int? categoryId;
   String? unit;
@@ -51,6 +52,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     mrp.dispose();
     priceSource.dispose();
     priceVerifiedAt.dispose();
+    for (final controller in manualDetails.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -64,6 +68,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
     return match['name']?.toString() ?? '';
   }
+
+  List<_ManualDetailField> get _categoryDetailFields =>
+      _manualDetailFieldsFor(_selectedCategoryName);
+
+  TextEditingController _manualDetailController(String key) =>
+      manualDetails.putIfAbsent(key, TextEditingController.new);
 
   Future<void> pickImage() async {
     final image = await ImagePicker().pickImage(
@@ -138,6 +148,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
           'name': name.text.trim(),
           'sku': sku.text.trim(),
           'category': categoryId,
+          'manual_details': {
+            for (final field in _categoryDetailFields)
+              if (_manualDetailController(field.key).text.trim().isNotEmpty)
+                field.key: _manualDetailController(field.key).text.trim(),
+          },
           'unit': unit ?? 'Pack',
           'purchase_price': purchasePrice.text.trim(),
           'selling_price': sellingPrice.text.trim(),
@@ -223,7 +238,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   .toList(),
                               onChanged: saving
                                   ? null
-                                  : (v) => setState(() => categoryId = v),
+                                  : (v) => setState(() {
+                                      categoryId = v;
+                                      unit = null;
+                                    }),
                               validator: (v) =>
                                   v == null ? 'Select a category' : null,
                             ),
@@ -336,6 +354,28 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           suffixIcon: Icon(
                             Icons.qr_code_scanner,
                             color: blue,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+                      _SectionHeader(
+                        icon: Icons.edit_note_outlined,
+                        title: '$_selectedCategoryName details',
+                        caption: 'Enter the product information for this category.',
+                      ),
+                      const SizedBox(height: 12),
+                      ..._categoryDetailFields.map(
+                        (field) => Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: TextFormField(
+                            controller: _manualDetailController(field.key),
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: InputDecoration(
+                              labelText: field.label,
+                              hintText: field.hint,
+                              prefixIcon: Icon(field.icon, size: 18),
+                            ),
                           ),
                         ),
                       ),
@@ -638,6 +678,58 @@ class _NoCategoryPlaceholder extends StatelessWidget {
 }
 
 // ── Section header ────────────────────────────────────────────────────────────
+
+class _ManualDetailField {
+  const _ManualDetailField(this.key, this.label, this.hint, this.icon);
+
+  final String key;
+  final String label;
+  final String hint;
+  final IconData icon;
+}
+
+List<_ManualDetailField> _manualDetailFieldsFor(String category) {
+  final value = category.toLowerCase();
+  if (value.contains('beverage') || value.contains('drink') || value.contains('juice')) {
+    return const [
+      _ManualDetailField('brand', 'Brand', 'Example: Tropicana', Icons.business_outlined),
+      _ManualDetailField('volume', 'Volume', 'Example: 1 L', Icons.local_drink_outlined),
+      _ManualDetailField('flavour', 'Flavour', 'Example: Mango', Icons.spa_outlined),
+      _ManualDetailField('packaging', 'Packaging', 'Bottle, can or carton', Icons.inventory_2_outlined),
+    ];
+  }
+  if (value.contains('oil') || value.contains('grocery') || value.contains('food') ||
+      value.contains('spice') || value.contains('snack')) {
+    return const [
+      _ManualDetailField('brand', 'Brand', 'Example: Fortune', Icons.business_outlined),
+      _ManualDetailField('net_weight', 'Net weight', 'Example: 500 g', Icons.scale_outlined),
+      _ManualDetailField('variant', 'Variant / type', 'Example: Refined', Icons.tune_outlined),
+      _ManualDetailField('ingredients', 'Ingredients', 'Main ingredients', Icons.restaurant_outlined),
+    ];
+  }
+  if (value.contains('dairy') || value.contains('milk')) {
+    return const [
+      _ManualDetailField('brand', 'Brand', 'Example: Amul', Icons.business_outlined),
+      _ManualDetailField('quantity', 'Quantity', 'Example: 500 ml', Icons.scale_outlined),
+      _ManualDetailField('fat_content', 'Fat content', 'Example: 3%', Icons.percent_outlined),
+      _ManualDetailField('storage', 'Storage instructions', 'Keep refrigerated', Icons.ac_unit_outlined),
+    ];
+  }
+  if (value.contains('house') || value.contains('clean') || value.contains('personal')) {
+    return const [
+      _ManualDetailField('brand', 'Brand', 'Product brand', Icons.business_outlined),
+      _ManualDetailField('size', 'Size / quantity', 'Example: 500 ml', Icons.straighten),
+      _ManualDetailField('material', 'Material / formulation', 'Material or formulation', Icons.science_outlined),
+      _ManualDetailField('usage', 'Usage instructions', 'How the product is used', Icons.info_outline),
+    ];
+  }
+  return const [
+    _ManualDetailField('brand', 'Brand', 'Product brand', Icons.business_outlined),
+    _ManualDetailField('variant', 'Variant / model', 'Product variant or model', Icons.tune_outlined),
+    _ManualDetailField('size', 'Size / quantity', 'Example: Large, 500 g or 1 L', Icons.straighten),
+    _ManualDetailField('additional_info', 'Additional information', 'Any category-specific detail', Icons.notes_outlined),
+  ];
+}
 
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
