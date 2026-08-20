@@ -28,6 +28,12 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
 
 For a deployed backend, pass its HTTPS API URL using the same `API_BASE_URL` define.
 
+For Render, use `backend` as the service Root Directory and set the Start
+Command to `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
+--timeout 120 --access-logfile - --error-logfile -`. If the service Root
+Directory is the repository root, use `cd backend && gunicorn config.wsgi:application
+--bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile -`.
+
 ## Verification
 
 ```powershell
