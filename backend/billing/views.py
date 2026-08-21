@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import DatabaseError, models, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
@@ -258,6 +258,20 @@ class ItemViewSet(SearchableModelViewSet):
     serializer_class = ItemSerializer
     search_fields = ["name", "sku", "description", "category__name"]
     ordering_fields = ["name", "selling_price", "stock_quantity", "created_at"]
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except DatabaseError as exception:
+            # Restricted to authenticated product editors; expose the legacy
+            # database failure needed to repair production without a reset.
+            return Response(
+                {
+                    "detail": "Product could not be saved.",
+                    "diagnostic": f"{exception.__class__.__name__}: {exception}",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     def perform_create(self, serializer):
         item = serializer.save()
