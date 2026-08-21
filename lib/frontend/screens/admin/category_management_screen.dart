@@ -40,11 +40,8 @@ class CategoriesScreen extends StatelessWidget {
                       return _CategoryCard(
                         category: category,
                         state: state,
-                        onTap: () => _openCategoryProducts(
-                          context,
-                          state,
-                          category,
-                        ),
+                        onTap: () =>
+                            _openCategoryProducts(context, state, category),
                       );
                     },
                   ),
@@ -139,10 +136,7 @@ class _CategoryCard extends StatelessWidget {
                         ),
                         Text(
                           '$count product${count == 1 ? '' : 's'}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: muted,
-                          ),
+                          style: const TextStyle(fontSize: 11, color: muted),
                         ),
                       ],
                     ),
@@ -210,26 +204,22 @@ class _StockPill extends StatelessWidget {
     ),
     child: Text(
       '$count $label',
-      style: TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        color: color,
-      ),
+      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color),
     ),
   );
 }
 
 /// Opens a bottom sheet listing all products in [category] with an
 /// "Add Product" button pre-selecting that category.
-void _openCategoryProducts(
+Future<void> _openCategoryProducts(
   BuildContext context,
   AdminState state,
   Map<String, dynamic> category,
-) {
+) async {
   final categoryName = category['name']?.toString() ?? '';
   final categoryId = category['id'] as int?;
 
-  showModalBottomSheet<void>(
+  final addProduct = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -270,10 +260,7 @@ void _openCategoryProducts(
                   ),
                   FilledButton.icon(
                     onPressed: () {
-                      Navigator.pop(sheetContext);
-                      // Navigate to Add Product with this category pre-selected
-                      state.pendingCategoryId = categoryId;
-                      state.go(5);
+                      Navigator.pop(sheetContext, true);
                     },
                     icon: const Icon(Icons.add, size: 16),
                     label: const Text('Add Product'),
@@ -312,9 +299,7 @@ void _openCategoryProducts(
                             const SizedBox(height: 20),
                             FilledButton.icon(
                               onPressed: () {
-                                Navigator.pop(sheetContext);
-                                state.pendingCategoryId = categoryId;
-                                state.go(5);
+                                Navigator.pop(sheetContext, true);
                               },
                               icon: const Icon(Icons.add),
                               label: const Text('Add first product'),
@@ -342,6 +327,10 @@ void _openCategoryProducts(
       },
     ),
   );
+  if (addProduct == true) {
+    state.pendingCategoryId = categoryId;
+    state.go(5);
+  }
 }
 
 class _CategoryProductRow extends StatelessWidget {
@@ -414,10 +403,7 @@ class _CategoryProductRow extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 7,
-                  vertical: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
                   color: statusBg,
                   borderRadius: BorderRadius.circular(6),

@@ -97,6 +97,23 @@ class AdminNavigationPanel extends StatelessWidget {
   final AdminState state;
   final bool inDrawer;
 
+  void _openScreen(BuildContext context, int screen, {bool logout = false}) {
+    if (!inDrawer) {
+      state.go(screen);
+      if (logout) state.showLogoutConfirmation();
+      return;
+    }
+
+    // Closing the drawer deactivates its inherited widget subtree. Replacing
+    // the page before that route has finished closing leaves dependents
+    // registered against an inactive element in debug mode.
+    Navigator.of(context).pop();
+    Future<void>.delayed(const Duration(milliseconds: 350), () {
+      state.go(screen);
+      if (logout) state.showLogoutConfirmation();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final content = ColoredBox(
@@ -176,10 +193,7 @@ class AdminNavigationPanel extends StatelessWidget {
                       _AdminNavigationTile(
                         destination: destination,
                         selected: state.screen == destination.screen,
-                        onTap: () {
-                          state.go(destination.screen);
-                          if (inDrawer) Navigator.of(context).pop();
-                        },
+                        onTap: () => _openScreen(context, destination.screen),
                       ),
                   ],
                 ],
@@ -189,9 +203,7 @@ class AdminNavigationPanel extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               child: OutlinedButton.icon(
                 onPressed: () {
-                  state.go(15);
-                  state.showLogoutConfirmation();
-                  if (inDrawer) Navigator.of(context).pop();
+                  _openScreen(context, 15, logout: true);
                 },
                 icon: const Icon(Icons.logout_rounded, size: 18),
                 label: const Text('Sign out'),

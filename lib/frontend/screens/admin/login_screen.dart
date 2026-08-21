@@ -28,8 +28,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadRememberedLogin() async {
     final preferences = await SharedPreferences.getInstance();
     final shouldRemember = preferences.getBool(_rememberKey) ?? false;
-    final identifier =
-        shouldRemember ? preferences.getString(_identifierKey) ?? '' : '';
+    final identifier = shouldRemember
+        ? preferences.getString(_identifierKey) ?? ''
+        : '';
     if (!mounted) return;
     setState(() {
       remember = shouldRemember;
@@ -58,6 +59,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool get _isWakingUp => false;
 
   Future<void> _doLogin() async {
+    // Detach EditableText/keyboard inherited dependencies before a successful
+    // login replaces this entire Scaffold with the dashboard.
+    FocusManager.instance.primaryFocus?.unfocus();
     final success = await widget.state.login(
       emailController.text.trim(),
       passwordController.text,
@@ -139,9 +143,16 @@ class _LoginScreenState extends State<LoginScreen> {
               const Text('Remember me', style: TextStyle(fontSize: 12)),
               const Spacer(),
               TextButton(
-                onPressed: () => widget.state.openChangePassword(
-                  emailController.text.trim(),
-                ),
+                onPressed: () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      widget.state.openChangePassword(
+                        emailController.text.trim(),
+                      );
+                    }
+                  });
+                },
                 child: const Text(
                   'Forgot Password?',
                   style: TextStyle(fontSize: 12),
@@ -151,33 +162,34 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
 
           // ── Server URL (collapsible) ──────────────────────────────────────
-          if (false) GestureDetector(
-            onTap: () => setState(() => showServerUrl = !showServerUrl),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: [
-                  const Icon(Icons.dns_outlined, size: 15, color: muted),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      widget.state.api.baseUrl,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, color: muted),
+          if (false)
+            GestureDetector(
+              onTap: () => setState(() => showServerUrl = !showServerUrl),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.dns_outlined, size: 15, color: muted),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        widget.state.api.baseUrl,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: muted),
+                      ),
                     ),
-                  ),
-                  Icon(
-                    showServerUrl
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    size: 18,
-                    color: muted,
-                  ),
-                ],
+                    Icon(
+                      showServerUrl
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 18,
+                      color: muted,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
           if (showServerUrl) ...[
             TextFormField(
               controller: serverUrlController,
@@ -217,11 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.error_outline,
-                    color: red,
-                    size: 18,
-                  ),
+                  const Icon(Icons.error_outline, color: red, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
