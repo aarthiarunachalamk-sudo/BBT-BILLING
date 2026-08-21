@@ -158,39 +158,68 @@ class AdminState extends ChangeNotifier {
   }
 
   Future<void> refreshAll() async {
-    final responses = await Future.wait<dynamic>([
-      api.getMap('dashboard'),
-      api.getList('users'),
-      api.getList('items'),
-      api.getList('categories'),
-      api.getList('suppliers'),
-      api.getList('purchase-orders'),
-      api.getList('discount-approvals'),
-      api.getList('invoices'),
-      api.getList('audit-logs'),
-      api.getList('role-permissions'),
-      api.getList('store-settings'),
-      api.getList('whatsapp-messages'),
-    ]);
-    dashboard = responses[0];
-    users = responses[1];
-    products = responses[2];
-    categories = responses[3];
-    suppliers = responses[4];
-    purchaseOrders = responses[5];
-    discountApprovals = responses[6];
-    invoices = responses[7];
-    auditLogs = responses[8];
-    rolePermissions = responses[9];
-    final settings = responses[10] as List<Map<String, dynamic>>;
-    whatsappMessages = responses[11];
-    storeSettings = settings.isEmpty ? {} : settings.first;
+    Object? firstFailure;
+    var loaded = 0;
+    Future<T?> load<T>(Future<T> Function() request) async {
+      try {
+        final value = await request();
+        loaded++;
+        return value;
+      } catch (exception) {
+        firstFailure ??= exception;
+        return null;
+      }
+    }
+
+    // Load sequentially. A Render free-tier instance can abort connections
+    // when the phone opens all dashboard requests at the same time.
+    final newCategories = await load(() => api.getList('categories'));
+    if (newCategories != null) categories = newCategories;
+    final newDashboard = await load(() => api.getMap('dashboard'));
+    if (newDashboard != null) dashboard = newDashboard;
+    final newUsers = await load(() => api.getList('users'));
+    if (newUsers != null) users = newUsers;
+    final newProducts = await load(() => api.getList('items'));
+    if (newProducts != null) products = newProducts;
+    final newSuppliers = await load(() => api.getList('suppliers'));
+    if (newSuppliers != null) suppliers = newSuppliers;
+    final newPurchaseOrders = await load(() => api.getList('purchase-orders'));
+    if (newPurchaseOrders != null) purchaseOrders = newPurchaseOrders;
+    final newDiscounts = await load(() => api.getList('discount-approvals'));
+    if (newDiscounts != null) discountApprovals = newDiscounts;
+    final newInvoices = await load(() => api.getList('invoices'));
+    if (newInvoices != null) invoices = newInvoices;
+    final newAuditLogs = await load(() => api.getList('audit-logs'));
+    if (newAuditLogs != null) auditLogs = newAuditLogs;
+    final newPermissions = await load(() => api.getList('role-permissions'));
+    if (newPermissions != null) rolePermissions = newPermissions;
+    final settings = await load(() => api.getList('store-settings'));
+    if (settings != null) {
+      storeSettings = settings.isEmpty ? {} : settings.first;
+    }
+    final newMessages = await load(() => api.getList('whatsapp-messages'));
+    if (newMessages != null) whatsappMessages = newMessages;
+    if (loaded == 0 && firstFailure != null) throw firstFailure!;
     settingsDraft = Map<String, dynamic>.from(storeSettings);
     if (rolePermissions.isNotEmpty) {
       selectedRole = _roleLabel(rolePermissions.first['role'].toString());
     }
     _hydrateControls();
     notifyListeners();
+  }
+
+  Future<bool> refreshCategories() async {
+    try {
+      categories = await api.getList('categories');
+      _hydrateControls();
+      error = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      error = 'Cannot reach ${api.baseUrl}';
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> reloadAll() async {

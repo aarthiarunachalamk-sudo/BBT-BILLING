@@ -37,7 +37,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
       widget.state.pendingCategoryId = null;
     } else if (widget.state.categories.isNotEmpty) {
       categoryId = widget.state.categories.first['id'] as int?;
+    } else {
+      unawaited(_loadCategories());
     }
+  }
+
+  Future<void> _loadCategories() async {
+    final loaded = await widget.state.refreshCategories();
+    if (!mounted || !loaded || widget.state.categories.isEmpty) return;
+    setState(() {
+      categoryId ??= widget.state.categories.first['id'] as int?;
+    });
   }
 
   @override
