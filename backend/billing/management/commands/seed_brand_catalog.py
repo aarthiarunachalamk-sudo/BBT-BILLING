@@ -1,5 +1,7 @@
 from decimal import Decimal
+from pathlib import Path
 
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 
 from billing.models import Brand, Category, Item, Supplier
@@ -31,7 +33,38 @@ class Command(BaseCommand):
         ("Colgate", "Colgate-Palmolive", "Personal Care", "Strong Teeth Toothpaste 200 g", "BR-COLGATE-PASTE", "Tube", "92", "115", 30),
     )
 
+    IMAGE_BY_SKU = {
+        "BR-INDIAGATE-RICE": "india-gate-rice-5kg.png",
+        "BR-AASHIRVAAD-ATTA": "aashirvaad-atta-5kg.png",
+        "BR-TATA-TOORDAL": "tata-sampann-toor-dal-1kg.png",
+        "BR-SAKTHI-TURMERIC": "sakthi-turmeric-200g.png",
+        "BR-AACHI-CHILLI": "aachi-chilli-200g.png",
+        "BR-FORTUNE-OIL": "fortune-sunflower-oil-1l.png",
+        "BR-GOLDWINNER-OIL": "gold-winner-sunflower-oil-1l.png",
+        "BR-TATASALT-1KG": "tata-salt-1kg.png",
+        "BR-AMUL-MILK": "amul-milk-1l.png",
+        "BR-BRITANNIA-BISCUIT": "britannia-good-day-200g.png",
+        "BR-PARLE-BISCUIT": "parle-g-250g.png",
+        "BR-SUNFEAST-BISCUIT": "sunfeast-marie-250g.png",
+        "BR-NESTLE-NOODLES": "nestle-maggi-280g.png",
+        "BR-BRU-COFFEE": "bru-coffee-200g.png",
+        "BR-REDLABEL-TEA": "red-label-tea-250g.png",
+        "BR-DOVE-SOAP": "dove-soap-100g.png",
+        "BR-LUX-SOAP": "lux-soap-100g.png",
+        "BR-SURFEXCEL-DETERGENT": "surf-excel-1kg.png",
+        "BR-ARIEL-DETERGENT": "ariel-matic-1kg.png",
+        "BR-COLGATE-PASTE": "colgate-200g.png",
+    }
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--replace-images",
+            action="store_true",
+            help="Replace catalog images with exact brand/product/quantity assets.",
+        )
+
     def handle(self, *args, **options):
+        image_directory = Path(__file__).with_name("brand_product_images")
         supplier, _ = Supplier.objects.get_or_create(
             name="National FMCG Distributor",
             defaults={"contact_person": "Catalog Supply", "phone": "9999999999"},
@@ -52,7 +85,7 @@ class Command(BaseCommand):
                 },
             )
             brand.categories.add(category)
-            _, created = Item.objects.update_or_create(
+            item, created = Item.objects.update_or_create(
                 sku=sku,
                 defaults={
                     "item_type": Item.ItemType.MATERIAL,
@@ -72,6 +105,13 @@ class Command(BaseCommand):
                     "is_active": True,
                 },
             )
+            if not item.image or options["replace_images"]:
+                image_path = image_directory / self.IMAGE_BY_SKU[sku]
+                item.image.save(
+                    f"brand-catalog-{sku.lower()}.png",
+                    ContentFile(image_path.read_bytes()),
+                    save=True,
+                )
             created_products += int(created)
 
         legacy_assignments = {
