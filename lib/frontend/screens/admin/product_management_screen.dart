@@ -12,6 +12,7 @@ class _ProductsScreenState extends State<ProductsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<String> _categoryTabs = [];
+  bool _loadingProducts = false;
 
   @override
   void initState() {
@@ -22,6 +23,22 @@ class _ProductsScreenState extends State<ProductsScreen>
       if (name.isNotEmpty) _categoryTabs.add(name);
     }
     _tabController = TabController(length: _categoryTabs.length, vsync: this);
+    unawaited(_loadProductsOnEntry());
+  }
+
+  Future<void> _loadProductsOnEntry() async {
+    if (widget.state.products.isNotEmpty || _loadingProducts) return;
+    setState(() => _loadingProducts = true);
+    while (mounted && widget.state.refreshing) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    if (!mounted) return;
+    if (widget.state.products.isEmpty) {
+      await widget.state.refreshProducts();
+    }
+    if (!mounted) return;
+    _buildTabs();
+    setState(() => _loadingProducts = false);
   }
 
   @override
@@ -54,6 +71,8 @@ class _ProductsScreenState extends State<ProductsScreen>
   Widget build(BuildContext context) {
     final state = widget.state;
     final mobile = MediaQuery.sizeOf(context).width < 620;
+    final waitingForProducts =
+        state.products.isEmpty && (_loadingProducts || state.refreshing);
     final query = state.productQuery.trim().toLowerCase();
 
     final allProducts = state.products.where((product) {
@@ -99,7 +118,18 @@ class _ProductsScreenState extends State<ProductsScreen>
           ],
         ),
       ],
-      child: mobile
+      child: waitingForProducts
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 14),
+                  Text('Loading products...', style: TextStyle(color: muted)),
+                ],
+              ),
+            )
+          : mobile
           ? _MobileProductList(state: state, products: allProducts)
           : Column(
               children: [

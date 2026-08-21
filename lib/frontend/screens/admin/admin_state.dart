@@ -232,6 +232,24 @@ class AdminState extends ChangeNotifier {
     }
   }
 
+  Future<bool> refreshProducts() async {
+    try {
+      products = await api.getList('items');
+      productQuery = '';
+      error = null;
+      notifyListeners();
+      return true;
+    } on ApiException catch (exception) {
+      error = exception.message;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      error = 'Cannot reach ${api.baseUrl}';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> reloadAll() async {
     if (refreshing) return false;
     refreshing = true;
