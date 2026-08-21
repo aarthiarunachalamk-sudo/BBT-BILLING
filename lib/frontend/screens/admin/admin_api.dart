@@ -292,10 +292,21 @@ class AdminApi {
   // ── Response handling ─────────────────────────────────────────────────────
 
   dynamic _decode(http.Response response) {
-    final dynamic data = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(utf8.decode(response.bodyBytes));
+    dynamic data = <String, dynamic>{};
+    if (response.bodyBytes.isNotEmpty) {
+      try {
+        data = jsonDecode(utf8.decode(response.bodyBytes));
+      } on FormatException {
+        data = <String, dynamic>{};
+      }
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode >= 500) {
+        throw ApiException(
+          'Server update in progress. Please retry in a minute.',
+          response.statusCode,
+        );
+      }
       final detail = data is Map
           ? data['detail'] ?? data.values.firstOrNull
           : null;
