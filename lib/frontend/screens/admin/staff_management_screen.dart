@@ -119,7 +119,7 @@ class StaffScreen extends StatelessWidget {
                           ),
                         ),
                         title: Text(
-                          name,
+                          '${user['employee_id'] ?? ''}${user['employee_id'] == null ? '' : ' – '}$name',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -129,39 +129,32 @@ class StaffScreen extends StatelessWidget {
                           user['email']?.toString() ?? '',
                           style: const TextStyle(fontSize: 10),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 72,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    _statusText(user['role']),
-                                    textAlign: TextAlign.end,
-                                    style: const TextStyle(
-                                      fontSize: 9,
-                                      color: green,
-                                    ),
+                        trailing: SizedBox(
+                          width: 98,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _statusText(user['role']),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    color: muted,
                                   ),
-                                  Text(
-                                    active ? 'Active' : 'Inactive',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: active ? green : red,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
-                            Switch(
-                              value: active,
-                              onChanged: (value) =>
-                                  state.toggleStaff(name, value),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              Text(
+                                active ? 'Active' : 'Inactive',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: active ? green : red,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },

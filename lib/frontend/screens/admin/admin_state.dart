@@ -79,7 +79,8 @@ class AdminState extends ChangeNotifier {
       2 || 3 => 1,
       >= 4 && <= 9 => 2,
       >= 10 && <= 13 => 3,
-      >= 14 => 4,
+      14 || 17 => 4,
+      >= 15 => 5,
       _ => navIndex,
     };
     notifyListeners();
@@ -304,8 +305,9 @@ class AdminState extends ChangeNotifier {
     screen = switch (index) {
       0 => 1,
       1 => 2,
-      2 => 10,
-      3 => 14,
+      2 => 4,
+      3 => 10,
+      4 => 14,
       _ => 15,
     };
     notifyListeners();

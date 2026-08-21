@@ -13,6 +13,7 @@ class UserDetailsScreen extends StatelessWidget {
     final bills = (user['recent_bills'] as List? ?? const []);
     final stock = (user['recent_stock_updates'] as List? ?? const []);
     final payments = (user['recent_payments'] as List? ?? const []);
+    final mobile = MediaQuery.sizeOf(context).width < 620;
     return _AdminPage(
       state: state,
       title: 'User Details',
@@ -23,6 +24,8 @@ class UserDetailsScreen extends StatelessWidget {
               'User details are unavailable.',
               icon: Icons.person_off_outlined,
             )
+          : mobile
+          ? _mobileDetails(user, name)
           : ListView(
               padding: const EdgeInsets.all(14),
               children: [
@@ -122,6 +125,72 @@ class UserDetailsScreen extends StatelessWidget {
             ),
     );
   }
+
+  Widget _mobileDetails(Map<String, dynamic> user, String name) => ListView(
+    padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
+    children: [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: const Color(0xFFDCEAFF),
+            child: Text(
+              name.isEmpty ? '?' : name[0],
+              style: const TextStyle(
+                color: navy,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${user['employee_id'] ?? '—'} – ${name.isEmpty ? user['username'] : name}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  _statusText(user['role']),
+                  style: const TextStyle(fontSize: 11, color: muted),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              user['is_active'] == true ? 'Active' : 'Inactive',
+              style: TextStyle(
+                color: user['is_active'] == true ? green : red,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+      const Divider(height: 28),
+      _detail('Email', user['email']),
+      _detail('Mobile', user['phone']),
+      _detail('Branch', user['branch']),
+      _detail('Login Time', user['last_login']),
+      _detail("Today's Bills", user['today_bills']),
+      _detail('Total Sales', _money(user['today_sales'])),
+      _detail('Cash', _money(user['cash_collection'])),
+      _detail('UPI', _money(user['upi_collection'])),
+      _detail('Card', _money(user['card_collection'])),
+      _detail('Stock Updated', '${user['stock_updated_count'] ?? 0} Items'),
+      _detail('Logout Time', user['last_logout']),
+    ],
+  );
 
   Widget _detail(String label, dynamic value) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 7),

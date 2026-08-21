@@ -53,6 +53,7 @@ class _ProductsScreenState extends State<ProductsScreen>
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
+    final mobile = MediaQuery.sizeOf(context).width < 620;
     final query = state.productQuery.trim().toLowerCase();
 
     final allProducts = state.products.where((product) {
@@ -98,87 +99,171 @@ class _ProductsScreenState extends State<ProductsScreen>
           ],
         ),
       ],
-      child: Column(
-        children: [
-          // ── Stats + search ───────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-            child: _CatalogHeader(
-              totalProducts: state.products.length,
-              lowStockCount: lowStockCount,
-              outOfStockCount: outOfStockCount,
-              inventoryValue: inventoryValue,
-              onAddProduct: () => state.go(5),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: Row(
+      child: mobile
+          ? _MobileProductList(state: state, products: allProducts)
+          : Column(
               children: [
-                Expanded(
-                  child: SearchBox(
-                    'Search by name, SKU or category',
-                    trailing: Icons.tune_rounded,
-                    onTrailingTap: () => _showProductFilters(context, state),
-                    onChanged: state.setProductQuery,
+                // ── Stats + search ───────────────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  child: _CatalogHeader(
+                    totalProducts: state.products.length,
+                    lowStockCount: lowStockCount,
+                    outOfStockCount: outOfStockCount,
+                    inventoryValue: inventoryValue,
+                    onAddProduct: () => state.go(5),
                   ),
                 ),
-                if (state.productStockFilter != 'All') ...[
-                  const SizedBox(width: 10),
-                  InputChip(
-                    avatar: const Icon(Icons.filter_alt, size: 16),
-                    label: Text(state.productStockFilter),
-                    onDeleted: () => state.setProductStockFilter('All'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SearchBox(
+                          'Search by name, SKU or category',
+                          trailing: Icons.tune_rounded,
+                          onTrailingTap: () =>
+                              _showProductFilters(context, state),
+                          onChanged: state.setProductQuery,
+                        ),
+                      ),
+                      if (state.productStockFilter != 'All') ...[
+                        const SizedBox(width: 10),
+                        InputChip(
+                          avatar: const Icon(Icons.filter_alt, size: 16),
+                          label: Text(state.productStockFilter),
+                          onDeleted: () => state.setProductStockFilter('All'),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
+                ),
+
+                // ── Category tabs ────────────────────────────────────────────────
+                if (_categoryTabs.length > 1)
+                  TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    labelStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    unselectedLabelStyle: const TextStyle(fontSize: 12),
+                    tabs: _categoryTabs.map((t) => Tab(text: t)).toList(),
+                  ),
+
+                // ── Product grid per tab ─────────────────────────────────────────
+                Expanded(
+                  child: _categoryTabs.length > 1
+                      ? TabBarView(
+                          controller: _tabController,
+                          children: _categoryTabs.map((tab) {
+                            final products = tab == 'All'
+                                ? allProducts
+                                : allProducts
+                                      .where(
+                                        (p) =>
+                                            p['category_name']
+                                                ?.toString()
+                                                .toLowerCase() ==
+                                            tab.toLowerCase(),
+                                      )
+                                      .toList();
+                            return _ProductGrid(
+                              state: state,
+                              products: products,
+                              categoryName: tab == 'All' ? null : tab,
+                            );
+                          }).toList(),
+                        )
+                      : _ProductGrid(state: state, products: allProducts),
+                ),
               ],
             ),
-          ),
-
-          // ── Category tabs ────────────────────────────────────────────────
-          if (_categoryTabs.length > 1)
-            TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              labelStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-              unselectedLabelStyle: const TextStyle(fontSize: 12),
-              tabs: _categoryTabs.map((t) => Tab(text: t)).toList(),
-            ),
-
-          // ── Product grid per tab ─────────────────────────────────────────
-          Expanded(
-            child: _categoryTabs.length > 1
-                ? TabBarView(
-                    controller: _tabController,
-                    children: _categoryTabs.map((tab) {
-                      final products = tab == 'All'
-                          ? allProducts
-                          : allProducts
-                                .where(
-                                  (p) =>
-                                      p['category_name']
-                                          ?.toString()
-                                          .toLowerCase() ==
-                                      tab.toLowerCase(),
-                                )
-                                .toList();
-                      return _ProductGrid(
-                        state: state,
-                        products: products,
-                        categoryName: tab == 'All' ? null : tab,
-                      );
-                    }).toList(),
-                  )
-                : _ProductGrid(state: state, products: allProducts),
-          ),
-        ],
-      ),
     );
   }
+}
+
+class _MobileProductList extends StatelessWidget {
+  const _MobileProductList({required this.state, required this.products});
+
+  final AdminState state;
+  final List<Map<String, dynamic>> products;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+        child: SearchBox(
+          'Search by name, SKU or barcode',
+          trailing: Icons.filter_alt_outlined,
+          onTrailingTap: () => _showProductFilters(context, state),
+          onChanged: state.setProductQuery,
+        ),
+      ),
+      Expanded(
+        child: products.isEmpty
+            ? const _EmptyState(
+                'No products found.',
+                icon: Icons.inventory_2_outlined,
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+                itemCount: products.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  final status = product['stock_status']?.toString() ?? '';
+                  return ListTile(
+                    minTileHeight: 72,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                    onTap: () => _showEditPriceSheet(context, state, product),
+                    leading: InkWell(
+                      onTap: () =>
+                          _replaceProductImage(context, state, product),
+                      child: SizedBox.square(
+                        dimension: 52,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: _ProductImage(
+                            url: _productImageUrl(state, product['image']),
+                          ),
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      product['name']?.toString() ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'SKU: ${product['sku'] ?? '—'}\nStock: ${product['stock_quantity'] ?? 0}  |  Shelf: ${product['shelf_quantity'] ?? product['shelf_stock'] ?? 0}',
+                        style: const TextStyle(fontSize: 9, height: 1.45),
+                      ),
+                    ),
+                    trailing: _StockBadge(status: status),
+                  );
+                },
+              ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+        child: PrimaryAction(
+          'Add Product',
+          icon: Icons.add,
+          onPressed: () => state.go(5),
+        ),
+      ),
+    ],
+  );
 }
 
 /// A scrollable grid of product cards, with an empty state and an
