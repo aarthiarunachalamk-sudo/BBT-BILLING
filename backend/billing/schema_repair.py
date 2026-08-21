@@ -12,6 +12,7 @@ FIELD_NAMES = {
     Item: (
         "manual_details",
         "barcode",
+        "image",
         "mrp",
         "price_source_url",
         "price_verified_at",
