@@ -88,7 +88,10 @@ void main() {
       client: MockClient((request) async {
         if (request.url.path.endsWith('/auth/login/')) {
           return http.Response(
-            jsonEncode({'access': 'token'}),
+            jsonEncode({
+              'access': 'token',
+              'user': {'role': 'admin'},
+            }),
             200,
             headers: {'content-type': 'application/json'},
           );
@@ -114,7 +117,7 @@ void main() {
     expect(state.screen, 1);
     expect(state.refreshing, isTrue);
     await Future<void>.delayed(const Duration(milliseconds: 10));
-    expect(hydrationRequests, 12);
+    expect(hydrationRequests, 16);
 
     hydrationGate.complete();
     await Future<void>.delayed(const Duration(milliseconds: 20));

@@ -1,9 +1,12 @@
+from datetime import timedelta
+from decimal import Decimal
 from io import StringIO
 from tempfile import TemporaryDirectory
-from django.urls import reverse
+
 from django.core.management import call_command
 from django.test import override_settings
-from decimal import Decimal
+from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -16,9 +19,12 @@ from .models import (
     Item,
     PurchaseOrder,
     PurchaseOrderItem,
+    ProductBatch,
     Quotation,
     RolePermission,
     StoreSettings,
+    StockAdjustment,
+    StockReview,
     Supplier,
     User,
 )
@@ -182,6 +188,39 @@ class AdminFlowTests(APITestCase):
         self.assertIn("low_stock_products", response.data)
         self.assertIn("top_products", response.data)
         self.assertIn("payment_breakdown", response.data)
+        self.assertIn("out_of_stock_count", response.data)
+        self.assertIn("expiring_soon_count", response.data)
+        self.assertIn("quantity_review_due_count", response.data)
+        self.assertIn("shelf_stock_3_month_count", response.data)
+
+    def test_physical_review_creates_auditable_stock_adjustment(self):
+        product = Item.objects.get(sku="TEST-ITEM")
+        product.store_stock = 2
+        product.save(update_fields=["store_stock"])
+        response = self.client.post(
+            "/api/inventory/quantity-reviews/",
+            {"item": product.pk, "physical_quantity": 5, "reason": "Cycle count"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        product.refresh_from_db()
+        self.assertEqual(product.stock_quantity, 5)
+        adjustment = StockAdjustment.objects.get(item=product)
+        self.assertEqual(adjustment.previous_quantity, 2)
+        self.assertEqual(adjustment.difference, 3)
+        self.assertEqual(StockReview.objects.filter(item=product).count(), 1)
+
+    def test_expiry_filter_returns_matching_batches(self):
+        product = Item.objects.get(sku="TEST-ITEM")
+        ProductBatch.objects.create(
+            item=product,
+            batch_number="EXP-7",
+            quantity=2,
+            expiry_date=timezone.localdate() + timedelta(days=5),
+        )
+        response = self.client.get("/api/inventory/batches/?range=7")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_product_creation_records_opening_inventory(self):
         category = Category.objects.get(name="Test Category")

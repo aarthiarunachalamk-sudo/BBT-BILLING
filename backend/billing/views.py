@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from rest_framework import filters, permissions, status, viewsets
@@ -23,12 +23,15 @@ from .models import (
     InvoiceItem,
     Item,
     Payment,
+    ProductBatch,
     PurchaseOrder,
     Quotation,
     Supplier,
     ReturnRequest,
     RolePermission,
     StoreSettings,
+    StockAdjustment,
+    StockReview,
     WhatsAppMessage,
 )
 from .serializers import (
@@ -41,18 +44,30 @@ from .serializers import (
     InvoiceSerializer,
     ItemSerializer,
     PaymentSerializer,
+    ProductBatchSerializer,
     PurchaseOrderSerializer,
     QuotationSerializer,
     SupplierSerializer,
     ReturnRequestSerializer,
     RolePermissionSerializer,
     StoreSettingsSerializer,
+    StockAdjustmentSerializer,
+    StockReviewSerializer,
     UserSerializer,
     WhatsAppMessageSerializer,
 )
 
 
 User = get_user_model()
+
+
+class IsAdminOrManager(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and (request.user.is_superuser or request.user.role in {User.Role.ADMIN, User.Role.MANAGER})
+        )
 
 
 class AdminTokenObtainPairView(TokenObtainPairView):
@@ -116,8 +131,16 @@ def change_password(request):
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
+    request.user.last_logout = timezone.now()
+    request.user.save(update_fields=["last_logout"])
     record_audit(request, "Logout", "Auth")
     return Response({"detail": "Logged out successfully."})
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def current_user(request):
+    return Response(UserSerializer(request.user).data)
 
 
 def record_audit(request, action, module, instance=None, metadata=None):
@@ -153,9 +176,60 @@ class SearchableModelViewSet(viewsets.ModelViewSet):
 class UserViewSet(SearchableModelViewSet):
     queryset = User.objects.all().order_by("first_name", "username")
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAdminUser]
-    search_fields = ["username", "email", "first_name", "last_name"]
+    permission_classes = [IsAdminOrManager]
+    search_fields = ["username", "employee_id", "email", "first_name", "last_name", "phone", "branch"]
     ordering_fields = ["username", "first_name", "date_joined"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        role = self.request.query_params.get("role")
+        branch = self.request.query_params.get("branch")
+        active = self.request.query_params.get("status")
+        if role:
+            queryset = queryset.filter(role=role)
+        if branch:
+            queryset = queryset.filter(branch__iexact=branch)
+        if active in {"active", "inactive"}:
+            queryset = queryset.filter(is_active=active == "active")
+        return queryset
+
+    @action(detail=True, methods=["post"])
+    def activate(self, request, pk=None):
+        user = self.get_object()
+        user.is_active = True
+        user.save(update_fields=["is_active"])
+        record_audit(request, "User activated", "Users", user)
+        return Response(self.get_serializer(user).data)
+
+    @action(detail=True, methods=["post"])
+    def deactivate(self, request, pk=None):
+        user = self.get_object()
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+        record_audit(request, "User deactivated", "Users", user)
+        return Response(self.get_serializer(user).data)
+
+    @action(detail=True, methods=["get"])
+    def activity(self, request, pk=None):
+        return Response(AuditLogSerializer(self.get_object().audit_logs.all()[:100], many=True).data)
+
+    @action(detail=True, methods=["get"])
+    def summary(self, request, pk=None):
+        user = self.get_object()
+        today = timezone.localdate()
+        invoices = Invoice.objects.filter(created_by=user, invoice_date=today)
+        payments = Payment.objects.filter(collected_by=user, status=Payment.Status.VERIFIED, verified_at__date=today)
+        by_method = {row["method"]: row["total"] for row in payments.values("method").annotate(total=Sum("amount"))}
+        return Response({
+            **UserSerializer(user).data,
+            "today_bills": invoices.count(),
+            "today_sales": invoices.aggregate(total=Sum("total"))["total"] or Decimal("0.00"),
+            "cash_collection": by_method.get(Payment.Method.CASH, Decimal("0.00")),
+            "upi_collection": by_method.get(Payment.Method.UPI, Decimal("0.00")),
+            "card_collection": by_method.get(Payment.Method.CARD, Decimal("0.00")),
+            "stock_updated_count": InventoryTransaction.objects.filter(performed_by=user, created_at__date=today).count(),
+            "last_activity": AuditLogSerializer(user.audit_logs.first()).data if user.audit_logs.exists() else None,
+        })
 
 
 class ClientViewSet(SearchableModelViewSet):
@@ -187,6 +261,9 @@ class ItemViewSet(SearchableModelViewSet):
 
     def perform_create(self, serializer):
         item = serializer.save()
+        if item.stock_quantity and not item.store_stock and not item.shelf_stock:
+            item.store_stock = item.stock_quantity
+            item.save(update_fields=["store_stock"])
         if item.item_type == Item.ItemType.MATERIAL and item.stock_quantity > 0:
             InventoryTransaction.objects.create(
                 item=item,
@@ -237,13 +314,30 @@ class ItemViewSet(SearchableModelViewSet):
         item_type = self.request.query_params.get("type")
         active = self.request.query_params.get("active")
         category = self.request.query_params.get("category")
+        stock_status = self.request.query_params.get("stock_status")
         if item_type:
             queryset = queryset.filter(item_type=item_type)
         if active in {"true", "false"}:
             queryset = queryset.filter(is_active=active == "true")
         if category:
             queryset = queryset.filter(category_id=category)
+        if stock_status == "low_stock":
+            queryset = queryset.filter(stock_quantity__gt=0, stock_quantity__lte=models.F("reorder_level"))
+        elif stock_status == "out_of_stock":
+            queryset = queryset.filter(stock_quantity=0)
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="current-stock")
+    def current_stock(self, request):
+        return Response(self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data)
+
+    @action(detail=False, methods=["get"], url_path="shelf-stock")
+    def shelf_stock_list(self, request):
+        queryset = self.get_queryset().filter(shelf_stock__gt=0)
+        age_days = int(request.query_params.get("age_days", 0) or 0)
+        if age_days:
+            queryset = queryset.filter(shelf_added_date__lte=timezone.localdate() - timedelta(days=age_days))
+        return Response(self.get_serializer(queryset, many=True).data)
 
     @action(detail=True, methods=["post"])
     def adjust_stock(self, request, pk=None):
@@ -257,9 +351,10 @@ class ItemViewSet(SearchableModelViewSet):
         if quantity == 0 or item.stock_quantity + quantity < 0:
             return Response({"quantity": "Stock cannot become negative and change cannot be zero."}, status=status.HTTP_400_BAD_REQUEST)
 
-        previous = item.stock_quantity
-        item.stock_quantity += quantity
-        item.save(update_fields=["stock_quantity", "updated_at"])
+        previous = item.total_stock
+        item.store_stock = max(item.store_stock + quantity, 0)
+        item.stock_quantity = item.store_stock + item.shelf_stock
+        item.save(update_fields=["store_stock", "stock_quantity", "updated_at"])
         transaction_type = request.data.get("transaction_type", InventoryTransaction.TransactionType.ADJUSTMENT)
         stock_entry = InventoryTransaction.objects.create(
             item=item,
@@ -272,6 +367,82 @@ class ItemViewSet(SearchableModelViewSet):
             performed_by=request.user,
         )
         return Response(InventoryTransactionSerializer(stock_entry).data, status=status.HTTP_201_CREATED)
+
+
+class ProductBatchViewSet(SearchableModelViewSet):
+    queryset = ProductBatch.objects.select_related("item", "supplier").all()
+    serializer_class = ProductBatchSerializer
+    search_fields = ["item__name", "item__sku", "batch_number"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        range_name = self.request.query_params.get("range")
+        today = timezone.localdate()
+        ranges = {"expired": (None, -1), "7": (0, 7), "30": (8, 30), "90": (31, 90)}
+        if range_name in ranges:
+            start, end = ranges[range_name]
+            if start is None:
+                queryset = queryset.filter(expiry_date__lt=today)
+            else:
+                queryset = queryset.filter(expiry_date__range=(today + timedelta(days=start), today + timedelta(days=end)))
+        return queryset
+
+    @action(detail=True, methods=["post"], url_path="remove-from-shelf")
+    def remove_from_shelf(self, request, pk=None):
+        return self._set_status(request, "removed")
+
+    @action(detail=True, methods=["post"], url_path="return-supplier")
+    def return_supplier(self, request, pk=None):
+        return self._set_status(request, "returned")
+
+    @action(detail=True, methods=["post"])
+    def dispose(self, request, pk=None):
+        return self._set_status(request, "disposed")
+
+    @action(detail=True, methods=["post"])
+    def clearance(self, request, pk=None):
+        return self._set_status(request, "clearance")
+
+    def _set_status(self, request, value):
+        batch = self.get_object()
+        batch.status = value
+        batch.save(update_fields=["status", "updated_at"])
+        record_audit(request, f"Expiry batch {value}", "Inventory", batch)
+        return Response(self.get_serializer(batch).data)
+
+
+class StockReviewViewSet(viewsets.ModelViewSet):
+    queryset = StockReview.objects.select_related("item", "reviewed_by").all()
+    serializer_class = StockReviewSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status_name = self.request.query_params.get("status")
+        today = timezone.localdate()
+        if status_name == "due": queryset = queryset.filter(next_review_date=today)
+        if status_name == "overdue": queryset = queryset.filter(next_review_date__lt=today).exclude(status=StockReview.Status.UPDATED)
+        if status_name == "updated": queryset = queryset.filter(status=StockReview.Status.UPDATED)
+        return queryset
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        item = Item.objects.select_for_update().get(pk=self.request.data.get("item"))
+        physical = int(self.request.data.get("physical_quantity"))
+        previous = item.total_stock
+        difference = physical - previous
+        review = serializer.save(system_quantity=previous, difference=difference, status=StockReview.Status.UPDATED, reviewed_by=self.request.user, reviewed_at=timezone.now(), next_review_date=timezone.localdate() + timedelta(days=14))
+        if difference:
+            StockAdjustment.objects.create(item=item, previous_quantity=previous, new_quantity=physical, difference=difference, reason=self.request.data.get("reason", "Physical stock review"), adjusted_by=self.request.user)
+            item.store_stock = max(physical - item.shelf_stock, 0)
+            item.stock_quantity = item.store_stock + item.shelf_stock
+        item.last_stock_review_date = timezone.localdate()
+        item.save(update_fields=["store_stock", "stock_quantity", "last_stock_review_date", "updated_at"])
+        record_audit(self.request, "Quantity review completed", "Inventory", review, {"difference": difference})
+
+
+class StockAdjustmentViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = StockAdjustment.objects.select_related("item", "adjusted_by").all()
+    serializer_class = StockAdjustmentSerializer
 
 
 class InventoryTransactionViewSet(viewsets.ReadOnlyModelViewSet):
@@ -394,6 +565,18 @@ class PaymentViewSet(SearchableModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(collected_by=self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        queryset = self.get_queryset().filter(status=Payment.Status.VERIFIED)
+        range_name = request.query_params.get("range", "today")
+        today = timezone.localdate()
+        if range_name == "today": queryset = queryset.filter(verified_at__date=today)
+        elif range_name == "yesterday": queryset = queryset.filter(verified_at__date=today - timedelta(days=1))
+        elif range_name == "week": queryset = queryset.filter(verified_at__date__gte=today - timedelta(days=6))
+        elif range_name == "month": queryset = queryset.filter(verified_at__date__gte=today.replace(day=1))
+        rows = list(queryset.values("method").annotate(total=Sum("amount"), count=Count("id")).order_by("method"))
+        return Response({"total_sales": queryset.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"), "total_transactions": queryset.count(), "payment_breakdown": rows})
 
     @action(detail=True, methods=["post"])
     @transaction.atomic
@@ -626,6 +809,11 @@ def dashboard(request):
         total=Sum("amount"), count=Count("id")
     )
     payment_breakdown = list(payment_rows)
+    payment_totals = {row["method"]: row["total"] for row in Payment.objects.filter(status=Payment.Status.VERIFIED, verified_at__date=today).values("method").annotate(total=Sum("amount"))}
+    out_of_stock = Item.objects.filter(item_type=Item.ItemType.MATERIAL, stock_quantity=0).count()
+    expiring_soon = ProductBatch.objects.filter(expiry_date__range=(today, today + timedelta(days=30)), status="active").count()
+    review_due = Item.objects.filter(Q(last_stock_review_date__isnull=True) | Q(last_stock_review_date__lte=today - timedelta(days=14))).count()
+    old_shelf_stock = Item.objects.filter(shelf_stock__gt=0, shelf_added_date__lte=today - timedelta(days=90)).count()
     low_stock_products = list(
         Item.objects.filter(
             item_type=Item.ItemType.MATERIAL,
@@ -678,6 +866,14 @@ def dashboard(request):
         "outstanding_total": sum((invoice.balance_due for invoice in Invoice.objects.exclude(status=Invoice.Status.CANCELLED)), Decimal("0.00")),
         "overdue_invoice_count": overdue.count(),
         "low_stock_count": low_stock,
+        "out_of_stock_count": out_of_stock,
+        "expiring_soon_count": expiring_soon,
+        "upi_collection": payment_totals.get(Payment.Method.UPI, Decimal("0.00")),
+        "cash_collection": payment_totals.get(Payment.Method.CASH, Decimal("0.00")),
+        "card_collection": payment_totals.get(Payment.Method.CARD, Decimal("0.00")),
+        "total_collection": paid_today,
+        "quantity_review_due_count": review_due,
+        "shelf_stock_3_month_count": old_shelf_stock,
         "customer_count": Client.objects.filter(is_active=True).count(),
         "products_sold": InvoiceItem.objects.filter(
             invoice__invoice_date=today,

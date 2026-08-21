@@ -42,6 +42,10 @@ class AdminState extends ChangeNotifier {
   List<Map<String, dynamic>> purchaseOrders = [];
   List<Map<String, dynamic>> discountApprovals = [];
   List<Map<String, dynamic>> invoices = [];
+  List<Map<String, dynamic>> payments = [];
+  List<Map<String, dynamic>> productBatches = [];
+  List<Map<String, dynamic>> stockReviews = [];
+  List<Map<String, dynamic>> stockAdjustments = [];
   List<Map<String, dynamic>> whatsappMessages = [];
   List<Map<String, dynamic>> auditLogs = [];
   List<Map<String, dynamic>> rolePermissions = [];
@@ -138,7 +142,14 @@ class AdminState extends ChangeNotifier {
       }
       error = null;
       notifyListeners();
-      await api.login(email, password);
+      final session = await api.login(email, password);
+      final user = (session['user'] as Map?)?.cast<String, dynamic>() ?? {};
+      final role = user['role']?.toString();
+      if (!{'admin', 'manager'}.contains(role)) {
+        api.clearSession();
+        error = 'Only Admin or Store Manager accounts can open this workspace.';
+        return false;
+      }
       loggedIn = true;
       passwordChangeIdentifier = email;
       screen = 1;
@@ -189,6 +200,18 @@ class AdminState extends ChangeNotifier {
     if (newDiscounts != null) discountApprovals = newDiscounts;
     final newInvoices = await load(() => api.getList('invoices'));
     if (newInvoices != null) invoices = newInvoices;
+    final newPayments = await load(() => api.getList('payments'));
+    if (newPayments != null) payments = newPayments;
+    final newBatches = await load(() => api.getList('inventory/batches'));
+    if (newBatches != null) productBatches = newBatches;
+    final newReviews = await load(
+      () => api.getList('inventory/quantity-reviews'),
+    );
+    if (newReviews != null) stockReviews = newReviews;
+    final newAdjustments = await load(
+      () => api.getList('inventory/stock-adjustments'),
+    );
+    if (newAdjustments != null) stockAdjustments = newAdjustments;
     final newAuditLogs = await load(() => api.getList('audit-logs'));
     if (newAuditLogs != null) auditLogs = newAuditLogs;
     final newPermissions = await load(() => api.getList('role-permissions'));
@@ -299,7 +322,7 @@ class AdminState extends ChangeNotifier {
     screen = switch (index) {
       0 => 1,
       1 => 2,
-      2 => 4,
+      2 => 10,
       3 => 14,
       _ => 15,
     };
@@ -746,6 +769,10 @@ class AdminState extends ChangeNotifier {
       purchaseOrders.clear();
       discountApprovals.clear();
       invoices.clear();
+      payments.clear();
+      productBatches.clear();
+      stockReviews.clear();
+      stockAdjustments.clear();
       whatsappMessages.clear();
       auditLogs.clear();
       rolePermissions.clear();

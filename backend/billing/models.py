@@ -47,11 +47,16 @@ class User(AbstractUser):
         SALES = "sales", "Sales"
         ACCOUNTANT = "accountant", "Accountant"
         INVENTORY = "inventory", "Inventory"
+        MANAGER = "manager", "Store Manager"
+        CASHIER = "cashier", "Cashier"
         ADMIN = "admin", "Admin"
 
     email = models.EmailField(unique=True)
+    employee_id = models.CharField(max_length=30, unique=True, null=True, blank=True, db_index=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.SALES)
     phone = models.CharField(max_length=20, blank=True)
+    branch = models.CharField(max_length=120, default="Main Branch")
+    last_logout = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.get_full_name() or self.username
@@ -111,6 +116,7 @@ class Item(TimeStampedModel):
     item_type = models.CharField(max_length=10, choices=ItemType.choices)
     name = models.CharField(max_length=200)
     sku = models.CharField(max_length=50, unique=True)
+    barcode = models.CharField(max_length=80, unique=True, null=True, blank=True, db_index=True)
     description = models.TextField(blank=True)
     manual_details = models.JSONField(default=dict, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="items")
@@ -130,6 +136,10 @@ class Item(TimeStampedModel):
         max_digits=5, decimal_places=2, default=Decimal("18.00")
     )
     stock_quantity = models.IntegerField(default=0)
+    store_stock = models.PositiveIntegerField(default=0)
+    shelf_stock = models.PositiveIntegerField(default=0)
+    shelf_added_date = models.DateField(null=True, blank=True)
+    last_stock_review_date = models.DateField(null=True, blank=True)
     reorder_level = models.PositiveIntegerField(default=5)
     expiry_date = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -146,6 +156,11 @@ class Item(TimeStampedModel):
         if self.stock_quantity <= self.reorder_level:
             return "low_stock"
         return "in_stock"
+
+    @property
+    def total_stock(self):
+        split_total = self.store_stock + self.shelf_stock
+        return split_total if split_total or self.stock_quantity == 0 else self.stock_quantity
 
     def __str__(self):
         return f"{self.name} ({self.sku})"
@@ -168,6 +183,53 @@ class InventoryTransaction(TimeStampedModel):
     performed_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="inventory_transactions"
     )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class ProductBatch(TimeStampedModel):
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="batches")
+    batch_number = models.CharField(max_length=80, db_index=True)
+    quantity = models.PositiveIntegerField(default=0)
+    manufactured_date = models.DateField(null=True, blank=True)
+    expiry_date = models.DateField(db_index=True)
+    purchase_date = models.DateField(default=timezone.localdate)
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True)
+    shelf_quantity = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, default="active")
+
+    class Meta:
+        ordering = ["expiry_date"]
+        constraints = [models.UniqueConstraint(fields=["item", "batch_number"], name="unique_item_batch")]
+
+
+class StockReview(TimeStampedModel):
+    class Status(models.TextChoices):
+        DUE = "due", "Due"
+        UPDATED = "updated", "Updated"
+        OVERDUE = "overdue", "Overdue"
+
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="stock_reviews")
+    system_quantity = models.IntegerField()
+    physical_quantity = models.IntegerField()
+    difference = models.IntegerField(default=0)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.UPDATED)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="stock_reviews")
+    reviewed_at = models.DateTimeField(default=timezone.now)
+    next_review_date = models.DateField(db_index=True)
+
+    class Meta:
+        ordering = ["next_review_date"]
+
+
+class StockAdjustment(TimeStampedModel):
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="stock_adjustments")
+    previous_quantity = models.IntegerField()
+    new_quantity = models.IntegerField()
+    difference = models.IntegerField()
+    reason = models.TextField()
+    adjusted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="stock_adjustments")
 
     class Meta:
         ordering = ["-created_at"]
@@ -350,6 +412,8 @@ class Payment(TimeStampedModel):
     method = models.CharField(max_length=10, choices=Method.choices)
     amount = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
     transaction_reference = models.CharField(max_length=100, blank=True)
+    cash_received = models.DecimalField(**MONEY)
+    balance_returned = models.DecimalField(**MONEY)
     proof = models.ImageField(upload_to="payment_proofs/%Y/%m/", blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     collected_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="collected_payments")
@@ -516,6 +580,7 @@ class AuditLog(models.Model):
     object_id = models.CharField(max_length=80, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     device = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

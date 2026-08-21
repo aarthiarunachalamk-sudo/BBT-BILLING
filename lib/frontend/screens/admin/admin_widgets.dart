@@ -92,7 +92,7 @@ class AdminBottomBar extends StatelessWidget {
       NavigationDestination(
         icon: Icon(Icons.inventory_2_outlined),
         selectedIcon: Icon(Icons.inventory_2),
-        label: 'Products',
+        label: 'Billing',
       ),
       NavigationDestination(
         icon: Icon(Icons.assessment_outlined),

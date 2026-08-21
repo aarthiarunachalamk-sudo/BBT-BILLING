@@ -15,6 +15,7 @@ from .models import (
     InvoiceItem,
     Item,
     Payment,
+    ProductBatch,
     PurchaseOrder,
     PurchaseOrderItem,
     Quotation,
@@ -24,6 +25,8 @@ from .models import (
     ReturnRequest,
     RolePermission,
     StoreSettings,
+    StockAdjustment,
+    StockReview,
     WhatsAppMessage,
 )
 
@@ -39,7 +42,18 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
             if user:
                 attrs[self.username_field] = user.username
         data = super().validate(attrs)
-        data["user"] = UserSerializer(self.user).data
+        user_data = UserSerializer(self.user).data
+        data["user"] = user_data
+        data["access_token"] = data["access"]
+        data["refresh_token"] = data["refresh"]
+        data.update({
+            "user_id": self.user.pk,
+            "employee_id": self.user.employee_id or self.user.username,
+            "name": self.user.get_full_name() or self.user.username,
+            "email": self.user.email,
+            "role": self.user.role,
+            "branch": self.user.branch,
+        })
         return data
 
 
@@ -48,7 +62,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "role", "phone", "password", "is_active"]
+        fields = ["id", "username", "employee_id", "email", "first_name", "last_name", "role", "phone", "branch", "password", "is_active", "last_login", "last_logout"]
+        read_only_fields = ["last_login", "last_logout"]
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)
@@ -103,6 +118,7 @@ class ItemSerializer(serializers.ModelSerializer):
     stock_status = serializers.CharField(read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    total_stock = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Item
@@ -161,6 +177,40 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
         model = InventoryTransaction
         fields = "__all__"
         read_only_fields = ["previous_stock", "new_stock", "performed_by"]
+
+
+class ProductBatchSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="item.name", read_only=True)
+    sku = serializers.CharField(source="item.sku", read_only=True)
+    days_remaining = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductBatch
+        fields = "__all__"
+
+    def get_days_remaining(self, obj):
+        return (obj.expiry_date - timezone.localdate()).days
+
+
+class StockReviewSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="item.name", read_only=True)
+    sku = serializers.CharField(source="item.sku", read_only=True)
+    reviewed_by_name = serializers.CharField(source="reviewed_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = StockReview
+        fields = "__all__"
+        read_only_fields = ["system_quantity", "difference", "status", "reviewed_by", "reviewed_at", "next_review_date"]
+
+
+class StockAdjustmentSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="item.name", read_only=True)
+    adjusted_by_name = serializers.CharField(source="adjusted_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = StockAdjustment
+        fields = "__all__"
+        read_only_fields = ["previous_quantity", "new_quantity", "difference", "adjusted_by"]
 
 
 class QuotationItemSerializer(serializers.ModelSerializer):
@@ -354,6 +404,7 @@ class StoreSettingsSerializer(serializers.ModelSerializer):
 
 class AuditLogSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source="user.get_full_name", read_only=True)
+    employee_id = serializers.CharField(source="user.employee_id", read_only=True)
 
     class Meta:
         model = AuditLog
