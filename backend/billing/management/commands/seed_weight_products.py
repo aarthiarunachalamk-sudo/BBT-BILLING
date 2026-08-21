@@ -1,4 +1,5 @@
 from decimal import Decimal
+from pathlib import Path
 
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
@@ -23,7 +24,28 @@ class Command(BaseCommand):
         ("WT-COFFEE-200G", "Instant Coffee 200 g", "Beverages", "Gram", "200 g", "140.00", "180.00", "195.00", 20),
     )
 
+    IMAGE_FILES = {
+        "WT-RICE-5KG": "premium-rice-5kg.png",
+        "WT-FLOUR-5KG": "wheat-flour-5kg.png",
+        "WT-TOOR-DAL-1KG": "toor-dal-1kg.png",
+        "WT-URAD-DAL-1KG": "urad-dal-1kg.png",
+        "WT-SUGAR-1KG": "white-sugar-1kg.png",
+        "WT-SALT-1KG": "iodized-salt-1kg.png",
+        "WT-TURMERIC-250G": "turmeric-powder-250g.png",
+        "WT-CHILLI-500G": "chilli-powder-500g.png",
+        "WT-TEA-250G": "premium-tea-250g.png",
+        "WT-COFFEE-200G": "instant-coffee-200g.png",
+    }
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--replace-images",
+            action="store_true",
+            help="Replace existing catalog images with the photographic seed assets.",
+        )
+
     def handle(self, *args, **options):
+        image_directory = Path(__file__).with_name("product_images")
         categories = {}
         for name in ("Groceries", "Beverages"):
             categories[name], _ = Category.objects.get_or_create(
@@ -61,9 +83,18 @@ class Command(BaseCommand):
                     "is_active": True,
                 },
             )
-            if not item.image:
-                image_bytes = DemoSeedCommand._product_image(name, category_name)
-                item.image.save(f"{sku.lower()}.png", ContentFile(image_bytes), save=True)
+            if not item.image or options["replace_images"]:
+                image_path = image_directory / self.IMAGE_FILES[sku]
+                image_bytes = (
+                    image_path.read_bytes()
+                    if image_path.exists()
+                    else DemoSeedCommand._product_image(name, category_name)
+                )
+                item.image.save(
+                    f"catalog-{sku.lower()}.png",
+                    ContentFile(image_bytes),
+                    save=True,
+                )
             created_count += int(created)
             updated_count += int(not created)
 
