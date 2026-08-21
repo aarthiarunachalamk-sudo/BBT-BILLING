@@ -15,7 +15,7 @@ class Command(BaseCommand):
         ("Aashirvaad", "ITC Limited", "Groceries", "Whole Wheat Atta 5 kg", "BR-AASHIRVAAD-ATTA", "Bag", "245", "295", 24),
         ("Tata Sampann", "Tata Consumer Products", "Groceries", "Toor Dal 1 kg", "BR-TATA-TOORDAL", "Pack", "145", "175", 28),
         ("Sakthi Masala", "Sakthi Masala Private Limited", "Spices", "Turmeric Powder 200 g", "BR-SAKTHI-TURMERIC", "Pack", "48", "62", 35),
-        ("Aachi", "Aachi Group", "Spices", "Chilli Powder 200 g", "BR-AACHI-CHILLI", "Pack", "72", "90", 30),
+        ("Aachi", "Aachi Group", "Spices", "Chilli Powder 500 g", "BR-AACHI-CHILLI", "Pack", "209", "247", 30),
         ("Fortune", "AWL Agri Business", "Edible Oils", "Sunflower Oil 1 L", "BR-FORTUNE-OIL", "Bottle", "125", "155", 32),
         ("Gold Winner", "Kaleesuwari Refinery", "Edible Oils", "Sunflower Oil 1 L", "BR-GOLDWINNER-OIL", "Pouch", "122", "150", 30),
         ("Tata Salt", "Tata Consumer Products", "Groceries", "Iodized Salt 1 kg", "BR-TATASALT-1KG", "Pack", "24", "30", 45),
@@ -38,7 +38,7 @@ class Command(BaseCommand):
         "BR-AASHIRVAAD-ATTA": "aashirvaad-atta-5kg.png",
         "BR-TATA-TOORDAL": "tata-sampann-toor-dal-1kg.png",
         "BR-SAKTHI-TURMERIC": "sakthi-turmeric-200g.png",
-        "BR-AACHI-CHILLI": "aachi-chilli-200g.png",
+        "BR-AACHI-CHILLI": "aachi-chilli-500g-official.webp",
         "BR-FORTUNE-OIL": "fortune-sunflower-oil-1l.png",
         "BR-GOLDWINNER-OIL": "gold-winner-sunflower-oil-1l.png",
         "BR-TATASALT-1KG": "tata-salt-1kg.png",
@@ -108,7 +108,7 @@ class Command(BaseCommand):
             if not item.image or options["replace_images"]:
                 image_path = image_directory / self.IMAGE_BY_SKU[sku]
                 item.image.save(
-                    f"brand-catalog-{sku.lower()}.png",
+                    f"brand-catalog-{sku.lower()}{image_path.suffix}",
                     ContentFile(image_path.read_bytes()),
                     save=True,
                 )
