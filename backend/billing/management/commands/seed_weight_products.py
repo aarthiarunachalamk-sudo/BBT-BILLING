@@ -5,7 +5,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 
 from billing.management.commands.seed_demo import Command as DemoSeedCommand
-from billing.models import Category, Item, Supplier
+from billing.models import Brand, Category, Item, Supplier
 
 
 class Command(BaseCommand):
@@ -37,6 +37,19 @@ class Command(BaseCommand):
         "WT-COFFEE-200G": "instant-coffee-200g.png",
     }
 
+    BRAND_BY_SKU = {
+        "WT-RICE-5KG": "BBT Select",
+        "WT-FLOUR-5KG": "BBT Select",
+        "WT-TOOR-DAL-1KG": "Golden Harvest",
+        "WT-URAD-DAL-1KG": "Golden Harvest",
+        "WT-SUGAR-1KG": "Daily Choice",
+        "WT-SALT-1KG": "Daily Choice",
+        "WT-TURMERIC-250G": "Golden Harvest",
+        "WT-CHILLI-500G": "Golden Harvest",
+        "WT-TEA-250G": "BBT Brew",
+        "WT-COFFEE-200G": "BBT Brew",
+    }
+
     def add_arguments(self, parser):
         parser.add_argument(
             "--replace-images",
@@ -61,6 +74,16 @@ class Command(BaseCommand):
                 "address": "Local wholesale market",
             },
         )
+        brands = {}
+        for brand_name in sorted(set(self.BRAND_BY_SKU.values())):
+            brands[brand_name], _ = Brand.objects.get_or_create(
+                name=brand_name,
+                defaults={
+                    "manufacturer": "BBT Supermarket Private Label",
+                    "country": "India",
+                    "description": "BBT supermarket catalog brand.",
+                },
+            )
 
         created_count = 0
         updated_count = 0
@@ -72,6 +95,7 @@ class Command(BaseCommand):
                     "name": name,
                     "category": categories[category_name],
                     "supplier": supplier,
+                    "brand": brands[self.BRAND_BY_SKU[sku]],
                     "unit": unit,
                     "manual_details": {"size": size},
                     "purchase_price": Decimal(purchase),

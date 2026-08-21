@@ -15,6 +15,7 @@ part 'roles_permissions_screen.dart';
 part 'product_management_screen.dart';
 part 'add_product_screen.dart';
 part 'category_management_screen.dart';
+part 'brand_management_screen.dart';
 part 'supplier_management_screen.dart';
 part 'purchase_order_approval_screen.dart';
 part 'inventory_alerts_screen.dart';
@@ -46,6 +47,7 @@ const adminScreenNames = [
   'Change Password',
   'Payment & Sales Report',
   'User Details',
+  'Brand Management',
 ];
 
 class AdminDestination {
@@ -70,6 +72,7 @@ const adminNavigationGroups = <String, List<AdminDestination>>{
     AdminDestination(4, 'Products', Icons.inventory_2_outlined),
     AdminDestination(5, 'Add Product', Icons.add_box_outlined),
     AdminDestination(6, 'Categories', Icons.category_outlined),
+    AdminDestination(19, 'Brands', Icons.branding_watermark_outlined),
     AdminDestination(7, 'Suppliers', Icons.local_shipping_outlined),
     AdminDestination(
       8,
@@ -286,6 +289,7 @@ Widget buildAdminScreen(AdminState state) => switch (state.screen) {
   16 => ChangePasswordScreen(state),
   17 => SalesDashboardScreen(state),
   18 => UserDetailsScreen(state),
+  19 => BrandsScreen(state),
   _ => AuditScreen(state),
 };
 

@@ -245,7 +245,7 @@ class _MobileProductList extends StatelessWidget {
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        'SKU: ${product['sku'] ?? '—'}\nStock: ${product['stock_quantity'] ?? 0}  |  Shelf: ${product['shelf_quantity'] ?? product['shelf_stock'] ?? 0}',
+                        '${product['brand_name']?.toString().isNotEmpty == true ? '${product['brand_name']} • ' : ''}SKU: ${product['sku'] ?? '—'}\nStock: ${product['stock_quantity'] ?? 0}  |  Shelf: ${product['shelf_quantity'] ?? product['shelf_stock'] ?? 0}',
                         style: const TextStyle(fontSize: 9, height: 1.45),
                       ),
                     ),
@@ -556,8 +556,8 @@ class _ProductCatalogCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          product['category_name']?.toString().toUpperCase() ??
-                              'UNCATEGORIZED',
+                          '${product['brand_name']?.toString().isNotEmpty == true ? '${product['brand_name']} • ' : ''}${product['category_name']?.toString() ?? 'Uncategorized'}'
+                              .toUpperCase(),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(

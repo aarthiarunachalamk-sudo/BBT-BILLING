@@ -38,6 +38,7 @@ class AdminState extends ChangeNotifier {
   List<Map<String, dynamic>> users = [];
   List<Map<String, dynamic>> products = [];
   List<Map<String, dynamic>> categories = [];
+  List<Map<String, dynamic>> brands = [];
   List<Map<String, dynamic>> suppliers = [];
   List<Map<String, dynamic>> purchaseOrders = [];
   List<Map<String, dynamic>> discountApprovals = [];
@@ -69,7 +70,7 @@ class AdminState extends ChangeNotifier {
   final Map<String, bool> categoryActive = {};
 
   void go(int value) {
-    var destination = value.clamp(0, 18);
+    var destination = value.clamp(0, 19);
     if (!loggedIn && destination != 0 && destination != 16) {
       destination = 0;
     }
@@ -78,6 +79,7 @@ class AdminState extends ChangeNotifier {
       1 => 0,
       2 || 3 => 1,
       >= 4 && <= 9 => 2,
+      19 => 2,
       >= 10 && <= 13 => 3,
       14 || 17 => 4,
       >= 15 => 5,
@@ -169,6 +171,8 @@ class AdminState extends ChangeNotifier {
     // when the phone opens all dashboard requests at the same time.
     final newCategories = await load(() => api.getList('categories'));
     if (newCategories != null) categories = newCategories;
+    final newBrands = await load(() => api.getList('brands'));
+    if (newBrands != null) brands = newBrands;
     final newDashboard = await load(() => api.getMap('dashboard'));
     if (newDashboard != null) dashboard = newDashboard;
     final newUsers = await load(() => api.getList('users'));
@@ -476,6 +480,31 @@ class AdminState extends ChangeNotifier {
     }
     notifyListeners();
     return created;
+  }
+
+  Future<Map<String, dynamic>> createBrand(Map<String, dynamic> values) async {
+    final created = await api.create('brands', values);
+    brands = [created, ...brands.where((brand) => brand['id'] != created['id'])]
+      ..sort((a, b) => a['name'].toString().compareTo(b['name'].toString()));
+    notifyListeners();
+    return created;
+  }
+
+  Future<void> toggleBrand(Map<String, dynamic> brand, bool value) async {
+    final previous = brand['is_active'] == true;
+    brand['is_active'] = value;
+    notifyListeners();
+    try {
+      final updated = await api.update('brands', brand['id'] as int, {
+        'is_active': value,
+      });
+      brand.addAll(updated);
+    } catch (error) {
+      brand['is_active'] = previous;
+      notifyListeners();
+      rethrow;
+    }
+    notifyListeners();
   }
 
   Future<Map<String, dynamic>> checkout({

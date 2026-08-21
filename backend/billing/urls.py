@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AuditLogViewSet,
+    BrandViewSet,
     CategoryViewSet,
     ClientViewSet,
     DiscountApprovalViewSet,
@@ -29,6 +30,7 @@ router = DefaultRouter()
 router.register("users", UserViewSet)
 router.register("clients", ClientViewSet)
 router.register("categories", CategoryViewSet)
+router.register("brands", BrandViewSet)
 router.register("suppliers", SupplierViewSet)
 router.register("items", ItemViewSet)
 router.register("inventory-transactions", InventoryTransactionViewSet)

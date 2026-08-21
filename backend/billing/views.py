@@ -15,6 +15,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import (
     AuditLog,
+    Brand,
     Category,
     Client,
     DiscountApproval,
@@ -36,6 +37,7 @@ from .models import (
 )
 from .serializers import (
     AuditLogSerializer,
+    BrandSerializer,
     CategorySerializer,
     ClientSerializer,
     DiscountApprovalSerializer,
@@ -435,6 +437,13 @@ class CategoryViewSet(SearchableModelViewSet):
     ordering_fields = ["name", "created_at"]
 
 
+class BrandViewSet(SearchableModelViewSet):
+    queryset = Brand.objects.all()
+    serializer_class = BrandSerializer
+    search_fields = ["name", "manufacturer", "country"]
+    ordering_fields = ["name", "manufacturer", "created_at"]
+
+
 class SupplierViewSet(SearchableModelViewSet):
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
@@ -443,9 +452,9 @@ class SupplierViewSet(SearchableModelViewSet):
 
 
 class ItemViewSet(SearchableModelViewSet):
-    queryset = Item.objects.select_related("category", "supplier").all()
+    queryset = Item.objects.select_related("category", "brand", "supplier").all()
     serializer_class = ItemSerializer
-    search_fields = ["name", "sku", "description", "category__name"]
+    search_fields = ["name", "sku", "description", "category__name", "brand__name"]
     ordering_fields = ["name", "selling_price", "stock_quantity", "created_at"]
 
     def create(self, request, *args, **kwargs):

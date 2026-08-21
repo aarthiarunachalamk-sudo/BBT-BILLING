@@ -108,6 +108,22 @@ class Supplier(TimeStampedModel):
         return self.name
 
 
+class Brand(TimeStampedModel):
+    name = models.CharField(max_length=120, unique=True)
+    manufacturer = models.CharField(max_length=160, blank=True)
+    country = models.CharField(max_length=80, blank=True)
+    website = models.URLField(blank=True)
+    contact_email = models.EmailField(blank=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Item(TimeStampedModel):
     class ItemType(models.TextChoices):
         SERVICE = "service", "Service"
@@ -120,6 +136,9 @@ class Item(TimeStampedModel):
     description = models.TextField(blank=True)
     manual_details = models.JSONField(default=dict, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="items")
+    brand = models.ForeignKey(
+        Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
+    )
     supplier = models.ForeignKey(
         Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
     )

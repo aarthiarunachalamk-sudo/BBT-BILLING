@@ -3,6 +3,7 @@ from django.contrib.auth.admin import UserAdmin
 
 from .models import (
     AuditLog,
+    Brand,
     Category,
     Client,
     DiscountApproval,
@@ -72,6 +73,7 @@ class ClientAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Category)
+admin.site.register(Brand)
 admin.site.register(Supplier)
 admin.site.register(InventoryTransaction)
 admin.site.register(DiscountApproval)

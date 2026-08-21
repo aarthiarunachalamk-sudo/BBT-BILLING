@@ -23,6 +23,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final Map<String, TextEditingController> manualDetails = {};
   int gst = 0;
   int? categoryId;
+  int? brandId;
   String? unit;
   XFile? selectedImage;
   Uint8List? selectedImageBytes;
@@ -40,6 +41,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
     } else {
       unawaited(_loadCategories());
     }
+    final activeBrands = widget.state.brands.where(
+      (brand) => brand['is_active'] == true,
+    );
+    if (activeBrands.isNotEmpty) brandId = activeBrands.first['id'] as int?;
   }
 
   Future<void> _loadCategories() async {
@@ -79,8 +84,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     return match['name']?.toString() ?? '';
   }
 
-  List<_ManualDetailField> get _categoryDetailFields =>
-      _manualDetailFieldsFor(_selectedCategoryName);
+  List<_ManualDetailField> get _categoryDetailFields => _manualDetailFieldsFor(
+    _selectedCategoryName,
+  ).where((field) => field.key != 'brand').toList();
+
+  String get _selectedBrandName {
+    final match = widget.state.brands.where((brand) => brand['id'] == brandId);
+    return match.isEmpty ? '' : match.first['name']?.toString() ?? '';
+  }
 
   TextEditingController _manualDetailController(String key) =>
       manualDetails.putIfAbsent(key, TextEditingController.new);
@@ -158,7 +169,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
           'name': name.text.trim(),
           'sku': sku.text.trim(),
           'category': categoryId,
+          if (brandId != null) 'brand': brandId,
           'manual_details': {
+            if (_selectedBrandName.isNotEmpty) 'brand': _selectedBrandName,
             for (final field in _categoryDetailFields)
               if (_manualDetailController(field.key).text.trim().isNotEmpty)
                 field.key: _manualDetailController(field.key).text.trim(),
@@ -341,6 +354,53 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                       ),
 
+                      const SizedBox(height: 14),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int?>(
+                              initialValue: brandId,
+                              decoration: const InputDecoration(
+                                labelText: 'Brand',
+                                prefixIcon: Icon(
+                                  Icons.branding_watermark_outlined,
+                                  size: 18,
+                                ),
+                              ),
+                              items: [
+                                const DropdownMenuItem<int?>(
+                                  value: null,
+                                  child: Text('No brand / Generic'),
+                                ),
+                                ...widget.state.brands
+                                    .where(
+                                      (brand) => brand['is_active'] == true,
+                                    )
+                                    .map(
+                                      (brand) => DropdownMenuItem<int?>(
+                                        value: brand['id'] as int,
+                                        child: Text(brand['name'].toString()),
+                                      ),
+                                    ),
+                              ],
+                              onChanged: saving
+                                  ? null
+                                  : (value) => setState(() => brandId = value),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Manage brands',
+                            child: IconButton.filledTonal(
+                              onPressed: saving
+                                  ? null
+                                  : () => widget.state.go(19),
+                              icon: const Icon(Icons.add_business_outlined),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 14),
                       TextFormField(
                         controller: name,

@@ -7,6 +7,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import (
     AuditLog,
+    Brand,
     Category,
     Client,
     DiscountApproval,
@@ -108,6 +109,24 @@ class CategorySerializer(serializers.ModelSerializer):
         return name
 
 
+class BrandSerializer(serializers.ModelSerializer):
+    product_count = serializers.IntegerField(source="items.count", read_only=True)
+
+    class Meta:
+        model = Brand
+        fields = "__all__"
+        extra_kwargs = {"name": {"validators": []}}
+
+    def validate_name(self, value):
+        name = value.strip()
+        queryset = Brand.objects.filter(name__iexact=name)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("Brand with this name already exists.")
+        return name
+
+
 class SupplierSerializer(serializers.ModelSerializer):
     class Meta:
         model = Supplier
@@ -118,6 +137,7 @@ class ItemSerializer(serializers.ModelSerializer):
     stock_status = serializers.CharField(read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    brand_name = serializers.CharField(source="brand.name", read_only=True)
     total_stock = serializers.IntegerField(read_only=True)
 
     class Meta:

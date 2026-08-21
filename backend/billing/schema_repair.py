@@ -4,10 +4,10 @@ from django.db import connection
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.models import F
 
-from .models import AuditLog, Item, Payment, ProductBatch, StockAdjustment, StockReview, User
+from .models import AuditLog, Brand, Item, Payment, ProductBatch, StockAdjustment, StockReview, User
 
 
-MIGRATION = "0006_admin_visibility_inventory"
+MIGRATIONS = ("0006_admin_visibility_inventory", "0007_brand_item_brand")
 FIELD_NAMES = {
     Item: (
         "manual_details",
@@ -20,12 +20,13 @@ FIELD_NAMES = {
         "shelf_added_date",
         "shelf_stock",
         "store_stock",
+        "brand",
     ),
     Payment: ("balance_returned", "cash_received"),
     User: ("branch", "employee_id", "last_logout"),
     AuditLog: ("description",),
 }
-NEW_MODELS = (StockAdjustment, StockReview, ProductBatch)
+NEW_MODELS = (StockAdjustment, StockReview, ProductBatch, Brand)
 
 
 def admin_visibility_schema_status():
@@ -51,9 +52,14 @@ def admin_visibility_schema_status():
 
 
 def repair_admin_visibility_schema():
-    """Idempotently create only the columns/tables introduced by migration 0006."""
+    """Idempotently create additive admin and brand schema for legacy databases."""
     existing_tables = set(connection.introspection.table_names())
     with connection.schema_editor() as editor:
+        for model in NEW_MODELS:
+            if model._meta.db_table not in existing_tables:
+                editor.create_model(model)
+                existing_tables.add(model._meta.db_table)
+
         for model, names in FIELD_NAMES.items():
             table = model._meta.db_table
             with connection.cursor() as cursor:
@@ -67,12 +73,15 @@ def repair_admin_visibility_schema():
                     editor.add_field(model, field)
                     columns.add(field.column)
 
-        for model in NEW_MODELS:
-            if model._meta.db_table not in existing_tables:
-                editor.create_model(model)
-                existing_tables.add(model._meta.db_table)
-
     Item.objects.filter(store_stock=0, shelf_stock=0, stock_quantity__gt=0).update(
         store_stock=F("stock_quantity")
     )
-    MigrationRecorder(connection).record_applied("billing", MIGRATION)
+    for item in Item.objects.filter(brand__isnull=True).iterator():
+        brand_name = str((item.manual_details or {}).get("brand", "")).strip()
+        if brand_name:
+            brand, _ = Brand.objects.get_or_create(name=brand_name)
+            item.brand = brand
+            item.save(update_fields=["brand"])
+    recorder = MigrationRecorder(connection)
+    for migration in MIGRATIONS:
+        recorder.record_applied("billing", migration)

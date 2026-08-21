@@ -26,15 +26,15 @@ def health_check(request):
     def schema_is_ready():
         applied = MigrationRecorder(connection).migration_qs.filter(
             app="billing",
-            name="0006_admin_visibility_inventory",
+            name="0007_brand_item_brand",
         ).exists()
         return applied and not admin_visibility_schema_status()
 
     try:
         schema_ready = schema_is_ready()
         if not schema_ready:
-            # This legacy database has an inconsistent squashed-migration
-            # history, so repair only the known additive 0006 schema changes.
+            # This legacy database has an inconsistent migration history, so
+            # repair only the known additive admin/brand schema changes.
             repair_admin_visibility_schema()
             connection.close()
             schema_ready = schema_is_ready()
@@ -48,7 +48,7 @@ def health_check(request):
             "status": "ok" if schema_ready else "error",
             "service": "bbt-billing-api",
             "database": "ready" if schema_ready else "migration_required",
-            "schema": "0006",
+            "schema": "0007",
             "missing": admin_visibility_schema_status() if not schema_ready else [],
         },
         status=200 if schema_ready else 503,
