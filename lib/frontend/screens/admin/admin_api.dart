@@ -92,8 +92,8 @@ class AdminApi {
   /// Pings the health endpoint repeatedly until the server responds or
   /// [maxAttempts] is exhausted.  Returns true when reachable.
   Future<bool> waitForServer({
-    int maxAttempts = 10,
-    Duration initialDelay = const Duration(seconds: 3),
+    int maxAttempts = 3,
+    Duration initialDelay = const Duration(seconds: 1),
     void Function(int attempt, int max)? onAttempt,
   }) async {
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -103,7 +103,7 @@ class AdminApi {
         try {
         final response = await _client
             .get(Uri.parse('$origin/health/'))
-            .timeout(const Duration(seconds: 15));
+            .timeout(const Duration(seconds: 6));
         if (response.statusCode >= 200 && response.statusCode < 400) {
           baseUrl = candidate;
           return true;
@@ -113,7 +113,7 @@ class AdminApi {
       }
       }
       if (attempt < maxAttempts) {
-        await Future<void>.delayed(initialDelay * attempt);
+        await Future<void>.delayed(initialDelay);
       }
     }
     return false;
@@ -128,7 +128,7 @@ class AdminApi {
           headers: _headers,
           body: jsonEncode({'username': email, 'password': password}),
         )
-        .timeout(const Duration(seconds: 30));
+        .timeout(const Duration(seconds: 15));
     final data = _decodeMap(response);
     _accessToken = data['access'] as String?;
     return data;

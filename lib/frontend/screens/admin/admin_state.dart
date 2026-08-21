@@ -124,12 +124,12 @@ class AdminState extends ChangeNotifier {
     try {
       // Render free tier: server may be sleeping — wake it up first.
       final alive = await api.waitForServer(
-        maxAttempts: 10,
+        maxAttempts: 3,
         onAttempt: (attempt, max) {
           if (attempt == 1) {
-            error = 'Waking up server… this may take up to 30 seconds.';
+            error = 'Connecting to server…';
           } else {
-            error = 'Waking up server… attempt $attempt/$max';
+            error = 'Connecting… attempt $attempt/$max';
           }
           notifyListeners();
         },
