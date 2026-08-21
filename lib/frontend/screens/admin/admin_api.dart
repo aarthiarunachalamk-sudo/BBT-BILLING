@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -72,6 +74,30 @@ class AdminApi {
     'Content-Type': 'application/json',
     if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
   };
+
+  /// Retries idempotent reads when Android or a sleeping Render instance drops
+  /// a connection. Writes are deliberately not retried here because the server
+  /// may already have applied them before the connection was interrupted.
+  Future<http.Response> _get(Uri uri) async {
+    Object? lastError;
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await _client
+            .get(uri, headers: _headers)
+            .timeout(const Duration(seconds: 30));
+      } on TimeoutException catch (error) {
+        lastError = error;
+      } on SocketException catch (error) {
+        lastError = error;
+      } on http.ClientException catch (error) {
+        lastError = error;
+      }
+      if (attempt < 3) {
+        await Future<void>.delayed(Duration(milliseconds: 500 * attempt));
+      }
+    }
+    throw lastError!;
+  }
 
   // ── Wake-up / health-check ────────────────────────────────────────────────
 
@@ -153,14 +179,14 @@ class AdminApi {
   // ── Data access ───────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getMap(String path) async => _decodeMap(
-    await _client.get(Uri.parse('$baseUrl/$path/'), headers: _headers),
+    await _get(Uri.parse('$baseUrl/$path/')),
   );
 
   Future<List<Map<String, dynamic>>> getList(String path) async {
     final results = <Map<String, dynamic>>[];
     String? url = '$baseUrl/$path/?page_size=200';
     while (url != null) {
-      final response = await _client.get(Uri.parse(url), headers: _headers);
+      final response = await _get(Uri.parse(url));
       final decoded = _decode(response);
       if (decoded is Map<String, dynamic>) {
         final items = decoded['results'];

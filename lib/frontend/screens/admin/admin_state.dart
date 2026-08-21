@@ -488,6 +488,7 @@ class AdminState extends ChangeNotifier {
     if (existing.isNotEmpty) {
       return existing.first;
     }
+    var recoverCreate = false;
     try {
       await api.create('categories', {'name': name.trim(), 'is_active': true});
     } on ApiException catch (exception) {
@@ -495,7 +496,38 @@ class AdminState extends ChangeNotifier {
         rethrow;
       }
     } catch (_) {
-      throw ApiException('Cannot reach ${api.baseUrl}. Check the backend URL.');
+      // A mobile connection can be aborted after Render has accepted the
+      // request. Wake the service and read the collection before reporting a
+      // failure; this also avoids blindly repeating a POST.
+      final alive = await api.waitForServer(maxAttempts: 3);
+      if (!alive) {
+        throw ApiException(
+          'Cannot reach ${api.baseUrl}. Check your internet connection.',
+        );
+      }
+      recoverCreate = true;
+    }
+    if (recoverCreate) {
+      categories = await api.getList('categories');
+      final savedDuringDisconnect = categories.where(
+        (category) =>
+            category['name']?.toString().trim().toLowerCase() == normalized,
+      );
+      if (savedDuringDisconnect.isNotEmpty) {
+        _hydrateControls();
+        notifyListeners();
+        return savedDuringDisconnect.first;
+      }
+      try {
+        await api.create('categories', {
+          'name': name.trim(),
+          'is_active': true,
+        });
+      } on ApiException catch (exception) {
+        if (!exception.message.toLowerCase().contains('already exists')) {
+          rethrow;
+        }
+      }
     }
     categories = await api.getList('categories');
     _hydrateControls();
