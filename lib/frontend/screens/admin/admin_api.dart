@@ -122,16 +122,29 @@ class AdminApi {
   // ── Auth ──────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final response = await _client
-        .post(
-          Uri.parse('$baseUrl/auth/login/'),
-          headers: _headers,
-          body: jsonEncode({'username': email, 'password': password}),
-        )
-        .timeout(const Duration(seconds: 15));
-    final data = _decodeMap(response);
-    _accessToken = data['access'] as String?;
-    return data;
+    Object? lastError;
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      try {
+        final response = await _client
+            .post(
+              Uri.parse('$baseUrl/auth/login/'),
+              headers: _headers,
+              body: jsonEncode({'username': email, 'password': password}),
+            )
+            .timeout(const Duration(seconds: 30));
+        final data = _decodeMap(response);
+        _accessToken = data['access'] as String?;
+        return data;
+      } on TimeoutException catch (error) {
+        lastError = error;
+      } on SocketException catch (error) {
+        lastError = error;
+      } on http.ClientException catch (error) {
+        lastError = error;
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    throw lastError!;
   }
 
   Future<Map<String, dynamic>> changePassword({

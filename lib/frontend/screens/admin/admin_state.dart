@@ -122,26 +122,6 @@ class AdminState extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      // Render free tier: server may be sleeping — wake it up first.
-      final alive = await api.waitForServer(
-        maxAttempts: 3,
-        onAttempt: (attempt, max) {
-          if (attempt == 1) {
-            error = 'Connecting to server…';
-          } else {
-            error = 'Connecting… attempt $attempt/$max';
-          }
-          notifyListeners();
-        },
-      );
-      if (!alive) {
-        error =
-            'Cannot reach ${api.baseUrl}\n'
-            'Check your internet connection or the server URL.';
-        return false;
-      }
-      error = null;
-      notifyListeners();
       final session = await api.login(email, password);
       final user = (session['user'] as Map?)?.cast<String, dynamic>() ?? {};
       final role = user['role']?.toString();
