@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.recorder import MigrationRecorder
 from django.http import JsonResponse
@@ -11,7 +12,7 @@ from billing.views import AdminTokenObtainPairView, change_password, current_use
 
 
 def health_check(request):
-    try:
+    def schema_is_ready():
         applied = MigrationRecorder(connection).migration_qs.filter(
             app="billing",
             name="0006_admin_visibility_inventory",
@@ -23,7 +24,17 @@ def health_check(request):
                 "billing_item",
             )
         }
-        schema_ready = applied and "barcode" in columns
+        return applied and "barcode" in columns
+
+    try:
+        schema_ready = schema_is_ready()
+        if not schema_ready:
+            # Existing Render services can retain a dashboard start command and
+            # ignore render.yaml updates. Repair only pending, code-owned Django
+            # migrations before accepting traffic on that runtime database.
+            call_command("migrate", interactive=False, verbosity=0)
+            connection.close()
+            schema_ready = schema_is_ready()
     except Exception as exception:
         return JsonResponse(
             {"status": "error", "service": "bbt-billing-api", "database": exception.__class__.__name__},
