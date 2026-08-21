@@ -7,7 +7,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _AdminPage(
     state: state,
-    title: 'Dashboard',
+    title: 'Admin Dashboard',
     actions: [
       IconButton(
         onPressed: () => state.go(9),
@@ -20,31 +20,289 @@ class DashboardScreen extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
         children: [
-          _Welcome(state),
-          const SizedBox(height: 16),
-          _Revenue(state.dashboard, () => state.go(17)),
-          const SizedBox(height: 24),
-          const _DashTitle('Store pulse', 'Live operational metrics'),
-          const SizedBox(height: 10),
-          _Kpis(state.dashboard),
-          const SizedBox(height: 24),
-          _SalesChart(state.dashboard),
-          const SizedBox(height: 24),
-          _QuickActions(state),
-          const SizedBox(height: 24),
-          _Approvals(state),
-          const SizedBox(height: 24),
-          _LowStock(state),
-          const SizedBox(height: 24),
-          _TopProducts(state.dashboard),
-          const SizedBox(height: 24),
-          _PaymentAnalysis(state.dashboard),
-          const SizedBox(height: 24),
-          _RecentBills(state.dashboard),
+          _ReferenceSummaryGrid(state),
+          const SizedBox(height: 18),
+          _ReferencePaymentSummary(state),
         ],
       ),
     ),
   );
+}
+
+class _ReferenceSummaryGrid extends StatelessWidget {
+  const _ReferenceSummaryGrid(this.state);
+  final AdminState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = state.dashboard;
+    final cards =
+        <
+          ({
+            String title,
+            String value,
+            String note,
+            Color color,
+            IconData icon,
+            VoidCallback tap,
+          })
+        >[
+          (
+            title: "Today's Sales",
+            value: _money(data['today_sales']),
+            note: '${data['sales_growth'] ?? 0}% vs yesterday',
+            color: green,
+            icon: Icons.currency_rupee_rounded,
+            tap: () => state.go(17),
+          ),
+          (
+            title: 'Total Bills',
+            value: '${data['total_bills'] ?? 0}',
+            note: '${data['bills_growth'] ?? 0}% vs yesterday',
+            color: blue,
+            icon: Icons.receipt_long_outlined,
+            tap: () => state.go(13),
+          ),
+          (
+            title: 'Profit',
+            value: _money(data['profit']),
+            note: '${data['profit_growth'] ?? 0}% vs yesterday',
+            color: green,
+            icon: Icons.trending_up_rounded,
+            tap: () => state.go(17),
+          ),
+          (
+            title: 'Low Stock',
+            value: '${data['low_stock_count'] ?? 0}',
+            note: 'Items need attention',
+            color: const Color(0xFFF59E0B),
+            icon: Icons.inventory_2_outlined,
+            tap: () {
+              state.setInventoryFilter('Low Stock');
+              state.go(9);
+            },
+          ),
+          (
+            title: 'Expiring Soon',
+            value: '${data['expiring_soon_count'] ?? 0}',
+            note: 'Within 30 days',
+            color: const Color(0xFFF97316),
+            icon: Icons.event_busy_outlined,
+            tap: () {
+              state.setInventoryFilter('Expiring');
+              state.go(9);
+            },
+          ),
+          (
+            title: 'Out of Stock',
+            value: '${data['out_of_stock_count'] ?? 0}',
+            note: 'Restock required',
+            color: red,
+            icon: Icons.warning_amber_rounded,
+            tap: () {
+              state.setInventoryFilter('Out of Stock');
+              state.go(9);
+            },
+          ),
+        ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 900
+            ? 3
+            : constraints.maxWidth >= 560
+            ? 3
+            : 2;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: cards.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: constraints.maxWidth < 560 ? 1.45 : 1.75,
+          ),
+          itemBuilder: (context, index) {
+            final card = cards[index];
+            return _ReferenceMetricCard(
+              title: card.title,
+              value: card.value,
+              note: card.note,
+              color: card.color,
+              icon: card.icon,
+              onTap: card.tap,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ReferenceMetricCard extends StatelessWidget {
+  const _ReferenceMetricCard({
+    required this.title,
+    required this.value,
+    required this.note,
+    required this.color,
+    required this.icon,
+    required this.onTap,
+  });
+  final String title, value, note;
+  final Color color;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: line),
+    ),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 19),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              value,
+              maxLines: 1,
+              style: TextStyle(
+                color: title == 'Low Stock' || title == 'Out of Stock'
+                    ? color
+                    : navy,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              note,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _ReferencePaymentSummary extends StatelessWidget {
+  const _ReferencePaymentSummary(this.state);
+  final AdminState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = (state.dashboard['payment_breakdown'] as List? ?? const []);
+    double amount(String method) => rows
+        .where((row) => row is Map && row['method'] == method)
+        .fold(
+          0,
+          (sum, row) =>
+              sum + (double.tryParse('${(row as Map)['total']}') ?? 0),
+        );
+    final upi = amount('upi');
+    final cash = amount('cash');
+    final card = amount('card');
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Today's Payments",
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 12),
+          _paymentRow(
+            Icons.account_balance_wallet_outlined,
+            'GPay / UPI',
+            upi,
+            green,
+          ),
+          _paymentRow(
+            Icons.payments_outlined,
+            'Cash',
+            cash,
+            const Color(0xFFF59E0B),
+          ),
+          _paymentRow(
+            Icons.credit_card_outlined,
+            'Card',
+            card,
+            const Color(0xFF7C3AED),
+          ),
+          const Divider(height: 22),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Total Collection',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              Text(
+                _money(upi + cash + card),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: navy,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _paymentRow(IconData icon, String label, double value, Color color) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          children: [
+            Icon(icon, size: 17, color: color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              _money(value),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
+      );
 }
 
 class _Welcome extends StatelessWidget {
