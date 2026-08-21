@@ -35,6 +35,9 @@ backend/db.sqlite3
 backend/db.sqlite3*.bak
 backend/media/
 backend/staticfiles/
+!backend/staticfiles/
+backend/staticfiles/*
+!backend/staticfiles/.gitkeep
 **/__pycache__/
 *.py[cod]
 .pub-cache/
