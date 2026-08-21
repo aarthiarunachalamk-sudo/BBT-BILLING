@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.db import connection
+from django.db.migrations.recorder import MigrationRecorder
 from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -9,7 +11,33 @@ from billing.views import AdminTokenObtainPairView, change_password, current_use
 
 
 def health_check(request):
-    return JsonResponse({"status": "ok", "service": "bbt-billing-api"})
+    try:
+        applied = MigrationRecorder(connection).migration_qs.filter(
+            app="billing",
+            name="0006_admin_visibility_inventory",
+        ).exists()
+        columns = {
+            column.name
+            for column in connection.introspection.get_table_description(
+                connection.cursor(),
+                "billing_item",
+            )
+        }
+        schema_ready = applied and "barcode" in columns
+    except Exception as exception:
+        return JsonResponse(
+            {"status": "error", "service": "bbt-billing-api", "database": exception.__class__.__name__},
+            status=503,
+        )
+    return JsonResponse(
+        {
+            "status": "ok" if schema_ready else "error",
+            "service": "bbt-billing-api",
+            "database": "ready" if schema_ready else "migration_required",
+            "schema": "0006",
+        },
+        status=200 if schema_ready else 503,
+    )
 
 
 urlpatterns = [

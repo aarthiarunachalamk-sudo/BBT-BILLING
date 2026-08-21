@@ -29,4 +29,8 @@ done
 mkdir -p staticfiles
 python manage.py collectstatic --no-input
 python manage.py migrate
+if python manage.py showmigrations billing | grep -q '\[ \]'; then
+  echo "Unapplied billing migrations remain; refusing to deploy."
+  exit 1
+fi
 python manage.py seed_weight_products
