@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from billing.schema_repair import repair_admin_visibility_schema
+from billing.schema_repair import admin_visibility_schema_status, repair_admin_visibility_schema
 from billing.views import AdminTokenObtainPairView, change_password, current_user, logout_view
 
 
@@ -17,14 +17,7 @@ def health_check(request):
             app="billing",
             name="0006_admin_visibility_inventory",
         ).exists()
-        columns = {
-            column.name
-            for column in connection.introspection.get_table_description(
-                connection.cursor(),
-                "billing_item",
-            )
-        }
-        return applied and "barcode" in columns
+        return applied and not admin_visibility_schema_status()
 
     try:
         schema_ready = schema_is_ready()
@@ -45,6 +38,7 @@ def health_check(request):
             "service": "bbt-billing-api",
             "database": "ready" if schema_ready else "migration_required",
             "schema": "0006",
+            "missing": admin_visibility_schema_status() if not schema_ready else [],
         },
         status=200 if schema_ready else 503,
     )
