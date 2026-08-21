@@ -428,78 +428,96 @@ class _CategoryProductRow extends StatelessWidget {
 Future<Map<String, dynamic>?> _showAddCategoryDialog(
   BuildContext context,
   AdminState state,
-) async {
+) => showDialog<Map<String, dynamic>>(
+  context: context,
+  builder: (_) => _AddCategoryDialog(state: state),
+);
+
+class _AddCategoryDialog extends StatefulWidget {
+  const _AddCategoryDialog({required this.state});
+
+  final AdminState state;
+
+  @override
+  State<_AddCategoryDialog> createState() => _AddCategoryDialogState();
+}
+
+class _AddCategoryDialogState extends State<_AddCategoryDialog> {
   final controller = TextEditingController();
-  var saving = false;
+  bool saving = false;
   String? errorText;
-  final result = await showDialog<Map<String, dynamic>>(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (dialogContext, setDialogState) => AlertDialog(
-        title: const Text('Add Category'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: controller,
-              autofocus: true,
-              enabled: !saving,
-              decoration: const InputDecoration(
-                labelText: 'Category name',
-                hintText: 'Example: Spices, Snacks, Beverages',
-              ),
-            ),
-            if (errorText != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                errorText!,
-                style: const TextStyle(color: Colors.red, fontSize: 12),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: saving ? null : () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Add Category'),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: controller,
+          autofocus: true,
+          enabled: !saving,
+          textInputAction: TextInputAction.done,
+          onSubmitted: saving ? null : (_) => _save(),
+          decoration: const InputDecoration(
+            labelText: 'Category name',
+            hintText: 'Example: Spices, Snacks, Beverages',
           ),
-          FilledButton(
-            onPressed: saving
-                ? null
-                : () async {
-                    final name = controller.text.trim();
-                    if (name.isEmpty) return;
-                    setDialogState(() {
-                      saving = true;
-                      errorText = null;
-                    });
-                    try {
-                      final category = await state.createCategory(name);
-                      if (dialogContext.mounted) {
-                        Navigator.pop(dialogContext, category);
-                      }
-                    } catch (error) {
-                      if (dialogContext.mounted) {
-                        setDialogState(() {
-                          saving = false;
-                          errorText = error.toString();
-                        });
-                      }
-                    }
-                  },
-            child: saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Save'),
+        ),
+        if (errorText != null) ...[
+          const SizedBox(height: 10),
+          Text(
+            errorText!,
+            style: const TextStyle(color: Colors.red, fontSize: 12),
           ),
         ],
-      ),
+      ],
     ),
+    actions: [
+      TextButton(
+        onPressed: saving ? null : () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: saving ? null : _save,
+        child: saving
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text('Save'),
+      ),
+    ],
   );
-  controller.dispose();
-  return result;
+
+  Future<void> _save() async {
+    final name = controller.text.trim();
+    if (name.isEmpty) {
+      setState(() => errorText = 'Enter a category name.');
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      saving = true;
+      errorText = null;
+    });
+    try {
+      final category = await widget.state.createCategory(name);
+      if (!mounted) return;
+      Navigator.pop(context, category);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        saving = false;
+        errorText = error.toString();
+      });
+    }
+  }
 }
