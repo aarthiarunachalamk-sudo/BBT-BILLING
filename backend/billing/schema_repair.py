@@ -9,7 +9,14 @@ from .models import AuditLog, Item, Payment, ProductBatch, StockAdjustment, Stoc
 
 MIGRATION = "0006_admin_visibility_inventory"
 FIELD_NAMES = {
-    Item: ("barcode", "last_stock_review_date", "shelf_added_date", "shelf_stock", "store_stock"),
+    Item: (
+        "manual_details",
+        "barcode",
+        "last_stock_review_date",
+        "shelf_added_date",
+        "shelf_stock",
+        "store_stock",
+    ),
     Payment: ("balance_returned", "cash_received"),
     User: ("branch", "employee_id", "last_logout"),
     AuditLog: ("description",),
