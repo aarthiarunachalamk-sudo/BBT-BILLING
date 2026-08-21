@@ -11,6 +11,7 @@ class BrandsScreen extends StatefulWidget {
 
 class _BrandsScreenState extends State<BrandsScreen> {
   String query = '';
+  String selectedCategory = 'All';
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +19,11 @@ class _BrandsScreenState extends State<BrandsScreen> {
       final text =
           '${brand['name']} ${brand['manufacturer']} ${brand['country']}'
               .toLowerCase();
-      return text.contains(query);
+      final categories = (brand['category_names'] as List? ?? const []).map(
+        (value) => value.toString(),
+      );
+      return text.contains(query) &&
+          (selectedCategory == 'All' || categories.contains(selectedCategory));
     }).toList();
     return _AdminPage(
       state: widget.state,
@@ -33,6 +38,31 @@ class _BrandsScreenState extends State<BrandsScreen> {
               onChanged: (value) => setState(() => query = value.toLowerCase()),
             ),
           ),
+          SizedBox(
+            height: 42,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              children: [
+                for (final category in <String>[
+                  'All',
+                  ...widget.state.categories.map(
+                    (row) => row['name'].toString(),
+                  ),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: selectedCategory == category,
+                      onSelected: (_) =>
+                          setState(() => selectedCategory = category),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
           Expanded(
             child: brands.isEmpty
                 ? const _EmptyState(
@@ -86,7 +116,7 @@ class _BrandsScreenState extends State<BrandsScreen> {
                                   if (brand['country']?.toString().isNotEmpty ==
                                       true)
                                     Text(
-                                      brand['country'].toString(),
+                                      '${(brand['category_names'] as List? ?? const []).join(', ')} • ${brand['country']}',
                                       style: const TextStyle(
                                         fontSize: 9,
                                         color: muted,
@@ -149,6 +179,7 @@ class _AddBrandDialogState extends State<_AddBrandDialog> {
   final description = TextEditingController();
   bool saving = false;
   String? errorText;
+  final Set<int> categoryIds = {};
 
   @override
   void dispose() {
@@ -196,6 +227,29 @@ class _AddBrandDialogState extends State<_AddBrandDialog> {
                   validator: (value) =>
                       value == null || value.trim().isEmpty ? 'Required' : null,
                 ),
+                const Text(
+                  'Available for categories *',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    for (final category in widget.state.categories)
+                      FilterChip(
+                        label: Text(category['name'].toString()),
+                        selected: categoryIds.contains(category['id']),
+                        onSelected: (selected) => setState(() {
+                          final id = category['id'] as int;
+                          selected
+                              ? categoryIds.add(id)
+                              : categoryIds.remove(id);
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
                 _field(
                   manufacturer,
                   'Manufacturer / company',
@@ -263,6 +317,10 @@ class _AddBrandDialogState extends State<_AddBrandDialog> {
 
   Future<void> _save() async {
     if (!(formKey.currentState?.validate() ?? false)) return;
+    if (categoryIds.isEmpty) {
+      setState(() => errorText = 'Select at least one category.');
+      return;
+    }
     setState(() {
       saving = true;
       errorText = null;
@@ -270,6 +328,7 @@ class _AddBrandDialogState extends State<_AddBrandDialog> {
     try {
       await widget.state.createBrand({
         'name': name.text.trim(),
+        'categories': categoryIds.toList(),
         'manufacturer': manufacturer.text.trim(),
         'country': country.text.trim(),
         'website': website.text.trim(),

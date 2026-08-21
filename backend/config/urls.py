@@ -26,7 +26,7 @@ def health_check(request):
     def schema_is_ready():
         applied = MigrationRecorder(connection).migration_qs.filter(
             app="billing",
-            name="0007_brand_item_brand",
+            name="0008_brand_categories",
         ).exists()
         return applied and not admin_visibility_schema_status()
 
@@ -48,7 +48,7 @@ def health_check(request):
             "status": "ok" if schema_ready else "error",
             "service": "bbt-billing-api",
             "database": "ready" if schema_ready else "migration_required",
-            "schema": "0007",
+            "schema": "0008",
             "missing": admin_visibility_schema_status() if not schema_ready else [],
         },
         status=200 if schema_ready else 503,

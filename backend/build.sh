@@ -33,3 +33,4 @@ if ! python manage.py migrate; then
   python manage.py shell -c "from billing.schema_repair import repair_admin_visibility_schema; repair_admin_visibility_schema()"
 fi
 python manage.py seed_weight_products
+python manage.py seed_brand_catalog

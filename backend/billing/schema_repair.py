@@ -7,7 +7,11 @@ from django.db.models import F
 from .models import AuditLog, Brand, Item, Payment, ProductBatch, StockAdjustment, StockReview, User
 
 
-MIGRATIONS = ("0006_admin_visibility_inventory", "0007_brand_item_brand")
+MIGRATIONS = (
+    "0006_admin_visibility_inventory",
+    "0007_brand_item_brand",
+    "0008_brand_categories",
+)
 FIELD_NAMES = {
     Item: (
         "manual_details",
@@ -48,6 +52,9 @@ def admin_visibility_schema_status():
             if model._meta.get_field(name).column not in columns
         )
     missing.extend(model._meta.db_table for model in NEW_MODELS if model._meta.db_table not in tables)
+    brand_categories_table = Brand._meta.get_field("categories").remote_field.through._meta.db_table
+    if brand_categories_table not in tables:
+        missing.append(brand_categories_table)
     return missing
 
 
@@ -59,6 +66,15 @@ def repair_admin_visibility_schema():
             if model._meta.db_table not in existing_tables:
                 editor.create_model(model)
                 existing_tables.add(model._meta.db_table)
+                existing_tables.update(
+                    field.remote_field.through._meta.db_table
+                    for field in model._meta.local_many_to_many
+                )
+
+        brand_categories = Brand._meta.get_field("categories").remote_field.through
+        if brand_categories._meta.db_table not in existing_tables:
+            editor.create_model(brand_categories)
+            existing_tables.add(brand_categories._meta.db_table)
 
         for model, names in FIELD_NAMES.items():
             table = model._meta.db_table

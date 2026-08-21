@@ -111,6 +111,9 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class BrandSerializer(serializers.ModelSerializer):
     product_count = serializers.IntegerField(source="items.count", read_only=True)
+    category_names = serializers.SlugRelatedField(
+        source="categories", many=True, read_only=True, slug_field="name"
+    )
 
     class Meta:
         model = Brand

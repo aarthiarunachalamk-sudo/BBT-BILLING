@@ -110,6 +110,7 @@ class Supplier(TimeStampedModel):
 
 class Brand(TimeStampedModel):
     name = models.CharField(max_length=120, unique=True)
+    categories = models.ManyToManyField(Category, related_name="brands", blank=True)
     manufacturer = models.CharField(max_length=160, blank=True)
     country = models.CharField(max_length=80, blank=True)
     website = models.URLField(blank=True)

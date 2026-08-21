@@ -41,9 +41,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     } else {
       unawaited(_loadCategories());
     }
-    final activeBrands = widget.state.brands.where(
-      (brand) => brand['is_active'] == true,
-    );
+    final activeBrands = _availableBrands;
     if (activeBrands.isNotEmpty) brandId = activeBrands.first['id'] as int?;
   }
 
@@ -92,6 +90,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final match = widget.state.brands.where((brand) => brand['id'] == brandId);
     return match.isEmpty ? '' : match.first['name']?.toString() ?? '';
   }
+
+  List<Map<String, dynamic>> get _availableBrands =>
+      widget.state.brands.where((brand) {
+        if (brand['is_active'] != true) return false;
+        final categories = (brand['category_names'] as List? ?? const []).map(
+          (value) => value.toString().toLowerCase(),
+        );
+        return _selectedCategoryName.isEmpty ||
+            categories.contains(_selectedCategoryName.toLowerCase());
+      }).toList();
 
   TextEditingController _manualDetailController(String key) =>
       manualDetails.putIfAbsent(key, TextEditingController.new);
@@ -261,6 +269,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   ? null
                                   : (v) => setState(() {
                                       categoryId = v;
+                                      brandId = null;
                                       unit = null;
                                     }),
                               validator: (v) =>
@@ -373,16 +382,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   value: null,
                                   child: Text('No brand / Generic'),
                                 ),
-                                ...widget.state.brands
-                                    .where(
-                                      (brand) => brand['is_active'] == true,
-                                    )
-                                    .map(
-                                      (brand) => DropdownMenuItem<int?>(
-                                        value: brand['id'] as int,
-                                        child: Text(brand['name'].toString()),
-                                      ),
-                                    ),
+                                ..._availableBrands.map(
+                                  (brand) => DropdownMenuItem<int?>(
+                                    value: brand['id'] as int,
+                                    child: Text(brand['name'].toString()),
+                                  ),
+                                ),
                               ],
                               onChanged: saving
                                   ? null
