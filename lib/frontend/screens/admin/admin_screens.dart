@@ -10,6 +10,7 @@ part 'login_screen.dart';
 part 'change_password_screen.dart';
 part 'admin_dashboard_screen.dart';
 part 'staff_management_screen.dart';
+part 'user_details_screen.dart';
 part 'roles_permissions_screen.dart';
 part 'product_management_screen.dart';
 part 'add_product_screen.dart';
@@ -17,6 +18,7 @@ part 'category_management_screen.dart';
 part 'supplier_management_screen.dart';
 part 'purchase_order_approval_screen.dart';
 part 'inventory_alerts_screen.dart';
+part 'billing_pos_screen.dart';
 part 'sales_dashboard_screen.dart';
 part 'discount_approval_screen.dart';
 part 'returns_refunds_screen.dart';
@@ -42,6 +44,8 @@ const adminScreenNames = [
   'Reports & Store Settings',
   'Audit Log & Logout',
   'Change Password',
+  'Payment & Sales Report',
+  'User Details',
 ];
 
 class AdminDestination {
@@ -75,7 +79,7 @@ const adminNavigationGroups = <String, List<AdminDestination>>{
     AdminDestination(9, 'Inventory Alerts', Icons.inventory_outlined),
   ],
   'Sales & service': [
-    AdminDestination(10, 'Sales Dashboard', Icons.analytics_outlined),
+    AdminDestination(10, 'Billing / POS', Icons.point_of_sale_outlined),
     AdminDestination(11, 'Discount Approvals', Icons.percent_outlined),
     AdminDestination(12, 'Returns & Refunds', Icons.assignment_return_outlined),
     AdminDestination(13, 'WhatsApp Invoices', Icons.chat_outlined),
@@ -273,13 +277,15 @@ Widget buildAdminScreen(AdminState state) => switch (state.screen) {
   7 => SuppliersScreen(state),
   8 => PurchaseOrderScreen(state),
   9 => InventoryAlertsScreen(state),
-  10 => SalesDashboardScreen(state),
+  10 => BillingPosScreen(state),
   11 => DiscountApprovalScreen(state),
   12 => ReturnsScreen(state),
   13 => WhatsAppScreen(state),
   14 => ReportsSettingsScreen(state),
   15 => AuditScreen(state),
   16 => ChangePasswordScreen(state),
+  17 => SalesDashboardScreen(state),
+  18 => UserDetailsScreen(state),
   _ => AuditScreen(state),
 };
 

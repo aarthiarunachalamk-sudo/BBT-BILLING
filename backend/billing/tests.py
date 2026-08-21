@@ -16,7 +16,9 @@ from .models import (
     Client,
     DiscountApproval,
     InventoryTransaction,
+    Invoice,
     Item,
+    Payment,
     PurchaseOrder,
     PurchaseOrderItem,
     ProductBatch,
@@ -308,3 +310,44 @@ class AdminFlowTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+    def test_checkout_recalculates_totals_and_deducts_stock_atomically(self):
+        product = Item.objects.get(sku="TEST-ITEM")
+        product.store_stock = 2
+        product.save(update_fields=["store_stock"])
+
+        response = self.client.post(
+            "/api/billing/checkout/",
+            {
+                "items": [{"product": product.pk, "quantity": 2, "price": "0.01"}],
+                "discount_percent": "0",
+                "payments": [{"method": "cash", "amount": "35.40", "cash_received": "40.00"}],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        invoice = Invoice.objects.get(pk=response.data["id"])
+        self.assertEqual(invoice.subtotal, Decimal("30.00"))
+        self.assertEqual(invoice.total, Decimal("35.40"))
+        product.refresh_from_db()
+        self.assertEqual(product.stock_quantity, 0)
+        self.assertTrue(Payment.objects.filter(invoice=invoice, status="verified").exists())
+        movement = InventoryTransaction.objects.filter(item=product, transaction_type="sale").get()
+        self.assertEqual(movement.quantity, -2)
+
+    def test_checkout_rejects_payment_mismatch_without_writes(self):
+        product = Item.objects.get(sku="TEST-ITEM")
+        before = product.stock_quantity
+        response = self.client.post(
+            "/api/billing/checkout/",
+            {
+                "items": [{"product": product.pk, "quantity": 1}],
+                "payments": [{"method": "upi", "amount": "1.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        product.refresh_from_db()
+        self.assertEqual(product.stock_quantity, before)
+        self.assertEqual(Invoice.objects.count(), 0)

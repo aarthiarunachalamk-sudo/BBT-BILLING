@@ -78,8 +78,7 @@ class _ProductsScreenState extends State<ProductsScreen>
         .where((p) => p['stock_status'] == 'out_of_stock')
         .length;
     final inventoryValue = state.products.fold<double>(0, (sum, p) {
-      final cost =
-          double.tryParse(p['purchase_price']?.toString() ?? '') ?? 0;
+      final cost = double.tryParse(p['purchase_price']?.toString() ?? '') ?? 0;
       final stock = int.tryParse(p['stock_quantity']?.toString() ?? '') ?? 0;
       return sum + cost * stock;
     });
@@ -147,9 +146,7 @@ class _ProductsScreenState extends State<ProductsScreen>
                 fontWeight: FontWeight.w700,
               ),
               unselectedLabelStyle: const TextStyle(fontSize: 12),
-              tabs: _categoryTabs
-                  .map((t) => Tab(text: t))
-                  .toList(),
+              tabs: _categoryTabs.map((t) => Tab(text: t)).toList(),
             ),
 
           // ── Product grid per tab ─────────────────────────────────────────
@@ -176,10 +173,7 @@ class _ProductsScreenState extends State<ProductsScreen>
                       );
                     }).toList(),
                   )
-                : _ProductGrid(
-                    state: state,
-                    products: allProducts,
-                  ),
+                : _ProductGrid(state: state, products: allProducts),
           ),
         ],
       ),
@@ -233,8 +227,7 @@ class _ProductGrid extends StatelessWidget {
             return _ProductCatalogCard(
               state: state,
               product: product,
-              onImageTap: () =>
-                  _replaceProductImage(context, state, product),
+              onImageTap: () => _replaceProductImage(context, state, product),
             );
           },
         );
@@ -705,10 +698,9 @@ Future<void> _showEditPriceSheet(
   final purchaseCtrl = TextEditingController(
     text: product['purchase_price']?.toString() ?? '',
   );
-  final mrpCtrl = TextEditingController(
-    text: product['mrp']?.toString() ?? '',
-  );
-  var gst = int.tryParse(
+  final mrpCtrl = TextEditingController(text: product['mrp']?.toString() ?? '');
+  var gst =
+      int.tryParse(
         double.tryParse(
               product['tax_percent']?.toString() ?? '',
             )?.toStringAsFixed(0) ??

@@ -51,7 +51,9 @@ class AdminState extends ChangeNotifier {
   List<Map<String, dynamic>> rolePermissions = [];
   Map<String, dynamic> storeSettings = {};
   Map<String, dynamic> settingsDraft = {};
-  int? pendingCategoryId; // pre-selects a category when navigating to Add Product
+  Map<String, dynamic> selectedUserDetails = {};
+  int?
+  pendingCategoryId; // pre-selects a category when navigating to Add Product
 
   final Map<String, bool> permissions = {
     'Dashboard': false,
@@ -67,7 +69,7 @@ class AdminState extends ChangeNotifier {
   final Map<String, bool> categoryActive = {};
 
   void go(int value) {
-    var destination = value.clamp(0, 16);
+    var destination = value.clamp(0, 18);
     if (!loggedIn && destination != 0 && destination != 16) {
       destination = 0;
     }
@@ -474,6 +476,42 @@ class AdminState extends ChangeNotifier {
     return created;
   }
 
+  Future<Map<String, dynamic>> checkout({
+    required List<Map<String, dynamic>> items,
+    required String paymentMethod,
+    String customerMobile = '',
+    double discountPercent = 0,
+  }) async {
+    final subtotal = items.fold<double>(0, (sum, line) {
+      final product = line['product'] as Map<String, dynamic>;
+      final price = double.tryParse(product['selling_price'].toString()) ?? 0;
+      final tax = double.tryParse(product['tax_percent'].toString()) ?? 0;
+      final quantity = line['quantity'] as int;
+      return sum + (price * quantity * (1 + tax / 100));
+    });
+    final payable = subtotal * (1 - discountPercent / 100);
+    final invoice = await api.create('billing/checkout', {
+      'items': [
+        for (final line in items)
+          {
+            'product': (line['product'] as Map<String, dynamic>)['id'],
+            'quantity': line['quantity'],
+          },
+      ],
+      'discount_percent': discountPercent.toStringAsFixed(2),
+      'customer_mobile': customerMobile.trim(),
+      'payments': [
+        {'method': paymentMethod, 'amount': payable.toStringAsFixed(2)},
+      ],
+    });
+    products = await api.getList('items');
+    invoices = await api.getList('invoices');
+    payments = await api.getList('payments');
+    dashboard = await api.getMap('dashboard');
+    notifyListeners();
+    return invoice;
+  }
+
   Future<void> updateProductImage(
     int productId,
     Uint8List imageBytes,
@@ -493,14 +531,9 @@ class AdminState extends ChangeNotifier {
 
   /// Patches price / GST / MRP fields on a product and refreshes
   /// quotations so open bills always reflect the latest price.
-  Future<void> updateProduct(
-    int productId,
-    Map<String, dynamic> fields,
-  ) async {
+  Future<void> updateProduct(int productId, Map<String, dynamic> fields) async {
     final updated = await api.update('items', productId, fields);
-    products = products
-        .map((p) => p['id'] == productId ? updated : p)
-        .toList();
+    products = products.map((p) => p['id'] == productId ? updated : p).toList();
     // Reload quotations because the backend may have recalculated open ones.
     try {
       purchaseOrders = await api.getList('purchase-orders');
@@ -585,6 +618,23 @@ class AdminState extends ChangeNotifier {
     users = await api.getList('users');
     _hydrateControls();
     notifyListeners();
+  }
+
+  Future<void> openUserDetails(int userId) async {
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      selectedUserDetails = await api.getMap('users/$userId/summary');
+      go(18);
+    } on ApiException catch (exception) {
+      error = exception.message;
+    } catch (_) {
+      error = 'Unable to load user details.';
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> adjustStock(int itemId, int quantity) async {
@@ -758,6 +808,7 @@ class AdminState extends ChangeNotifier {
       rolePermissions.clear();
       storeSettings.clear();
       settingsDraft.clear();
+      selectedUserDetails.clear();
       permissions.updateAll((key, value) => false);
       staffActive.clear();
       categoryActive.clear();

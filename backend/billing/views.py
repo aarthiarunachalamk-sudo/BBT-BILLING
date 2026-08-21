@@ -1,5 +1,5 @@
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -143,6 +143,182 @@ def current_user(request):
     return Response(UserSerializer(request.user).data)
 
 
+def _money(value):
+    try:
+        return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError("Enter a valid monetary amount.")
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+@transaction.atomic
+def checkout(request):
+    """Create a paid invoice and deduct stock as one atomic operation.
+
+    Client totals and prices are deliberately ignored. Products are locked and
+    every monetary value is recalculated from current database values.
+    """
+    lines = request.data.get("items")
+    payments_data = request.data.get("payments")
+    if not isinstance(lines, list) or not lines:
+        return Response({"items": "Add at least one product."}, status=status.HTTP_400_BAD_REQUEST)
+    if not isinstance(payments_data, list) or not payments_data:
+        return Response({"payments": "Select at least one payment method."}, status=status.HTTP_400_BAD_REQUEST)
+
+    normalized = []
+    product_ids = []
+    for index, line in enumerate(lines):
+        try:
+            product_id = int(line.get("product", line.get("item")))
+            quantity = int(line.get("quantity"))
+        except (AttributeError, TypeError, ValueError):
+            return Response({"items": f"Line {index + 1} is invalid."}, status=status.HTTP_400_BAD_REQUEST)
+        if quantity <= 0:
+            return Response({"items": f"Line {index + 1} quantity must be positive."}, status=status.HTTP_400_BAD_REQUEST)
+        normalized.append((product_id, quantity))
+        product_ids.append(product_id)
+
+    products = {
+        product.pk: product
+        for product in Item.objects.select_for_update().filter(pk__in=set(product_ids), is_active=True)
+    }
+    if len(products) != len(set(product_ids)):
+        return Response({"items": "One or more products are unavailable."}, status=status.HTTP_400_BAD_REQUEST)
+
+    subtotal = Decimal("0.00")
+    tax_total = Decimal("0.00")
+    invoice_lines = []
+    for product_id, quantity in normalized:
+        product = products[product_id]
+        if product.item_type == Item.ItemType.MATERIAL and product.stock_quantity < quantity:
+            return Response(
+                {"items": f"Not enough stock for {product.name}. Available: {product.stock_quantity}."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        line_total = (product.selling_price * quantity).quantize(Decimal("0.01"))
+        line_tax = (line_total * product.tax_percent / Decimal("100")).quantize(Decimal("0.01"))
+        subtotal += line_total
+        tax_total += line_tax
+        invoice_lines.append((product, quantity, line_total))
+
+    try:
+        discount_percent = _money(request.data.get("discount_percent", 0))
+    except ValueError as exception:
+        return Response({"discount_percent": str(exception)}, status=status.HTTP_400_BAD_REQUEST)
+    settings = StoreSettings.objects.first()
+    maximum_discount = settings.max_cashier_discount if settings else Decimal("10.00")
+    if discount_percent < 0 or discount_percent > maximum_discount:
+        return Response(
+            {"discount_percent": f"Discount must be between 0 and {maximum_discount}%."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    discount_amount = (subtotal * discount_percent / Decimal("100")).quantize(Decimal("0.01"))
+    taxable_amount = subtotal - discount_amount
+    # Reduce GST proportionally when a bill-level discount is applied.
+    discounted_tax = (tax_total * (Decimal("100") - discount_percent) / Decimal("100")).quantize(Decimal("0.01"))
+    grand_total = taxable_amount + discounted_tax
+
+    allowed_methods = {choice for choice, _ in Payment.Method.choices}
+    parsed_payments = []
+    payment_total = Decimal("0.00")
+    for index, entry in enumerate(payments_data):
+        method = str(entry.get("method", "")).lower()
+        if method not in allowed_methods:
+            return Response({"payments": f"Payment {index + 1} has an invalid method."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            amount = _money(entry.get("amount"))
+        except (AttributeError, ValueError) as exception:
+            return Response({"payments": str(exception)}, status=status.HTTP_400_BAD_REQUEST)
+        if amount <= 0:
+            return Response({"payments": "Payment amounts must be positive."}, status=status.HTTP_400_BAD_REQUEST)
+        parsed_payments.append((method, amount, entry))
+        payment_total += amount
+    if payment_total != grand_total:
+        return Response(
+            {"payments": f"Payment total {payment_total} must equal invoice total {grand_total}."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    client_id = request.data.get("client")
+    if client_id:
+        client = Client.objects.filter(pk=client_id, is_active=True).first()
+        if client is None:
+            return Response({"client": "Customer was not found."}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        mobile = str(request.data.get("customer_mobile", "")).strip()
+        client, _ = Client.objects.get_or_create(
+            name="Walk-in Customer",
+            whatsapp_mobile=mobile,
+            defaults={"contact_person": "Walk-in Customer", "billing_address": "Counter sale"},
+        )
+
+    invoice = Invoice.objects.create(
+        client=client,
+        created_by=request.user,
+        due_date=timezone.localdate(),
+        status=Invoice.Status.PAID,
+        subtotal=subtotal,
+        discount_amount=discount_amount,
+        taxable_amount=taxable_amount,
+        cgst_amount=(discounted_tax / 2).quantize(Decimal("0.01")),
+        sgst_amount=discounted_tax - (discounted_tax / 2).quantize(Decimal("0.01")),
+        total=grand_total,
+        notes=str(request.data.get("notes", "")),
+    )
+    InvoiceItem.objects.bulk_create([
+        InvoiceItem(
+            invoice=invoice,
+            item=product,
+            name=product.name,
+            sku=product.sku,
+            quantity=quantity,
+            unit_price=product.selling_price,
+            amount=line_total,
+        )
+        for product, quantity, line_total in invoice_lines
+    ])
+
+    for product, quantity, _ in invoice_lines:
+        if product.item_type != Item.ItemType.MATERIAL:
+            continue
+        previous = product.stock_quantity
+        shelf_deduction = min(product.shelf_stock, quantity)
+        product.shelf_stock -= shelf_deduction
+        product.store_stock = max(product.store_stock - (quantity - shelf_deduction), 0)
+        product.stock_quantity = previous - quantity
+        product.save(update_fields=["shelf_stock", "store_stock", "stock_quantity", "updated_at"])
+        InventoryTransaction.objects.create(
+            item=product,
+            transaction_type=InventoryTransaction.TransactionType.SALE,
+            quantity=-quantity,
+            previous_stock=previous,
+            new_stock=product.stock_quantity,
+            reference=invoice.number,
+            notes="Atomic POS checkout",
+            performed_by=request.user,
+        )
+
+    for method, amount, entry in parsed_payments:
+        Payment.objects.create(
+            invoice=invoice,
+            payment_type=Payment.PaymentType.FULL if len(parsed_payments) == 1 else Payment.PaymentType.PARTIAL,
+            method=method,
+            amount=amount,
+            transaction_reference=str(entry.get("reference", "")),
+            cash_received=_money(entry.get("cash_received", amount if method == Payment.Method.CASH else 0)),
+            balance_returned=Decimal("0.00"),
+            status=Payment.Status.VERIFIED,
+            collected_by=request.user,
+            verified_by=request.user,
+            verified_at=timezone.now(),
+            stock_processed=True,
+        )
+    record_audit(request, "New Bill Created", "Billing", invoice, {"total": str(grand_total)})
+    record_audit(request, "Payment Received", "Payments", invoice, {"payments": len(parsed_payments)})
+    return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
+
+
 def record_audit(request, action, module, instance=None, metadata=None):
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
     AuditLog.objects.create(
@@ -229,6 +405,19 @@ class UserViewSet(SearchableModelViewSet):
             "card_collection": by_method.get(Payment.Method.CARD, Decimal("0.00")),
             "stock_updated_count": InventoryTransaction.objects.filter(performed_by=user, created_at__date=today).count(),
             "last_activity": AuditLogSerializer(user.audit_logs.first()).data if user.audit_logs.exists() else None,
+            "recent_bills": InvoiceSerializer(
+                Invoice.objects.filter(created_by=user).select_related("client").prefetch_related("items", "payments")[:10],
+                many=True,
+            ).data,
+            "recent_payments": PaymentSerializer(
+                Payment.objects.filter(collected_by=user).select_related("invoice")[:10],
+                many=True,
+            ).data,
+            "recent_stock_updates": InventoryTransactionSerializer(
+                InventoryTransaction.objects.filter(performed_by=user).select_related("item")[:10],
+                many=True,
+            ).data,
+            "recent_activity": AuditLogSerializer(user.audit_logs.all()[:20], many=True).data,
         })
 
 

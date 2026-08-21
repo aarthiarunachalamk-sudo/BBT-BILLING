@@ -104,6 +104,9 @@ class StaffScreen extends StatelessWidget {
                       final name = userName(user);
                       final active = user['is_active'] == true;
                       return ListTile(
+                        onTap: state.loading
+                            ? null
+                            : () => state.openUserDetails(user['id'] as int),
                         contentPadding: const EdgeInsets.symmetric(vertical: 3),
                         leading: CircleAvatar(
                           backgroundColor: const Color(0xFFDCEAFF),

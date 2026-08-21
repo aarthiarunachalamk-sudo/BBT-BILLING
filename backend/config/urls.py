@@ -8,7 +8,7 @@ from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from billing.schema_repair import admin_visibility_schema_status, repair_admin_visibility_schema
-from billing.views import AdminTokenObtainPairView, change_password, current_user, logout_view
+from billing.views import AdminTokenObtainPairView, change_password, checkout, current_user, dashboard, logout_view
 
 
 def health_check(request):
@@ -52,6 +52,8 @@ urlpatterns = [
     path("api/auth/logout/", logout_view, name="logout"),
     path("api/auth/me/", current_user, name="current-user"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/billing/checkout/", checkout, name="billing-checkout"),
+    path("api/dashboard/admin-summary/", dashboard, name="admin-dashboard-summary"),
     path("api/", include("billing.urls")),
 ]
 

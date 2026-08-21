@@ -240,9 +240,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   .map(
                                     (c) => DropdownMenuItem<int>(
                                       value: c['id'] as int,
-                                      child: Text(
-                                        c['name']?.toString() ?? '',
-                                      ),
+                                      child: Text(c['name']?.toString() ?? ''),
                                     ),
                                   )
                                   .toList(),
@@ -361,10 +359,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Barcode / SKU *',
                           prefixIcon: Icon(Icons.qr_code_scanner, size: 18),
-                          suffixIcon: Icon(
-                            Icons.qr_code_scanner,
-                            color: blue,
-                          ),
+                          suffixIcon: Icon(Icons.qr_code_scanner, color: blue),
                         ),
                       ),
 
@@ -372,7 +367,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       _SectionHeader(
                         icon: Icons.edit_note_outlined,
                         title: '$_selectedCategoryName details',
-                        caption: 'Enter the product information for this category.',
+                        caption:
+                            'Enter the product information for this category.',
                       ),
                       const SizedBox(height: 12),
                       ..._categoryDetailFields.map(
@@ -437,8 +433,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       const SizedBox(height: 14),
                       TextFormField(
                         controller: mrp,
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty
+                        validator: (v) => v == null || v.trim().isEmpty
                             ? null
                             : moneyValidator(v, allowZero: false),
                         keyboardType: const TextInputType.numberWithOptions(
@@ -507,18 +502,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             child: Text('Piece'),
                           ),
                           DropdownMenuItem(value: 'Kg', child: Text('Kg')),
-                          DropdownMenuItem(
-                            value: 'Gram',
-                            child: Text('Gram'),
-                          ),
+                          DropdownMenuItem(value: 'Gram', child: Text('Gram')),
                           DropdownMenuItem(
                             value: 'Litre',
                             child: Text('Litre'),
                           ),
-                          DropdownMenuItem(
-                            value: 'Box',
-                            child: Text('Box'),
-                          ),
+                          DropdownMenuItem(value: 'Box', child: Text('Box')),
                           DropdownMenuItem(
                             value: 'Dozen',
                             child: Text('Dozen'),
@@ -553,9 +542,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                         setState(() => gst = value),
                                     selectedColor: blue,
                                     labelStyle: TextStyle(
-                                      color: gst == value
-                                          ? Colors.white
-                                          : ink,
+                                      color: gst == value ? Colors.white : ink,
                                     ),
                                   ),
                                 ),
@@ -704,44 +691,151 @@ class _ManualDetailField {
 
 List<_ManualDetailField> _manualDetailFieldsFor(String category) {
   final value = category.toLowerCase();
-  if (value.contains('beverage') || value.contains('drink') || value.contains('juice')) {
+  if (value.contains('beverage') ||
+      value.contains('drink') ||
+      value.contains('juice')) {
     return const [
-      _ManualDetailField('brand', 'Brand', 'Example: Tropicana', Icons.business_outlined),
-      _ManualDetailField('volume', 'Volume', 'Example: 1 L', Icons.local_drink_outlined),
-      _ManualDetailField('flavour', 'Flavour', 'Example: Mango', Icons.spa_outlined),
-      _ManualDetailField('packaging', 'Packaging', 'Bottle, can or carton', Icons.inventory_2_outlined),
+      _ManualDetailField(
+        'brand',
+        'Brand',
+        'Example: Tropicana',
+        Icons.business_outlined,
+      ),
+      _ManualDetailField(
+        'volume',
+        'Volume',
+        'Example: 1 L',
+        Icons.local_drink_outlined,
+      ),
+      _ManualDetailField(
+        'flavour',
+        'Flavour',
+        'Example: Mango',
+        Icons.spa_outlined,
+      ),
+      _ManualDetailField(
+        'packaging',
+        'Packaging',
+        'Bottle, can or carton',
+        Icons.inventory_2_outlined,
+      ),
     ];
   }
-  if (value.contains('oil') || value.contains('grocery') || value.contains('food') ||
-      value.contains('spice') || value.contains('snack')) {
+  if (value.contains('oil') ||
+      value.contains('grocery') ||
+      value.contains('food') ||
+      value.contains('spice') ||
+      value.contains('snack')) {
     return const [
-      _ManualDetailField('brand', 'Brand', 'Example: Fortune', Icons.business_outlined),
-      _ManualDetailField('net_weight', 'Net weight', 'Example: 500 g', Icons.scale_outlined),
-      _ManualDetailField('variant', 'Variant / type', 'Example: Refined', Icons.tune_outlined),
-      _ManualDetailField('ingredients', 'Ingredients', 'Main ingredients', Icons.restaurant_outlined),
+      _ManualDetailField(
+        'brand',
+        'Brand',
+        'Example: Fortune',
+        Icons.business_outlined,
+      ),
+      _ManualDetailField(
+        'net_weight',
+        'Net weight',
+        'Example: 500 g',
+        Icons.scale_outlined,
+      ),
+      _ManualDetailField(
+        'variant',
+        'Variant / type',
+        'Example: Refined',
+        Icons.tune_outlined,
+      ),
+      _ManualDetailField(
+        'ingredients',
+        'Ingredients',
+        'Main ingredients',
+        Icons.restaurant_outlined,
+      ),
     ];
   }
   if (value.contains('dairy') || value.contains('milk')) {
     return const [
-      _ManualDetailField('brand', 'Brand', 'Example: Amul', Icons.business_outlined),
-      _ManualDetailField('quantity', 'Quantity', 'Example: 500 ml', Icons.scale_outlined),
-      _ManualDetailField('fat_content', 'Fat content', 'Example: 3%', Icons.percent_outlined),
-      _ManualDetailField('storage', 'Storage instructions', 'Keep refrigerated', Icons.ac_unit_outlined),
+      _ManualDetailField(
+        'brand',
+        'Brand',
+        'Example: Amul',
+        Icons.business_outlined,
+      ),
+      _ManualDetailField(
+        'quantity',
+        'Quantity',
+        'Example: 500 ml',
+        Icons.scale_outlined,
+      ),
+      _ManualDetailField(
+        'fat_content',
+        'Fat content',
+        'Example: 3%',
+        Icons.percent_outlined,
+      ),
+      _ManualDetailField(
+        'storage',
+        'Storage instructions',
+        'Keep refrigerated',
+        Icons.ac_unit_outlined,
+      ),
     ];
   }
-  if (value.contains('house') || value.contains('clean') || value.contains('personal')) {
+  if (value.contains('house') ||
+      value.contains('clean') ||
+      value.contains('personal')) {
     return const [
-      _ManualDetailField('brand', 'Brand', 'Product brand', Icons.business_outlined),
-      _ManualDetailField('size', 'Size / quantity', 'Example: 500 ml', Icons.straighten),
-      _ManualDetailField('material', 'Material / formulation', 'Material or formulation', Icons.science_outlined),
-      _ManualDetailField('usage', 'Usage instructions', 'How the product is used', Icons.info_outline),
+      _ManualDetailField(
+        'brand',
+        'Brand',
+        'Product brand',
+        Icons.business_outlined,
+      ),
+      _ManualDetailField(
+        'size',
+        'Size / quantity',
+        'Example: 500 ml',
+        Icons.straighten,
+      ),
+      _ManualDetailField(
+        'material',
+        'Material / formulation',
+        'Material or formulation',
+        Icons.science_outlined,
+      ),
+      _ManualDetailField(
+        'usage',
+        'Usage instructions',
+        'How the product is used',
+        Icons.info_outline,
+      ),
     ];
   }
   return const [
-    _ManualDetailField('brand', 'Brand', 'Product brand', Icons.business_outlined),
-    _ManualDetailField('variant', 'Variant / model', 'Product variant or model', Icons.tune_outlined),
-    _ManualDetailField('size', 'Size / quantity', 'Example: Large, 500 g or 1 L', Icons.straighten),
-    _ManualDetailField('additional_info', 'Additional information', 'Any category-specific detail', Icons.notes_outlined),
+    _ManualDetailField(
+      'brand',
+      'Brand',
+      'Product brand',
+      Icons.business_outlined,
+    ),
+    _ManualDetailField(
+      'variant',
+      'Variant / model',
+      'Product variant or model',
+      Icons.tune_outlined,
+    ),
+    _ManualDetailField(
+      'size',
+      'Size / quantity',
+      'Example: Large, 500 g or 1 L',
+      Icons.straighten,
+    ),
+    _ManualDetailField(
+      'additional_info',
+      'Additional information',
+      'Any category-specific detail',
+      Icons.notes_outlined,
+    ),
   ];
 }
 
@@ -775,16 +869,10 @@ class _SectionHeader extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 2),
-            Text(
-              caption,
-              style: const TextStyle(fontSize: 9, color: muted),
-            ),
+            Text(caption, style: const TextStyle(fontSize: 9, color: muted)),
           ],
         ),
       ),

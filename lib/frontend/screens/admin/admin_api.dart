@@ -101,16 +101,16 @@ class AdminApi {
       for (final candidate in _candidateBaseUrls) {
         final origin = candidate.replaceFirst(RegExp(r'/api$'), '');
         try {
-        final response = await _client
-            .get(Uri.parse('$origin/health/'))
-            .timeout(const Duration(seconds: 6));
-        if (response.statusCode >= 200 && response.statusCode < 400) {
-          baseUrl = candidate;
-          return true;
+          final response = await _client
+              .get(Uri.parse('$origin/health/'))
+              .timeout(const Duration(seconds: 6));
+          if (response.statusCode >= 200 && response.statusCode < 400) {
+            baseUrl = candidate;
+            return true;
+          }
+        } catch (_) {
+          // Timeout or transient error — keep retrying.
         }
-      } catch (_) {
-        // Timeout or transient error — keep retrying.
-      }
       }
       if (attempt < maxAttempts) {
         await Future<void>.delayed(initialDelay);
@@ -179,9 +179,8 @@ class AdminApi {
 
   // ── Data access ───────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> getMap(String path) async => _decodeMap(
-    await _get(Uri.parse('$baseUrl/$path/')),
-  );
+  Future<Map<String, dynamic>> getMap(String path) async =>
+      _decodeMap(await _get(Uri.parse('$baseUrl/$path/')));
 
   Future<List<Map<String, dynamic>>> getList(String path) async {
     final results = <Map<String, dynamic>>[];

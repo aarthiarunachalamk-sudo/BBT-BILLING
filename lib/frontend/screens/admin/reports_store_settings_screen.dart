@@ -24,7 +24,7 @@ class ReportsSettingsScreen extends StatelessWidget {
           mainAxisSpacing: 8,
           childAspectRatio: .92,
           children: [
-            _ReportTile(Icons.bar_chart, 'Sales Report', () => state.go(10)),
+            _ReportTile(Icons.bar_chart, 'Sales Report', () => state.go(17)),
             _ReportTile(
               Icons.receipt_long_outlined,
               'GST Report',
