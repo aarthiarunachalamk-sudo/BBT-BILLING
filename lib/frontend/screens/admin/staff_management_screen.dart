@@ -182,99 +182,246 @@ class StaffScreen extends StatelessWidget {
 }
 
 Future<void> _showAddUserDialog(BuildContext context, AdminState state) async {
+  await showDialog<void>(
+    context: context,
+    useSafeArea: false,
+    builder: (dialogContext) {
+      final size = MediaQuery.sizeOf(dialogContext);
+      final mobile = size.width < 600;
+      return Dialog(
+        insetPadding: mobile ? EdgeInsets.zero : const EdgeInsets.all(28),
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(mobile ? 0 : 20),
+        ),
+        child: SizedBox(
+          width: mobile ? size.width : 560,
+          height: mobile ? size.height : size.height.clamp(560, 760),
+          child: _AddUserForm(state: state),
+        ),
+      );
+    },
+  );
+}
+
+class _AddUserForm extends StatefulWidget {
+  const _AddUserForm({required this.state});
+  final AdminState state;
+
+  @override
+  State<_AddUserForm> createState() => _AddUserFormState();
+}
+
+class _AddUserFormState extends State<_AddUserForm> {
+  final formKey = GlobalKey<FormState>();
   final username = TextEditingController();
   final email = TextEditingController();
   final firstName = TextEditingController();
   final lastName = TextEditingController();
   final password = TextEditingController();
-  var role = 'sales';
-  await showDialog<void>(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
-        title: const Text('Add User'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: username,
-                decoration: const InputDecoration(labelText: 'Username'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: email,
-                decoration: const InputDecoration(labelText: 'Email'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: firstName,
-                decoration: const InputDecoration(labelText: 'First name'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: lastName,
-                decoration: const InputDecoration(labelText: 'Last name'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: password,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Password'),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: role,
-                decoration: const InputDecoration(labelText: 'Role'),
-                items: const [
-                  DropdownMenuItem(value: 'sales', child: Text('Sales')),
-                  DropdownMenuItem(
-                    value: 'accountant',
-                    child: Text('Accountant'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'inventory',
-                    child: Text('Inventory'),
-                  ),
-                  DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                ],
-                onChanged: (value) =>
-                    setDialogState(() => role = value ?? role),
-              ),
-            ],
-          ),
+  String role = 'cashier';
+  bool saving = false;
+  bool obscure = true;
+
+  @override
+  void dispose() {
+    username.dispose();
+    email.dispose();
+    firstName.dispose();
+    lastName.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
+  String? _required(String? value) =>
+      value == null || value.trim().isEmpty ? 'This field is required.' : null;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.white,
+    appBar: AppBar(
+      automaticallyImplyLeading: false,
+      title: const Text('Add User'),
+      actions: [
+        IconButton(
+          tooltip: 'Close',
+          onPressed: saving ? null : () => Navigator.pop(context),
+          icon: const Icon(Icons.close),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await state.createUser({
-                  'username': username.text.trim(),
-                  'email': email.text.trim(),
-                  'first_name': firstName.text.trim(),
-                  'last_name': lastName.text.trim(),
-                  'password': password.text,
-                  'role': role,
-                  'is_active': true,
-                });
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
-              } catch (error) {
-                if (context.mounted) showNotice(context, error.toString());
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
+        const SizedBox(width: 6),
+      ],
+    ),
+    body: SafeArea(
+      top: false,
+      child: Form(
+        key: formKey,
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+          children: [
+            const Text(
+              'Staff information',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Create an account and assign the correct supermarket role.',
+              style: TextStyle(fontSize: 12, color: muted),
+            ),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: username,
+              validator: _required,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Username *',
+                prefixIcon: Icon(Icons.badge_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: email,
+              validator: (value) {
+                final required = _required(value);
+                if (required != null) return required;
+                return value!.contains('@') ? null : 'Enter a valid email.';
+              },
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Email *',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: firstName,
+                    validator: _required,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'First name *',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: lastName,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(labelText: 'Last name'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: password,
+              validator: (value) {
+                final required = _required(value);
+                if (required != null) return required;
+                return value!.length >= 8 ? null : 'Use at least 8 characters.';
+              },
+              obscureText: obscure,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'Password *',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  onPressed: () => setState(() => obscure = !obscure),
+                  icon: Icon(
+                    obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              initialValue: role,
+              decoration: const InputDecoration(
+                labelText: 'Role *',
+                prefixIcon: Icon(Icons.admin_panel_settings_outlined),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                DropdownMenuItem(
+                  value: 'manager',
+                  child: Text('Store Manager'),
+                ),
+                DropdownMenuItem(
+                  value: 'inventory',
+                  child: Text('Inventory Staff'),
+                ),
+                DropdownMenuItem(value: 'cashier', child: Text('Cashier')),
+                DropdownMenuItem(value: 'sales', child: Text('Billing Staff')),
+                DropdownMenuItem(
+                  value: 'accountant',
+                  child: Text('Accountant'),
+                ),
+              ],
+              onChanged: saving
+                  ? null
+                  : (value) => setState(() => role = value ?? role),
+            ),
+          ],
+        ),
+      ),
+    ),
+    bottomNavigationBar: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: saving ? null : () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: FilledButton.icon(
+                onPressed: saving ? null : _save,
+                icon: saving
+                    ? const SizedBox.square(
+                        dimension: 17,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.person_add_alt_1),
+                label: Text(saving ? 'Saving...' : 'Save User'),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
-  username.dispose();
-  email.dispose();
-  firstName.dispose();
-  lastName.dispose();
-  password.dispose();
+
+  Future<void> _save() async {
+    if (!(formKey.currentState?.validate() ?? false)) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => saving = true);
+    try {
+      await widget.state.createUser({
+        'username': username.text.trim(),
+        'email': email.text.trim(),
+        'first_name': firstName.text.trim(),
+        'last_name': lastName.text.trim(),
+        'password': password.text,
+        'role': role,
+        'is_active': true,
+      });
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (error) {
+      if (!mounted) return;
+      showNotice(context, error.toString());
+      setState(() => saving = false);
+    }
+  }
 }
