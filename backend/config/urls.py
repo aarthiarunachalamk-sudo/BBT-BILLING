@@ -11,6 +11,17 @@ from billing.schema_repair import admin_visibility_schema_status, repair_admin_v
 from billing.views import AdminTokenObtainPairView, change_password, checkout, current_user, dashboard, logout_view
 
 
+def api_root(request):
+    return JsonResponse(
+        {
+            "status": "ok",
+            "service": "bbt-billing-api",
+            "health": request.build_absolute_uri("/health/"),
+            "api": request.build_absolute_uri("/api/"),
+        }
+    )
+
+
 def health_check(request):
     def schema_is_ready():
         applied = MigrationRecorder(connection).migration_qs.filter(
@@ -45,6 +56,7 @@ def health_check(request):
 
 
 urlpatterns = [
+    path("", api_root, name="api-root"),
     path("health/", health_check, name="health-check"),
     path("admin/", admin.site.urls),
     path("api/auth/login/", AdminTokenObtainPairView.as_view(), name="token_obtain_pair"),
