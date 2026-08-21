@@ -73,50 +73,47 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedSwitcher(
-    duration: const Duration(milliseconds: 350),
-    child: _finished
-        ? KeyedSubtree(
-            key: const ValueKey('admin-app'),
-            child: widget.destination,
-          )
-        : ColoredBox(
-            key: const ValueKey('video-splash'),
-            color: Colors.black,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (_controller.value.isInitialized)
-                  FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      width: _controller.value.size.width,
-                      height: _controller.value.size.height,
-                      child: VideoPlayer(_controller),
-                    ),
-                  )
-                else
-                  const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
+  Widget build(BuildContext context) {
+    // Do not retain the platform video subtree while mounting the admin app.
+    // AnimatedSwitcher keeps its outgoing child alive for the animation. On
+    // Android that can make the VideoPlayer subtree deactivate after its
+    // inherited dependencies have already moved, tripping InheritedElement's
+    // `_dependents.isEmpty` lifecycle assertion.
+    if (_finished) return widget.destination;
+    return ColoredBox(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_controller.value.isInitialized)
+            FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: _controller.value.size.width,
+                height: _controller.value.size.height,
+                child: VideoPlayer(_controller),
+              ),
+            )
+          else
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: TextButton(
+                  onPressed: _finish,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.black38,
                   ),
-                SafeArea(
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: TextButton(
-                        onPressed: _finish,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: Colors.black38,
-                        ),
-                        child: const Text('Skip'),
-                      ),
-                    ),
-                  ),
+                  child: const Text('Skip'),
                 ),
-              ],
+              ),
             ),
           ),
-  );
+        ],
+      ),
+    );
+  }
 }
