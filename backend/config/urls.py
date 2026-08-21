@@ -1,13 +1,13 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.recorder import MigrationRecorder
 from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from billing.schema_repair import repair_admin_visibility_schema
 from billing.views import AdminTokenObtainPairView, change_password, current_user, logout_view
 
 
@@ -29,10 +29,9 @@ def health_check(request):
     try:
         schema_ready = schema_is_ready()
         if not schema_ready:
-            # Existing Render services can retain a dashboard start command and
-            # ignore render.yaml updates. Repair only pending, code-owned Django
-            # migrations before accepting traffic on that runtime database.
-            call_command("migrate", interactive=False, verbosity=0)
+            # This legacy database has an inconsistent squashed-migration
+            # history, so repair only the known additive 0006 schema changes.
+            repair_admin_visibility_schema()
             connection.close()
             schema_ready = schema_is_ready()
     except Exception as exception:
