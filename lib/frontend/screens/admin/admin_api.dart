@@ -21,7 +21,7 @@ class AdminApi {
         baseUrl ??
             const String.fromEnvironment(
               'API_BASE_URL',
-              defaultValue: 'https://bbt-billing.onrender.com/api',
+              defaultValue: 'https://bbt-billing-c16x.onrender.com/api',
             ),
       );
 
@@ -30,10 +30,16 @@ class AdminApi {
   String? _accessToken;
 
   static String _canonicalBaseUrl(String value) {
-    var normalized = value.trim().replaceFirst(
+    var normalized = value.trim();
+    for (final legacyHost in [
       'bbt-billing-api.onrender.com',
       'bbt-billing.onrender.com',
-    );
+    ]) {
+      normalized = normalized.replaceFirst(
+        legacyHost,
+        'bbt-billing-c16x.onrender.com',
+      );
+    }
     while (normalized.endsWith('/')) {
       normalized = normalized.substring(0, normalized.length - 1);
     }
@@ -41,25 +47,7 @@ class AdminApi {
     return normalized;
   }
 
-  List<String> get _candidateBaseUrls {
-    final candidates = <String>[baseUrl];
-    if (baseUrl.contains('bbt-billing-api.onrender.com')) {
-      candidates.add(
-        baseUrl.replaceFirst(
-          'bbt-billing-api.onrender.com',
-          'bbt-billing.onrender.com',
-        ),
-      );
-    } else if (baseUrl.contains('bbt-billing.onrender.com')) {
-      candidates.add(
-        baseUrl.replaceFirst(
-          'bbt-billing.onrender.com',
-          'bbt-billing-api.onrender.com',
-        ),
-      );
-    }
-    return candidates;
-  }
+  List<String> get _candidateBaseUrls => [baseUrl];
 
   void setBaseUrl(String value) {
     final normalized = _canonicalBaseUrl(value);

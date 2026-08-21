@@ -186,14 +186,14 @@ class _LoginScreenState extends State<LoginScreen> {
               style: const TextStyle(fontSize: 12),
               decoration: InputDecoration(
                 labelText: 'Server URL',
-                hintText: 'https://bbt-billing.onrender.com',
+                hintText: 'https://bbt-billing-c16x.onrender.com',
                 prefixIcon: const Icon(Icons.link, size: 18),
                 suffixIcon: IconButton(
                   tooltip: 'Reset to default',
                   icon: const Icon(Icons.refresh, size: 18),
                   onPressed: () => setState(() {
                     serverUrlController.text =
-                        'https://bbt-billing.onrender.com/api';
+                        'https://bbt-billing-c16x.onrender.com/api';
                   }),
                 ),
                 helperText: 'Must start with https://',

@@ -508,6 +508,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           ),
                           DropdownMenuItem(value: 'Kg', child: Text('Kg')),
                           DropdownMenuItem(
+                            value: 'Gram',
+                            child: Text('Gram'),
+                          ),
+                          DropdownMenuItem(
                             value: 'Litre',
                             child: Text('Litre'),
                           ),

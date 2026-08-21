@@ -1,4 +1,8 @@
+from io import StringIO
+from tempfile import TemporaryDirectory
 from django.urls import reverse
+from django.core.management import call_command
+from django.test import override_settings
 from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -152,6 +156,18 @@ class AdminFlowTests(APITestCase):
             with self.subTest(endpoint=endpoint):
                 response = self.client.get(endpoint)
                 self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+    def test_weight_product_seed_creates_ten_products_and_is_idempotent(self):
+        output = StringIO()
+        with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):
+            call_command("seed_weight_products", stdout=output)
+            call_command("seed_weight_products", stdout=output)
+
+            products = Item.objects.filter(sku__startswith="WT-")
+            self.assertEqual(products.count(), 10)
+            self.assertTrue(all(product.unit in {"Gram", "Kg"} for product in products))
+            self.assertTrue(all(product.manual_details.get("size") for product in products))
+            self.assertTrue(all(bool(product.image) for product in products))
 
     def test_dashboard_values_are_calculated_from_database(self):
         response = self.client.get("/api/dashboard/")
