@@ -14,11 +14,17 @@ class UserShell extends StatelessWidget {
   final bool showBack;
   @override
   Widget build(BuildContext context) => Scaffold(
+    drawer: showBack ? null : _UserDrawer(state: state),
     appBar: AppBar(
       backgroundColor: userNavy, foregroundColor: Colors.white,
+      toolbarHeight: 52,
       title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-      leading: showBack ? IconButton(onPressed: () => state.go(UserPage.inventory), icon: const Icon(Icons.arrow_back)) : null,
-      actions: [IconButton(onPressed: state.loading ? null : state.refresh, icon: const Icon(Icons.refresh))],
+      leading: showBack
+          ? IconButton(onPressed: () => state.go(UserPage.inventory), icon: const Icon(Icons.arrow_back))
+          : Builder(builder: (context) => IconButton(onPressed: () => Scaffold.of(context).openDrawer(), icon: const Icon(Icons.menu_rounded))),
+      actions: title == 'Dashboard'
+          ? [Padding(padding: const EdgeInsets.only(right: 5), child: Stack(alignment: Alignment.center, children: [IconButton(onPressed: () => state.go(UserPage.expiry), icon: const Icon(Icons.notifications_none_rounded)), const Positioned(right: 8, top: 10, child: CircleAvatar(radius: 4, backgroundColor: userRed))]))]
+          : [IconButton(onPressed: state.loading ? null : state.refresh, icon: const Icon(Icons.refresh))],
     ),
     body: SafeArea(top: false, child: Column(children: [
       if (state.error != null) Material(color: const Color(0xFFFFE8E8), child: ListTile(
@@ -28,7 +34,7 @@ class UserShell extends StatelessWidget {
       Expanded(child: state.loading ? const Center(child: CircularProgressIndicator()) : child),
     ])),
     bottomNavigationBar: NavigationBar(
-      selectedIndex: state.navIndex, onDestinationSelected: state.setNav,
+      height: 60, selectedIndex: state.navIndex, onDestinationSelected: state.setNav,
       destinations: const [
         NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Dashboard'),
         NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Inventory'),
@@ -36,6 +42,33 @@ class UserShell extends StatelessWidget {
         NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'Reports'),
         NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
       ],
+    ),
+  );
+}
+
+class _UserDrawer extends StatelessWidget {
+  const _UserDrawer({required this.state});
+  final UserState state;
+
+  @override
+  Widget build(BuildContext context) => Drawer(
+    child: SafeArea(
+      child: Column(
+        children: [
+          const ListTile(leading: CircleAvatar(backgroundColor: userNavy, child: Icon(Icons.storefront, color: Colors.white)), title: Text('BBT BILLING', style: TextStyle(fontWeight: FontWeight.w900)), subtitle: Text('STAFF WORKSPACE')),
+          const Divider(),
+          for (final item in [(0, 'Dashboard', Icons.dashboard_outlined), (1, 'Inventory', Icons.inventory_2_outlined), (2, 'Billing', Icons.point_of_sale_outlined), (3, 'Reports', Icons.bar_chart_outlined), (4, 'Profile', Icons.person_outline)])
+            ListTile(
+              selected: state.navIndex == item.$1,
+              leading: Icon(item.$3),
+              title: Text(item.$2),
+              onTap: () {
+                Navigator.pop(context);
+                state.setNav(item.$1);
+              },
+            ),
+        ],
+      ),
     ),
   );
 }

@@ -1172,6 +1172,7 @@ def dashboard(request):
         "low_stock_count": low_stock,
         "out_of_stock_count": out_of_stock,
         "expiring_soon_count": expiring_soon,
+        "active_products": Item.objects.filter(is_active=True).count(),
         "upi_collection": payment_totals.get(Payment.Method.UPI, Decimal("0.00")),
         "cash_collection": payment_totals.get(Payment.Method.CASH, Decimal("0.00")),
         "card_collection": payment_totals.get(Payment.Method.CARD, Decimal("0.00")),
