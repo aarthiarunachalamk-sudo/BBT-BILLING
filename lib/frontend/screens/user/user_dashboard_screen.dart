@@ -35,6 +35,11 @@ class UserDashboardScreen extends StatelessWidget {
                   value: '${data['active_products'] ?? 0}',
                   color: userBlue,
                   icon: Icons.inventory_2_outlined,
+                  onTap: () {
+                    state.clearSelectedCategory();
+                    state.setStockFilter('In Stock');
+                    state.go(UserPage.currentStock);
+                  },
                 ),
                 _DashboardMetric(
                   label: 'Low Stock',
@@ -65,7 +70,10 @@ class UserDashboardScreen extends StatelessWidget {
                   label: 'Current\nStock',
                   icon: Icons.inventory_2_outlined,
                   color: userBlue,
-                  onTap: () => state.go(UserPage.currentStock),
+                  onTap: () {
+                    state.clearSelectedCategory();
+                    state.go(UserPage.currentStock);
+                  },
                 ),
                 _QuickAction(
                   label: 'Shelf Stock\n3+ Months',
@@ -108,6 +116,7 @@ class _DashboardMetric extends StatelessWidget {
     required this.color,
     required this.icon,
     this.warning = false,
+    this.onTap,
   });
 
   final String label;
@@ -115,19 +124,21 @@ class _DashboardMetric extends StatelessWidget {
   final Color color;
   final IconData icon;
   final bool warning;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: .065),
+  Widget build(BuildContext context) => Material(
+    color: color.withValues(alpha: .065),
+    shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: color.withValues(alpha: .24)),
-      boxShadow: const [
-        BoxShadow(color: Color(0x090F172A), blurRadius: 6, offset: Offset(0, 2)),
-      ],
+      side: BorderSide(color: color.withValues(alpha: .24)),
     ),
-    child: Column(
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
+        child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -157,6 +168,8 @@ class _DashboardMetric extends StatelessWidget {
           ],
         ),
       ],
+        ),
+      ),
     ),
   );
 }

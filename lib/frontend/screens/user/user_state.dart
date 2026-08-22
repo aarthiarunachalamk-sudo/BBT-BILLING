@@ -14,6 +14,8 @@ class UserState extends ChangeNotifier {
   final List<CartLine> cart = [];
   int navIndex = 0;
   String search = '', stockFilter = 'All', reviewFilter = 'All', expiryFilter = '30 Days';
+  int? selectedCategoryId;
+  String selectedCategoryName = '';
 
   Future<void> initialize() async {
     user = await api.restore();
@@ -46,7 +48,12 @@ class UserState extends ChangeNotifier {
           categories = await api.getList('categories');
           break;
         case UserPage.currentStock || UserPage.shelfAging || UserPage.billing:
-          products = await api.getList(page == UserPage.shelfAging ? 'inventory/shelf-stock' : 'inventory/current-stock');
+          products = await api.getList(
+            page == UserPage.shelfAging ? 'inventory/shelf-stock' : 'inventory/current-stock',
+            query: page != UserPage.currentStock || selectedCategoryId == null
+                ? null
+                : {'category': '$selectedCategoryId'},
+          );
           break;
         case UserPage.expiry:
           batches = await api.getList('inventory/expiry');
@@ -81,7 +88,21 @@ class UserState extends ChangeNotifier {
     if (load) refresh();
   }
 
-  void setNav(int index) => go([UserPage.dashboard, UserPage.inventory, UserPage.billing, UserPage.reports, UserPage.profile][index]);
+  void setNav(int index) {
+    if (index == 1 || index == 2) clearSelectedCategory();
+    go([UserPage.dashboard, UserPage.inventory, UserPage.billing, UserPage.reports, UserPage.profile][index]);
+  }
+  void openCategory(Map<String, dynamic> category) {
+    selectedCategoryId = int.tryParse('${category['id']}');
+    selectedCategoryName = '${category['name']}';
+    search = '';
+    stockFilter = 'All';
+    go(UserPage.currentStock);
+  }
+  void clearSelectedCategory() {
+    selectedCategoryId = null;
+    selectedCategoryName = '';
+  }
   void setSearch(String value) { search = value; notifyListeners(); }
   void setStockFilter(String value) { stockFilter = value; notifyListeners(); }
   void setReviewFilter(String value) { reviewFilter = value; notifyListeners(); }

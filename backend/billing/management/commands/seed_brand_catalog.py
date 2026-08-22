@@ -14,7 +14,7 @@ class Command(BaseCommand):
         ("India Gate", "KRBL Limited", "Groceries", "Basmati Rice 5 kg", "BR-INDIAGATE-RICE", "Bag", "620", "760", 18),
         ("Aashirvaad", "ITC Limited", "Groceries", "Whole Wheat Atta 5 kg", "BR-AASHIRVAAD-ATTA", "Bag", "245", "295", 24),
         ("Tata Sampann", "Tata Consumer Products", "Groceries", "Toor Dal 1 kg", "BR-TATA-TOORDAL", "Pack", "145", "175", 28),
-        ("Sakthi Masala", "Sakthi Masala Private Limited", "Spices", "Turmeric Powder 200 g", "BR-SAKTHI-TURMERIC", "Pack", "48", "62", 35),
+        ("Sakthi Masala", "Sakthi Masala Private Limited", "Groceries", "Turmeric Powder 200 g", "BR-SAKTHI-TURMERIC", "Pack", "48", "62", 35),
         ("Aachi", "Aachi Group", "Spices", "Chilli Powder 500 g", "BR-AACHI-CHILLI", "Pack", "209", "247", 30),
         ("Fortune", "AWL Agri Business", "Edible Oils", "Sunflower Oil 1 L", "BR-FORTUNE-OIL", "Bottle", "125", "155", 32),
         ("Gold Winner", "Kaleesuwari Refinery", "Edible Oils", "Sunflower Oil 1 L", "BR-GOLDWINNER-OIL", "Pouch", "122", "150", 30),

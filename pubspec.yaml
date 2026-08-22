@@ -64,6 +64,7 @@ flutter:
 
   assets:
     - assets/splash-screen.mp4
+    - assets/category_icons/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
