@@ -7,11 +7,12 @@ const userNavy = Color(0xFF06245A), userBlue = Color(0xFF075DEB), userGreen = Co
 const userOrange = Color(0xFFF59E0B), userRed = Color(0xFFEF4444), userBg = Color(0xFFF8FAFC);
 
 class UserShell extends StatelessWidget {
-  const UserShell({super.key, required this.state, required this.title, required this.child, this.showBack = false});
+  const UserShell({super.key, required this.state, required this.title, required this.child, this.showBack = false, this.backPage = UserPage.inventory});
   final UserState state;
   final String title;
   final Widget child;
   final bool showBack;
+  final UserPage backPage;
   @override
   Widget build(BuildContext context) => Scaffold(
     drawer: showBack ? null : _UserDrawer(state: state),
@@ -20,7 +21,7 @@ class UserShell extends StatelessWidget {
       toolbarHeight: 52,
       title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
       leading: showBack
-          ? IconButton(onPressed: () => state.go(UserPage.inventory), icon: const Icon(Icons.arrow_back))
+          ? IconButton(onPressed: () => state.back(fallback: backPage), icon: const Icon(Icons.arrow_back))
           : Builder(builder: (context) => IconButton(onPressed: () => Scaffold.of(context).openDrawer(), icon: const Icon(Icons.menu_rounded))),
       actions: title == 'Dashboard'
           ? [Padding(padding: const EdgeInsets.only(right: 5), child: Stack(alignment: Alignment.center, children: [IconButton(onPressed: () => state.go(UserPage.expiry), icon: const Icon(Icons.notifications_none_rounded)), const Positioned(right: 8, top: 10, child: CircleAvatar(radius: 4, backgroundColor: userRed))]))]
@@ -95,6 +96,73 @@ class StatusPill extends StatelessWidget {
   const StatusPill(this.status, {super.key}); final String status;
   @override Widget build(BuildContext context) { final s = status.toLowerCase(); final c = s.contains('out') || s.contains('expired') || s.contains('overdue') ? userRed : s.contains('low') || s.contains('review') ? userOrange : userGreen;
     return Container(padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4), decoration: BoxDecoration(color: c.withValues(alpha: .12), borderRadius: BorderRadius.circular(20)), child: Text(status.replaceAll('_', ' '), style: TextStyle(color: c, fontSize: 11, fontWeight: FontWeight.w700)));
+  }
+}
+
+class UserProductImage extends StatelessWidget {
+  const UserProductImage({
+    super.key,
+    required this.imageUrl,
+    required this.quantity,
+    this.size = 62,
+  });
+
+  final String? imageUrl;
+  final int quantity;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl?.trim();
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: DecoratedBox(
+                decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
+                child: url == null || url.isEmpty
+                    ? const Icon(Icons.inventory_2_outlined, color: userBlue)
+                    : Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.inventory_2_outlined,
+                          color: userBlue,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: -5,
+            bottom: -5,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: quantity > 0 ? userGreen : userRed,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: Text(
+                '$quantity',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

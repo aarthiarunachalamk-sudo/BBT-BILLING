@@ -7,6 +7,7 @@ class UserState extends ChangeNotifier {
   UserState({UserApi? api}) : api = api ?? UserApi();
   final UserApi api;
   UserPage page = UserPage.login;
+  UserPage? previousPage;
   bool loading = true;
   String? error;
   Map<String, dynamic> user = {}, dashboard = {}, lastInvoice = {}, paymentSummary = {};
@@ -73,7 +74,8 @@ class UserState extends ChangeNotifier {
     }, showLoader: true);
   }
 
-  void go(UserPage value, {bool load = true}) {
+  void go(UserPage value, {bool load = true, bool remember = true}) {
+    if (remember && value != page) previousPage = page;
     page = value;
     navIndex = switch (value) {
       UserPage.dashboard => 0,
@@ -88,9 +90,15 @@ class UserState extends ChangeNotifier {
     if (load) refresh();
   }
 
+  void back({UserPage fallback = UserPage.dashboard}) {
+    final destination = previousPage ?? fallback;
+    previousPage = null;
+    go(destination, remember: false);
+  }
+
   void setNav(int index) {
     if (index == 1 || index == 2) clearSelectedCategory();
-    go([UserPage.dashboard, UserPage.inventory, UserPage.billing, UserPage.reports, UserPage.profile][index]);
+    go([UserPage.dashboard, UserPage.inventory, UserPage.billing, UserPage.reports, UserPage.profile][index], remember: false);
   }
   void openCategory(Map<String, dynamic> category) {
     selectedCategoryId = int.tryParse('${category['id']}');
@@ -147,12 +155,12 @@ class UserState extends ChangeNotifier {
     page = UserPage.invoice;
   });
 
-  Future<bool> reviewQuantity(int itemId, int physicalQuantity) async =>
+  Future<bool> reviewQuantity(int itemId, int physicalQuantity, {String reason = 'Staff physical stock review'}) async =>
       _perform(() async {
         await api.post('inventory/quantity-reviews', {
           'item': itemId,
           'physical_quantity': physicalQuantity,
-          'reason': 'Staff physical stock review',
+          'reason': reason,
         });
         reviews = await api.getList('inventory/quantity-reviews');
       });

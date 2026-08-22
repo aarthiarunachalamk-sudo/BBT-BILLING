@@ -329,7 +329,7 @@ class AdminState extends ChangeNotifier {
       1 => 2,
       2 => 10,
       3 => 17,
-      _ => 15,
+      _ => 14,
     };
     notifyListeners();
   }

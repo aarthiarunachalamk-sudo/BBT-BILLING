@@ -173,8 +173,8 @@ class ReportsSettingsScreen extends StatelessWidget {
         ),
         TextButton.icon(
           onPressed: () => state.go(13),
-          icon: const Icon(Icons.chat_outlined),
-          label: const Text('WhatsApp Invoice Control'),
+          icon: const Icon(Icons.receipt_long_outlined),
+          label: const Text('All Bills & WhatsApp'),
         ),
         TextButton.icon(
           onPressed: () => state.go(15),

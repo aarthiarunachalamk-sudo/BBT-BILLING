@@ -127,9 +127,9 @@ class _InventoryProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => UserCard(
     child: Row(children: [
-      CircleAvatar(
-        backgroundColor: userBlue.withValues(alpha: .09),
-        child: const Icon(Icons.shopping_bag_outlined, color: userBlue),
+      UserProductImage(
+        imageUrl: product['image']?.toString(),
+        quantity: number(product['total_stock'] ?? product['stock_quantity']),
       ),
       const SizedBox(width: 12),
       Expanded(

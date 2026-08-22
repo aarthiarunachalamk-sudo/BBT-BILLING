@@ -41,7 +41,7 @@ const adminScreenNames = [
   'Sales Dashboard',
   'Discount Approval',
   'Returns & Refunds',
-  'WhatsApp Invoice Control',
+  'All Bills',
   'Reports & Store Settings',
   'Audit Log & Logout',
   'Change Password',
@@ -85,7 +85,7 @@ const adminNavigationGroups = <String, List<AdminDestination>>{
     AdminDestination(10, 'Billing / POS', Icons.point_of_sale_outlined),
     AdminDestination(11, 'Discount Approvals', Icons.percent_outlined),
     AdminDestination(12, 'Returns & Refunds', Icons.assignment_return_outlined),
-    AdminDestination(13, 'WhatsApp Invoices', Icons.chat_outlined),
+    AdminDestination(13, 'All Bills', Icons.receipt_long_outlined),
   ],
   'Administration': [
     AdminDestination(14, 'Reports & Settings', Icons.tune_outlined),

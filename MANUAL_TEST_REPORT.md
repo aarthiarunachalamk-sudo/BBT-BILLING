@@ -3,6 +3,37 @@
 Date: 22 August 2026  
 Overall result: **PARTIALLY PASS**
 
+## Navigation remediation audit — 22 August 2026
+
+This pass inspected every Flutter `onTap`, `onPressed`, navigation bar, route transition, dialog action, and clickable list/card in both active modules. The application uses centralized state-driven navigation (`AdminState.go/setNav` and `UserState.go/setNav`), so no second router or duplicate legacy screen was introduced.
+
+| Navigation flow | Result | Evidence |
+|---|---|---|
+| Portal → Admin/User choice | PASS | Both choices push only the active `SupermarketAdminApp` / `SupermarketUserApp` modules |
+| Admin login → Dashboard | PASS | Login changes the centralized screen to Dashboard; `PopScope` prevents returning to login while authenticated |
+| Admin bottom Dashboard/Users/Billing/Reports/Settings | PASS | Settings mapping corrected from Audit/Logout to Reports & Store Settings; state switching does not stack routes |
+| Admin dashboard sales/profit | PASS | Opens Payment & Sales Report |
+| Admin dashboard Low/Expiring/Out of Stock | PASS | Opens Inventory Alerts with the requested filter selected |
+| Admin dashboard Total Bills | PASS | Opens the existing invoice-control module, now implemented as searchable All Bills |
+| Admin All Bills → selected invoice | PASS | Invoice ID-backed row opens its itemized detail dialog |
+| Admin Users → selected user | PASS | Passes backend user ID to `openUserDetails`; back returns to User Management |
+| Admin Add User → refresh | PASS | Successful API creation reloads the user collection before closing |
+| Admin Products → selected product | PASS | Product ID-backed row opens edit workflow; filter icon opens filter sheet |
+| Admin Add Product → refresh | PASS | Successful creation updates centralized products before returning |
+| Admin logout | PASS | Confirmation, guarded request, local session clear, and portal callback are wired |
+| Staff login → Verification → Dashboard | PASS | State transition occurs only after successful authentication |
+| Staff bottom Dashboard/Inventory/Billing/Reports/Profile | PASS | Uses state switching; no Admin destination is referenced |
+| Staff logical back navigation | PASS | Added previous-screen tracking; Payment returns to Billing and Profile subflows return logically without loops |
+| Staff dashboard quick actions | PASS | Current Stock, Shelf Stock, Quantity Review, and Expiry route to their existing screens |
+| Inventory category → filtered products | PASS | Passes category database ID to current-stock API query |
+| Billing → Payment → Invoice | PASS | Cart remains in state; invoice transition occurs only after checkout succeeds |
+| Quantity Update/Confirm/Report Difference | PASS | All three actions now use confirmation/input and the stock-review API |
+| Expiry Remove/Clearance/Return/Dispose | PASS | Each action confirms, calls its batch endpoint by ID, and refreshes batch data |
+| Shelf Move Stock | PASS | Quantity dialog calls the stock-transfer endpoint and refreshes shelf stock |
+| Shelf Discount/Return/Clearance | BLOCKED | No corresponding staff-authorized shelf-product API exists; UI explicitly reports manager-only availability |
+| Invoice PDF/WhatsApp/Print | BLOCKED | Dedicated staff PDF, platform share, and print services/endpoints do not exist in this project |
+| Physical device click-through | BLOCKED | Flutter CLI/device tooling still stalls without producing a usable target; results above are code-path and backend verification, not claimed physical taps |
+
 ## Environment evidence
 
 - `python backend/manage.py check`: PASS.

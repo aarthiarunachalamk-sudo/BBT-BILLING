@@ -1,82 +1,55 @@
 part of 'admin_screens.dart';
 
-class WhatsAppScreen extends StatelessWidget {
+class WhatsAppScreen extends StatefulWidget {
   const WhatsAppScreen(this.state, {super.key});
   final AdminState state;
 
   @override
-  Widget build(BuildContext context) => _AdminPage(
-    state: state,
-    title: 'WhatsApp Invoice Control',
-    back: 14,
-    bottom: false,
-    child: Column(
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(14, 16, 14, 6),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Invoice History',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-            ),
-          ),
+  State<WhatsAppScreen> createState() => _WhatsAppScreenState();
+}
+
+class _WhatsAppScreenState extends State<WhatsAppScreen> {
+  String query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final invoices = widget.state.invoices.where((invoice) {
+      final searchable = '${invoice['number']} ${invoice['client_name']} ${invoice['client_mobile']}'.toLowerCase();
+      return searchable.contains(query.toLowerCase().trim());
+    }).toList();
+    return _AdminPage(
+      state: widget.state,
+      title: 'All Bills',
+      back: 14,
+      bottom: false,
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+          child: SearchBox('Search bill number or customer', onChanged: (value) => setState(() => query = value)),
         ),
         Expanded(
-          child: state.whatsappMessages.isEmpty
-              ? const _EmptyState(
-                  'No WhatsApp invoice messages found.',
-                  icon: Icons.chat_outlined,
-                )
+          child: invoices.isEmpty
+              ? const _EmptyState('No invoices found.', icon: Icons.receipt_long_outlined)
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
-                  itemCount: state.whatsappMessages.length,
-                  separatorBuilder: (_, _) => const Divider(),
+                  itemCount: invoices.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
-                    final message = state.whatsappMessages[index];
-                    final status = message['status']?.toString() ?? '';
-                    final color = status == 'failed'
-                        ? red
-                        : status == 'queued'
-                        ? Colors.orange
-                        : green;
+                    final invoice = invoices[index];
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.description_outlined,
-                        color: navy,
-                      ),
-                      title: Text(
-                        message['invoice_number']?.toString() ?? '',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      subtitle: Text(
-                        message['recipient']?.toString() ?? '',
-                        style: const TextStyle(fontSize: 10),
-                      ),
+                      leading: const CircleAvatar(child: Icon(Icons.receipt_long_outlined)),
+                      title: Text(invoice['number']?.toString() ?? 'Invoice', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                      subtitle: Text('${invoice['client_name'] ?? 'Walk-in customer'} • ${_dateText(invoice['invoice_date'] ?? invoice['created_at'])}', style: const TextStyle(fontSize: 10)),
                       trailing: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(
-                            _statusText(status),
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          Text(
-                            _dateText(
-                              message['sent_at'] ?? message['created_at'],
-                            ),
-                            style: const TextStyle(fontSize: 9, color: muted),
-                          ),
+                          Text(_money(invoice['total']), style: const TextStyle(fontWeight: FontWeight.w800)),
+                          Text(_statusText(invoice['status']), style: const TextStyle(fontSize: 9, color: muted)),
                         ],
                       ),
+                      onTap: () => _showInvoice(context, invoice),
                     );
                   },
                 ),
@@ -84,30 +57,58 @@ class WhatsAppScreen extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.all(14),
           child: PrimaryAction(
-            'Send Latest Invoice',
+            'Send Latest Invoice on WhatsApp',
             outlined: true,
-            onPressed: () async {
-              try {
-                await state.resendInvoice();
-                if (context.mounted) {
-                  showNotice(context, 'Invoice queued for WhatsApp');
-                }
-              } catch (error) {
-                if (context.mounted) showNotice(context, error.toString());
-              }
-            },
+            onPressed: widget.state.invoices.isEmpty ? null : () => _sendLatest(context),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 18),
-          child: Text(
-            state.storeSettings['whatsapp_enabled'] == true
-                ? 'WhatsApp messaging is enabled.'
-                : 'Enable WhatsApp messaging in store settings.',
-            style: const TextStyle(fontSize: 9, color: muted),
+      ]),
+    );
+  }
+
+  Future<void> _sendLatest(BuildContext context) async {
+    try {
+      await widget.state.resendInvoice();
+      if (context.mounted) showNotice(context, 'Invoice queued for WhatsApp');
+    } catch (error) {
+      if (context.mounted) showNotice(context, error.toString());
+    }
+  }
+
+  Future<void> _showInvoice(BuildContext context, Map<String, dynamic> invoice) async {
+    final items = (invoice['items'] as List? ?? const []);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(invoice['number']?.toString() ?? 'Invoice Details'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: SingleChildScrollView(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _invoiceLine('Customer', invoice['client_name'] ?? 'Walk-in customer'),
+              _invoiceLine('Date', _dateText(invoice['invoice_date'] ?? invoice['created_at'])),
+              _invoiceLine('Status', _statusText(invoice['status'])),
+              const Divider(),
+              for (final item in items.whereType<Map>())
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(item['item_name']?.toString() ?? 'Product'),
+                  subtitle: Text('Qty ${item['quantity'] ?? 0}'),
+                  trailing: Text(_money(item['line_total'] ?? item['amount'])),
+                ),
+              const Divider(),
+              _invoiceLine('Total', _money(invoice['total'])),
+            ]),
           ),
         ),
-      ],
-    ),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+      ),
+    );
+  }
+
+  Widget _invoiceLine(String label, dynamic value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(children: [Expanded(child: Text(label, style: const TextStyle(color: muted))), Text('$value', style: const TextStyle(fontWeight: FontWeight.w700))]),
   );
 }

@@ -245,7 +245,6 @@ class UserDetailsScreen extends StatelessWidget {
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                     title: Text(text((item as Map).cast<String, dynamic>())),
-                    trailing: const Icon(Icons.chevron_right, size: 18),
                   ),
               ],
             ),

@@ -4,7 +4,7 @@ class PaymentMethodScreen extends StatefulWidget { const PaymentMethodScreen(thi
 class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
   String method = 'upi'; final cash = TextEditingController(), upi = TextEditingController(), card = TextEditingController();
   @override void dispose() { cash.dispose(); upi.dispose(); card.dispose(); super.dispose(); }
-  @override Widget build(BuildContext context) => UserShell(state: widget.state, title: 'Payment Method', child: ListView(padding: const EdgeInsets.all(16), children: [
+  @override Widget build(BuildContext context) => UserShell(state: widget.state, title: 'Payment Method', showBack: true, backPage: UserPage.billing, child: ListView(padding: const EdgeInsets.all(16), children: [
     UserCard(child: Column(children: [const Text('Amount Payable'), Text(money(widget.state.grandTotal), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: userNavy))])), const SizedBox(height: 10),
     for (final item in [('upi', 'GPay / UPI', Icons.qr_code), ('cash', 'Cash', Icons.payments_outlined), ('card', 'Card', Icons.credit_card), ('split', 'Split Payment', Icons.call_split)])
       UserCard(onTap: () => setState(() => method = item.$1), child: Row(children: [Radio<String>(value: item.$1, groupValue: method, onChanged: (v) => setState(() => method = v!)), Icon(item.$3, color: userBlue), const SizedBox(width: 10), Text(item.$2, style: const TextStyle(fontWeight: FontWeight.w700))])),
