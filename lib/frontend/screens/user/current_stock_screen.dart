@@ -1,0 +1,9 @@
+part of 'user_screens.dart';
+
+class CurrentStockScreen extends StatelessWidget { const CurrentStockScreen(this.state, {super.key}); final UserState state;
+  @override Widget build(BuildContext context) => UserShell(state: state, title: 'Current Stock', showBack: true, child: Column(children: [
+    Padding(padding: const EdgeInsets.fromLTRB(14, 14, 14, 8), child: TextField(onChanged: state.setSearch, decoration: const InputDecoration(hintText: 'Search product / scan barcode', prefixIcon: Icon(Icons.search), suffixIcon: Icon(Icons.qr_code_scanner)))),
+    SizedBox(height: 42, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [for (final f in ['All', 'In Stock', 'Low Stock', 'Out of Stock']) Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: ChoiceChip(label: Text(f), selected: state.stockFilter == f, onSelected: (_) => state.setStockFilter(f)))])),
+    Expanded(child: state.visibleProducts.isEmpty ? const EmptyMessage('No products match these filters.') : ListView.builder(padding: const EdgeInsets.all(12), itemCount: state.visibleProducts.length, itemBuilder: (_, i) { final p = state.visibleProducts[i]; return UserCard(child: Row(children: [const CircleAvatar(child: Icon(Icons.shopping_bag_outlined)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${p['name']}', style: const TextStyle(fontWeight: FontWeight.w800)), Text('SKU ${p['sku'] ?? '—'}', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)), Text('Store ${number(p['store_stock'])}  •  Shelf ${number(p['shelf_stock'])}  •  Total ${number(p['total_stock'] ?? p['stock_quantity'])}', style: const TextStyle(fontSize: 12))])), StatusPill('${p['stock_status'] ?? 'in_stock'}') ])); }))
+  ]));
+}

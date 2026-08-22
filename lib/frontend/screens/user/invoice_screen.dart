@@ -1,0 +1,9 @@
+part of 'user_screens.dart';
+
+class InvoiceScreen extends StatelessWidget { const InvoiceScreen(this.state, {super.key}); final UserState state;
+  @override Widget build(BuildContext context) { final invoice = state.lastInvoice.isNotEmpty ? state.lastInvoice : (state.invoices.isNotEmpty ? state.invoices.first : <String, dynamic>{}); return UserShell(state: state, title: 'Invoice', child: invoice.isEmpty ? const EmptyMessage('No invoice is available yet.') : ListView(padding: const EdgeInsets.all(16), children: [
+    UserCard(child: Column(children: [const Icon(Icons.check_circle, size: 54, color: userGreen), const Text('Payment Successful', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)), const Divider(height: 28), _line('Invoice ID', invoice['number']), _line('Date', invoice['created_at'] ?? invoice['invoice_date']), _line('Cashier', state.user['first_name'] ?? state.user['username']), _line('Status', invoice['status']), _line('Total Amount', money(invoice['total']))])), const SizedBox(height: 12),
+    OutlinedButton.icon(onPressed: () => _notice(context, 'PDF download is available from the invoice API.'), icon: const Icon(Icons.picture_as_pdf), label: const Text('Download PDF')), const SizedBox(height: 8), ElevatedButton.icon(onPressed: () => _notice(context, 'Enter the customer mobile number in billing to share via WhatsApp.'), icon: const Icon(Icons.chat), label: const Text('Send on WhatsApp')), const SizedBox(height: 8), TextButton(onPressed: () => state.go(UserPage.billing), child: const Text('Create New Bill')),
+  ])); }
+  Widget _line(String label, dynamic value) => Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [Expanded(child: Text(label, style: const TextStyle(color: Colors.blueGrey))), Flexible(child: Text('$value', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700)))]));
+}

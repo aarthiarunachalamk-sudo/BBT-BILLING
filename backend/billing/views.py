@@ -72,6 +72,19 @@ class IsAdminOrManager(permissions.BasePermission):
         )
 
 
+class IsInventoryEditor(permissions.BasePermission):
+    """Allow stock/catalog writes only to operational inventory roles."""
+
+    allowed_roles = {User.Role.ADMIN, User.Role.MANAGER, User.Role.INVENTORY}
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and (request.user.is_superuser or request.user.role in self.allowed_roles)
+        )
+
+
 class AdminTokenObtainPairView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
 
@@ -79,6 +92,9 @@ class AdminTokenObtainPairView(TokenObtainPairView):
         response = super().post(request, *args, **kwargs)
         if response.status_code == status.HTTP_200_OK and response.data.get("user"):
             user = User.objects.filter(pk=response.data["user"]["id"]).first()
+            if user:
+                user.last_login = timezone.now()
+                user.save(update_fields=["last_login"])
             forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
             AuditLog.objects.create(user=user, action="Login", module="Auth", ip_address=forwarded or request.META.get("REMOTE_ADDR"), device=request.META.get("HTTP_USER_AGENT", "")[:255])
         return response
@@ -457,6 +473,12 @@ class ItemViewSet(SearchableModelViewSet):
     search_fields = ["name", "sku", "description", "category__name", "brand__name"]
     ordering_fields = ["name", "selling_price", "stock_quantity", "created_at"]
 
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.IsAuthenticated()]
+        return [IsInventoryEditor()]
+
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         try:
             return super().create(request, *args, **kwargs)
@@ -486,6 +508,17 @@ class ItemViewSet(SearchableModelViewSet):
                 reference="Opening stock",
                 notes="Opening stock recorded when product was created.",
                 performed_by=self.request.user,
+            )
+        batch_number = str(self.request.data.get("batch_number", "")).strip()
+        expiry_date = self.request.data.get("expiry_date")
+        if batch_number and expiry_date:
+            ProductBatch.objects.create(
+                item=item,
+                batch_number=batch_number,
+                quantity=item.total_stock,
+                shelf_quantity=item.shelf_stock,
+                manufactured_date=self.request.data.get("manufactured_date") or None,
+                expiry_date=expiry_date,
             )
         record_audit(self.request, "Item created", "Item", item)
 
@@ -580,11 +613,65 @@ class ItemViewSet(SearchableModelViewSet):
         )
         return Response(InventoryTransactionSerializer(stock_entry).data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=["post"], url_path="move-to-shelf")
+    @transaction.atomic
+    def move_to_shelf(self, request, pk=None):
+        item = Item.objects.select_for_update().get(pk=pk)
+        try:
+            quantity = int(request.data.get("quantity"))
+        except (TypeError, ValueError):
+            return Response(
+                {"quantity": "Enter a positive whole number."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if quantity <= 0 or quantity > item.store_stock:
+            return Response(
+                {"quantity": f"Quantity must be between 1 and {item.store_stock}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        previous = item.total_stock
+        item.store_stock -= quantity
+        item.shelf_stock += quantity
+        item.stock_quantity = item.store_stock + item.shelf_stock
+        item.shelf_added_date = timezone.localdate()
+        item.save(
+            update_fields=[
+                "store_stock",
+                "shelf_stock",
+                "stock_quantity",
+                "shelf_added_date",
+                "updated_at",
+            ]
+        )
+        movement = InventoryTransaction.objects.create(
+            item=item,
+            transaction_type=InventoryTransaction.TransactionType.ADJUSTMENT,
+            quantity=0,
+            previous_stock=previous,
+            new_stock=item.stock_quantity,
+            reference="Shelf transfer",
+            notes=f"Moved {quantity} units from store to shelf.",
+            performed_by=request.user,
+        )
+        record_audit(
+            request,
+            "Shelf stock moved",
+            "Inventory",
+            item,
+            {"quantity": quantity},
+        )
+        return Response(InventoryTransactionSerializer(movement).data)
+
 
 class ProductBatchViewSet(SearchableModelViewSet):
     queryset = ProductBatch.objects.select_related("item", "supplier").all()
     serializer_class = ProductBatchSerializer
     search_fields = ["item__name", "item__sku", "batch_number"]
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.IsAuthenticated()]
+        return [IsInventoryEditor()]
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -626,6 +713,11 @@ class ProductBatchViewSet(SearchableModelViewSet):
 class StockReviewViewSet(viewsets.ModelViewSet):
     queryset = StockReview.objects.select_related("item", "reviewed_by").all()
     serializer_class = StockReviewSerializer
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.IsAuthenticated()]
+        return [IsInventoryEditor()]
 
     def get_queryset(self):
         queryset = super().get_queryset()

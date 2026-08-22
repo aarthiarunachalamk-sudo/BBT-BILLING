@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework.test import APIClient
 
 from .models import (
     AuditLog,
@@ -254,6 +255,146 @@ class AdminFlowTests(APITestCase):
         self.assertEqual(opening.quantity, 20)
         self.assertEqual(opening.previous_stock, 0)
         self.assertEqual(opening.new_stock, 20)
+
+
+class StaffAdminIntegrationTests(APITestCase):
+    """Critical shared-database flow exercised without production test data."""
+
+    def setUp(self):
+        # Preserve the shared fixture used by the remaining Admin flow tests.
+        AdminFlowTests.setUp(self)
+        self.admin = self.user
+        self.admin.role = User.Role.ADMIN
+        self.admin.save(update_fields=["role"])
+        self.category = Category.objects.create(name="Integration Beverages")
+        self.admin_client = APIClient()
+        self.admin_client.force_authenticate(self.admin)
+
+    def test_complete_staff_to_admin_and_admin_to_staff_flow(self):
+        create_user = self.admin_client.post(
+            "/api/admin/users/",
+            {
+                "username": "emp200",
+                "employee_id": "EMP200",
+                "email": "emp200@example.com",
+                "first_name": "Integration",
+                "last_name": "Staff",
+                "role": User.Role.INVENTORY,
+                "branch": "Main Branch",
+                "password": "StaffTest@123",
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(create_user.status_code, status.HTTP_201_CREATED, create_user.data)
+        staff_id = create_user.data["id"]
+
+        staff_client = APIClient()
+        login = staff_client.post(
+            "/api/auth/login/",
+            {"username": "EMP200", "password": "StaffTest@123"},
+            format="json",
+        )
+        self.assertEqual(login.status_code, status.HTTP_200_OK, login.data)
+        staff_client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+
+        created = staff_client.post(
+            "/api/products/",
+            {
+                "item_type": "material",
+                "name": "Integration Test Juice",
+                "sku": "INT-JUICE-001",
+                "barcode": "990000000001",
+                "category": self.category.pk,
+                "unit": "Bottle",
+                "purchase_price": "70.00",
+                "selling_price": "100.00",
+                "tax_percent": "5.00",
+                "store_stock": 50,
+                "shelf_stock": 10,
+                "stock_quantity": 60,
+                "reorder_level": 10,
+                "batch_number": "TESTB001",
+                "expiry_date": (timezone.localdate() + timedelta(days=60)).isoformat(),
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
+        product_id = created.data["id"]
+        self.assertTrue(ProductBatch.objects.filter(item_id=product_id, batch_number="TESTB001").exists())
+        self.assertTrue(InventoryTransaction.objects.filter(item_id=product_id, new_stock=60).exists())
+
+        admin_products = self.admin_client.get("/api/products/?search=INT-JUICE-001")
+        self.assertEqual(admin_products.status_code, status.HTTP_200_OK)
+        self.assertEqual(admin_products.data["results"][0]["total_stock"], 60)
+
+        moved = staff_client.post(
+            f"/api/items/{product_id}/move-to-shelf/",
+            {"quantity": 5},
+            format="json",
+        )
+        self.assertEqual(moved.status_code, status.HTTP_200_OK, moved.data)
+        product = Item.objects.get(pk=product_id)
+        self.assertEqual((product.store_stock, product.shelf_stock, product.total_stock), (45, 15, 60))
+
+        reviewed = staff_client.post(
+            "/api/inventory/quantity-reviews/",
+            {"item": product_id, "physical_quantity": 58, "reason": "Integration count"},
+            format="json",
+        )
+        self.assertEqual(reviewed.status_code, status.HTTP_201_CREATED, reviewed.data)
+        product.refresh_from_db()
+        self.assertEqual(product.total_stock, 58)
+
+        price_update = self.admin_client.patch(
+            f"/api/products/{product_id}/",
+            {"selling_price": "110.00"},
+            format="json",
+        )
+        self.assertEqual(price_update.status_code, status.HTTP_200_OK, price_update.data)
+        staff_product = staff_client.get(f"/api/products/{product_id}/")
+        self.assertEqual(staff_product.data["selling_price"], "110.00")
+
+        checkout_response = staff_client.post(
+            "/api/billing/checkout/",
+            {
+                "items": [{"item": product_id, "quantity": 2}],
+                "payments": [{"method": "upi", "amount": "231.00"}],
+            },
+            format="json",
+        )
+        self.assertEqual(checkout_response.status_code, status.HTTP_201_CREATED, checkout_response.data)
+        product.refresh_from_db()
+        self.assertEqual(product.total_stock, 56)
+        invoice_id = checkout_response.data["id"]
+        self.assertTrue(Payment.objects.filter(invoice_id=invoice_id, method=Payment.Method.UPI, status=Payment.Status.VERIFIED).exists())
+
+        dashboard_response = self.admin_client.get("/api/dashboard/")
+        self.assertEqual(dashboard_response.data["total_bills"], 1)
+        self.assertEqual(Decimal(dashboard_response.data["today_sales"]), Decimal("231.00"))
+        summary = self.admin_client.get(f"/api/users/{staff_id}/summary/")
+        self.assertEqual(summary.data["today_bills"], 1)
+        self.assertEqual(Decimal(summary.data["upi_collection"]), Decimal("231.00"))
+        self.assertTrue(AuditLog.objects.filter(user_id=staff_id, action="New Bill Created").exists())
+        self.assertTrue(AuditLog.objects.filter(user_id=staff_id, action="Payment Received").exists())
+
+        logout = staff_client.post("/api/auth/logout/", {}, format="json")
+        self.assertEqual(logout.status_code, status.HTTP_200_OK)
+        self.assertTrue(AuditLog.objects.filter(user_id=staff_id, action="Logout").exists())
+
+        deactivated = self.admin_client.patch(
+            f"/api/admin/users/{staff_id}/",
+            {"is_active": False},
+            format="json",
+        )
+        self.assertEqual(deactivated.status_code, status.HTTP_200_OK)
+        blocked_login = APIClient().post(
+            "/api/auth/login/",
+            {"username": "EMP200", "password": "StaffTest@123"},
+            format="json",
+        )
+        self.assertEqual(blocked_login.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_product_creation_rejects_duplicate_sku_ignoring_case(self):
         existing = Item.objects.get(sku="TEST-ITEM")

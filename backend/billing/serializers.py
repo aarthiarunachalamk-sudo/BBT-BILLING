@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -37,11 +38,14 @@ User = get_user_model()
 
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        login = attrs.get(self.username_field, "")
-        if "@" in login:
-            user = User.objects.filter(email__iexact=login).first()
-            if user:
-                attrs[self.username_field] = user.username
+        login = str(attrs.get(self.username_field, "")).strip()
+        user = User.objects.filter(
+            models.Q(email__iexact=login)
+            | models.Q(employee_id__iexact=login)
+            | models.Q(phone__iexact=login)
+        ).first()
+        if user:
+            attrs[self.username_field] = user.username
         data = super().validate(attrs)
         user_data = UserSerializer(self.user).data
         data["user"] = user_data
@@ -142,6 +146,8 @@ class ItemSerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
     brand_name = serializers.CharField(source="brand.name", read_only=True)
     total_stock = serializers.IntegerField(read_only=True)
+    batch_number = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    manufactured_date = serializers.DateField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Item
@@ -150,6 +156,11 @@ class ItemSerializer(serializers.ModelSerializer):
 
     def validate_name(self, value):
         return value.strip()
+
+    def create(self, validated_data):
+        validated_data.pop("batch_number", None)
+        validated_data.pop("manufactured_date", None)
+        return super().create(validated_data)
 
     def validate_sku(self, value):
         sku = value.strip()

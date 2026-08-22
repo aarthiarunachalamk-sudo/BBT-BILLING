@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'frontend/screens/admin/admin_app.dart';
+import 'app_portal.dart';
 
-void main() => runApp(const SupermarketAdminApp());
+void main() => runApp(const SupermarketBillingPortal());
