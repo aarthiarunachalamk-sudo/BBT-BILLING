@@ -31,6 +31,9 @@ from .models import (
     ReturnRequest,
     RolePermission,
     StoreSettings,
+    StoreStock,
+    ShelfStock,
+    StockMovement,
     StockAdjustment,
     StockReview,
     WhatsAppMessage,
@@ -53,10 +56,25 @@ from .serializers import (
     ReturnRequestSerializer,
     RolePermissionSerializer,
     StoreSettingsSerializer,
+    StoreStockSerializer,
+    ShelfStockSerializer,
+    StockMovementSerializer,
     StockAdjustmentSerializer,
     StockReviewSerializer,
     UserSerializer,
     WhatsAppMessageSerializer,
+)
+from .inventory.services.stock_service import (
+    adjust_store_stock,
+    adjust_shelf_stock,
+    auto_refill_shelf,
+    branch_for,
+    deduct_shelf_for_sale,
+    get_stock,
+    initialize_stock,
+    stock_result,
+    transfer_shelf_to_store,
+    transfer_store_to_shelf,
 )
 
 
@@ -209,9 +227,13 @@ def checkout(request):
     invoice_lines = []
     for product_id, quantity in normalized:
         product = products[product_id]
-        if product.item_type == Item.ItemType.MATERIAL and product.stock_quantity < quantity:
+        available = product.stock_quantity
+        if product.item_type == Item.ItemType.MATERIAL:
+            store_record, shelf_record = get_stock(product, branch_for(request.user), lock=True)
+            available = store_record.quantity + shelf_record.quantity
+        if product.item_type == Item.ItemType.MATERIAL and available < quantity:
             return Response(
-                {"items": f"Not enough stock for {product.name}. Available: {product.stock_quantity}."},
+                {"items": f"Not enough stock for {product.name}. Available: {available}."},
                 status=status.HTTP_409_CONFLICT,
             )
         line_total = (product.selling_price * quantity).quantize(Decimal("0.01"))
@@ -301,11 +323,14 @@ def checkout(request):
         if product.item_type != Item.ItemType.MATERIAL:
             continue
         previous = product.stock_quantity
-        shelf_deduction = min(product.shelf_stock, quantity)
-        product.shelf_stock -= shelf_deduction
-        product.store_stock = max(product.store_stock - (quantity - shelf_deduction), 0)
-        product.stock_quantity = previous - quantity
-        product.save(update_fields=["shelf_stock", "store_stock", "stock_quantity", "updated_at"])
+        deduct_shelf_for_sale(
+            product,
+            quantity,
+            branch=branch_for(request.user),
+            user=request.user,
+            reference_id=invoice.pk,
+        )
+        product.refresh_from_db(fields=["stock_quantity"])
         InventoryTransaction.objects.create(
             item=product,
             transaction_type=InventoryTransaction.TransactionType.SALE,
@@ -498,6 +523,15 @@ class ItemViewSet(SearchableModelViewSet):
         if item.stock_quantity and not item.store_stock and not item.shelf_stock:
             item.store_stock = item.stock_quantity
             item.save(update_fields=["store_stock"])
+        initialize_stock(
+            item,
+            branch=branch_for(self.request.user),
+            store_quantity=item.store_stock,
+            shelf_quantity=item.shelf_stock,
+            target_quantity=self.request.data.get("target_shelf_quantity", item.shelf_stock),
+            minimum_quantity=item.reorder_level,
+            user=self.request.user,
+        )
         if item.item_type == Item.ItemType.MATERIAL and item.stock_quantity > 0:
             InventoryTransaction.objects.create(
                 item=item,
@@ -597,10 +631,12 @@ class ItemViewSet(SearchableModelViewSet):
             return Response({"quantity": "Stock cannot become negative and change cannot be zero."}, status=status.HTTP_400_BAD_REQUEST)
 
         previous = item.total_stock
-        item.store_stock = max(item.store_stock + quantity, 0)
-        item.stock_quantity = item.store_stock + item.shelf_stock
-        item.save(update_fields=["store_stock", "stock_quantity", "updated_at"])
         transaction_type = request.data.get("transaction_type", InventoryTransaction.TransactionType.ADJUSTMENT)
+        try:
+            adjust_store_stock(item, quantity, branch=branch_for(request.user), user=request.user, notes=request.data.get("notes", ""), reference_id=request.data.get("reference", ""))
+        except ValidationError as exception:
+            return Response({"quantity": exception.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        item.refresh_from_db()
         stock_entry = InventoryTransaction.objects.create(
             item=item,
             transaction_type=transaction_type,
@@ -616,7 +652,7 @@ class ItemViewSet(SearchableModelViewSet):
     @action(detail=True, methods=["post"], url_path="move-to-shelf")
     @transaction.atomic
     def move_to_shelf(self, request, pk=None):
-        item = Item.objects.select_for_update().get(pk=pk)
+        item = Item.objects.get(pk=pk)
         try:
             quantity = int(request.data.get("quantity"))
         except (TypeError, ValueError):
@@ -624,25 +660,12 @@ class ItemViewSet(SearchableModelViewSet):
                 {"quantity": "Enter a positive whole number."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if quantity <= 0 or quantity > item.store_stock:
-            return Response(
-                {"quantity": f"Quantity must be between 1 and {item.store_stock}."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         previous = item.total_stock
-        item.store_stock -= quantity
-        item.shelf_stock += quantity
-        item.stock_quantity = item.store_stock + item.shelf_stock
-        item.shelf_added_date = timezone.localdate()
-        item.save(
-            update_fields=[
-                "store_stock",
-                "shelf_stock",
-                "stock_quantity",
-                "shelf_added_date",
-                "updated_at",
-            ]
-        )
+        try:
+            transfer_store_to_shelf(item, quantity, branch=branch_for(request.user), user=request.user)
+        except ValidationError as exception:
+            return Response({"quantity": exception.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        item.refresh_from_db()
         movement = InventoryTransaction.objects.create(
             item=item,
             transaction_type=InventoryTransaction.TransactionType.ADJUSTMENT,
@@ -737,16 +760,105 @@ class StockReviewViewSet(viewsets.ModelViewSet):
         review = serializer.save(system_quantity=previous, difference=difference, status=StockReview.Status.UPDATED, reviewed_by=self.request.user, reviewed_at=timezone.now(), next_review_date=timezone.localdate() + timedelta(days=14))
         if difference:
             StockAdjustment.objects.create(item=item, previous_quantity=previous, new_quantity=physical, difference=difference, reason=self.request.data.get("reason", "Physical stock review"), adjusted_by=self.request.user)
-            item.store_stock = max(physical - item.shelf_stock, 0)
-            item.stock_quantity = item.store_stock + item.shelf_stock
+            branch = branch_for(self.request.user)
+            store_record, _ = get_stock(item, branch, lock=True)
+            store_change = difference if difference > 0 else -min(abs(difference), store_record.quantity)
+            if store_change:
+                adjust_store_stock(item, store_change, branch=branch, user=self.request.user, notes=self.request.data.get("reason", "Physical stock review"), reference_id=review.pk)
+            remaining = difference - store_change
+            if remaining:
+                adjust_shelf_stock(item, remaining, branch=branch, user=self.request.user, notes=self.request.data.get("reason", "Physical stock review"), reference_id=review.pk)
         item.last_stock_review_date = timezone.localdate()
-        item.save(update_fields=["store_stock", "stock_quantity", "last_stock_review_date", "updated_at"])
+        item.save(update_fields=["last_stock_review_date", "updated_at"])
         record_audit(self.request, "Quantity review completed", "Inventory", review, {"difference": difference})
 
 
 class StockAdjustmentViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = StockAdjustment.objects.select_related("item", "adjusted_by").all()
     serializer_class = StockAdjustmentSerializer
+
+
+class StoreStockViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = StoreStockSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = StoreStock.objects.select_related("product", "updated_by")
+        branch = self.request.query_params.get("branch") or branch_for(self.request.user)
+        product_id = self.request.query_params.get("product_id")
+        queryset = queryset.filter(branch=branch)
+        return (queryset.filter(product_id=product_id) if product_id else queryset).order_by("product__name")
+
+
+class ShelfStockViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = ShelfStockSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = ShelfStock.objects.select_related("product", "updated_by").prefetch_related("product__store_stocks")
+        branch = self.request.query_params.get("branch") or branch_for(self.request.user)
+        product_id = self.request.query_params.get("product_id")
+        queryset = queryset.filter(branch=branch)
+        return (queryset.filter(product_id=product_id) if product_id else queryset).order_by("product__name")
+
+
+class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = StockMovementSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = StockMovement.objects.select_related("product", "performed_by")
+        branch = self.request.query_params.get("branch") or branch_for(self.request.user)
+        product_id = self.request.query_params.get("product_id")
+        queryset = queryset.filter(branch=branch)
+        return queryset.filter(product_id=product_id) if product_id else queryset
+
+
+@api_view(["POST"])
+@permission_classes([IsInventoryEditor])
+def store_to_shelf(request):
+    try:
+        product = Item.objects.get(pk=int(request.data.get("product_id")))
+        result = transfer_store_to_shelf(product, request.data.get("quantity"), branch=branch_for(request.user), user=request.user)
+        return Response(result)
+    except (Item.DoesNotExist, TypeError, ValueError):
+        return Response({"product_id": "Select a valid product."}, status=status.HTTP_400_BAD_REQUEST)
+    except ValidationError as exception:
+        return Response({"quantity": exception.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["POST"])
+@permission_classes([IsInventoryEditor])
+def shelf_to_store(request):
+    try:
+        product = Item.objects.get(pk=int(request.data.get("product_id")))
+        result = transfer_shelf_to_store(product, request.data.get("quantity"), branch=branch_for(request.user), user=request.user)
+        return Response(result)
+    except (Item.DoesNotExist, TypeError, ValueError):
+        return Response({"product_id": "Select a valid product."}, status=status.HTTP_400_BAD_REQUEST)
+    except ValidationError as exception:
+        return Response({"quantity": exception.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["POST"])
+@permission_classes([IsInventoryEditor])
+def auto_refill_product(request, product_id):
+    product = Item.objects.filter(pk=product_id).first()
+    if product is None:
+        return Response({"product_id": "Product was not found."}, status=status.HTTP_404_NOT_FOUND)
+    return Response(auto_refill_shelf(product, branch=branch_for(request.user), user=request.user))
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def stock_summary(request):
+    branch = request.query_params.get("branch") or branch_for(request.user)
+    rows = []
+    for product in Item.objects.filter(item_type=Item.ItemType.MATERIAL, is_active=True):
+        store, shelf = get_stock(product, branch)
+        result = stock_result(store, shelf)
+        rows.append({"product_id": product.pk, "name": product.name, **result, "target_shelf_quantity": shelf.target_quantity, "last_refill": shelf.last_refill_date})
+    return Response(rows)
 
 
 class InventoryTransactionViewSet(viewsets.ReadOnlyModelViewSet):
@@ -899,17 +1011,19 @@ class PaymentViewSet(SearchableModelViewSet):
                 item = Item.objects.select_for_update().get(pk=line.item_id)
                 if item.item_type != Item.ItemType.MATERIAL:
                     continue
-                if item.stock_quantity < line.quantity:
+                store_record, shelf_record = get_stock(item, branch_for(request.user), lock=True)
+                available = store_record.quantity + shelf_record.quantity
+                if available < line.quantity:
                     return Response(
-                        {"detail": f"Not enough stock for {item.name}. Available: {item.stock_quantity}."},
+                        {"detail": f"Not enough stock for {item.name}. Available: {available}."},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 material_lines.append((line, item))
 
             for line, item in material_lines:
                 previous = item.stock_quantity
-                item.stock_quantity -= line.quantity
-                item.save(update_fields=["stock_quantity", "updated_at"])
+                deduct_shelf_for_sale(item, line.quantity, branch=branch_for(request.user), user=request.user, reference_id=invoice.pk)
+                item.refresh_from_db(fields=["stock_quantity"])
                 InventoryTransaction.objects.create(
                     item=item,
                     transaction_type=InventoryTransaction.TransactionType.SALE,
@@ -1001,8 +1115,8 @@ class PurchaseOrderViewSet(SearchableModelViewSet):
         for line in order.items.select_related("item"):
             item = Item.objects.select_for_update().get(pk=line.item_id)
             previous = item.stock_quantity
-            item.stock_quantity += line.quantity
-            item.save(update_fields=["stock_quantity", "updated_at"])
+            adjust_store_stock(item, line.quantity, branch=branch_for(request.user), user=request.user, movement_type=StockMovement.MovementType.PURCHASE_TO_STORE, reference_id=order.pk, notes=f"Purchase order {order.number}")
+            item.refresh_from_db(fields=["stock_quantity"])
             InventoryTransaction.objects.create(item=item, transaction_type=InventoryTransaction.TransactionType.STOCK_IN, quantity=line.quantity, previous_stock=previous, new_stock=item.stock_quantity, reference=order.number, performed_by=request.user)
         order.status = PurchaseOrder.Status.RECEIVED
         order.save(update_fields=["status", "updated_at"])
@@ -1034,8 +1148,8 @@ class ReturnRequestViewSet(SearchableModelViewSet):
                 if item.item_type == Item.ItemType.SERVICE:
                     continue
                 previous = item.stock_quantity
-                item.stock_quantity += line.quantity
-                item.save(update_fields=["stock_quantity", "updated_at"])
+                adjust_store_stock(item, line.quantity, branch=branch_for(request.user), user=request.user, reference_id=returned.pk, notes="Approved customer return")
+                item.refresh_from_db(fields=["stock_quantity"])
                 InventoryTransaction.objects.create(item=item, transaction_type=InventoryTransaction.TransactionType.STOCK_IN, quantity=line.quantity, previous_stock=previous, new_stock=item.stock_quantity, reference=returned.number, notes="Approved customer return", performed_by=request.user)
         returned.status = decision
         returned.reviewed_by = request.user

@@ -21,6 +21,9 @@ from .models import (
     ReturnRequest,
     RolePermission,
     StoreSettings,
+    StoreStock,
+    ShelfStock,
+    StockMovement,
     User,
     WhatsAppMessage,
 )
@@ -85,4 +88,7 @@ admin.site.register(PurchaseOrderItem)
 admin.site.register(ReturnRequest)
 admin.site.register(ReturnItem)
 admin.site.register(StoreSettings)
+admin.site.register(StoreStock)
+admin.site.register(ShelfStock)
+admin.site.register(StockMovement)
 admin.site.register(AuditLog)

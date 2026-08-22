@@ -10,7 +10,7 @@ class UserAddProductScreen extends StatefulWidget {
 class _UserAddProductScreenState extends State<UserAddProductScreen> {
   final formKey = GlobalKey<FormState>();
   final fields = <String, TextEditingController>{
-    for (final name in ['name', 'sku', 'barcode', 'purchase_price', 'selling_price', 'tax_percent', 'store_stock', 'shelf_stock', 'reorder_level', 'batch_number', 'manufactured_date', 'expiry_date'])
+    for (final name in ['name', 'sku', 'barcode', 'purchase_price', 'selling_price', 'tax_percent', 'store_stock', 'shelf_stock', 'target_shelf_quantity', 'reorder_level', 'batch_number', 'manufactured_date', 'expiry_date'])
       name: TextEditingController(),
   };
   int? category;
@@ -46,6 +46,7 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
           _text('tax_percent', 'GST %', numeric: true, initial: '5'),
           _text('store_stock', 'Store Quantity', numeric: true, initial: '0'),
           _text('shelf_stock', 'Shelf Quantity', numeric: true, initial: '0'),
+          _text('target_shelf_quantity', 'Shelf Target Quantity', numeric: true, initial: '0'),
           _text('reorder_level', 'Minimum Stock', numeric: true, initial: '5'),
           _text('batch_number', 'Batch Number', isRequired: false),
           _text('manufactured_date', 'Manufacturing Date (YYYY-MM-DD)', isRequired: false),
@@ -79,6 +80,7 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
       'barcode': fields['barcode']!.text.trim().isEmpty ? null : fields['barcode']!.text.trim(), 'category': category,
       'unit': 'unit', 'purchase_price': fields['purchase_price']!.text, 'selling_price': fields['selling_price']!.text,
       'tax_percent': fields['tax_percent']!.text, 'store_stock': store, 'shelf_stock': shelf,
+      'target_shelf_quantity': int.tryParse(fields['target_shelf_quantity']!.text) ?? shelf,
       'stock_quantity': store + shelf, 'reorder_level': int.tryParse(fields['reorder_level']!.text) ?? 5, 'is_active': true,
       if (fields['batch_number']!.text.trim().isNotEmpty) 'batch_number': fields['batch_number']!.text.trim(),
       if (fields['manufactured_date']!.text.trim().isNotEmpty) 'manufactured_date': fields['manufactured_date']!.text.trim(),

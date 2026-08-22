@@ -186,6 +186,79 @@ class Item(TimeStampedModel):
         return f"{self.name} ({self.sku})"
 
 
+class StoreStock(TimeStampedModel):
+    product = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="store_stocks")
+    branch = models.CharField(max_length=120, default="Main Branch", db_index=True)
+    quantity = models.PositiveIntegerField(default=0)
+    minimum_quantity = models.PositiveIntegerField(default=0)
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="store_stock_updates")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["product", "branch"], name="unique_store_stock_product_branch")]
+
+
+class ShelfStock(TimeStampedModel):
+    product = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="shelf_stocks")
+    branch = models.CharField(max_length=120, default="Main Branch", db_index=True)
+    quantity = models.PositiveIntegerField(default=0)
+    target_quantity = models.PositiveIntegerField(default=0)
+    minimum_quantity = models.PositiveIntegerField(default=0)
+    shelf_added_date = models.DateTimeField(null=True, blank=True)
+    last_refill_date = models.DateTimeField(null=True, blank=True)
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="shelf_stock_updates")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["product", "branch"], name="unique_shelf_stock_product_branch")]
+
+    @property
+    def refill_required(self):
+        return max(self.target_quantity - self.quantity, 0)
+
+    @property
+    def shelf_status(self):
+        if self.quantity == 0:
+            return "OUT_OF_SHELF_STOCK"
+        if self.quantity < self.minimum_quantity:
+            return "LOW_SHELF_STOCK"
+        if self.quantity < self.target_quantity:
+            return "REFILL_REQUIRED"
+        return "FULL"
+
+
+class StockMovement(TimeStampedModel):
+    class MovementType(models.TextChoices):
+        PURCHASE_TO_STORE = "PURCHASE_TO_STORE", "Purchase to store"
+        STORE_TO_SHELF = "STORE_TO_SHELF", "Store to shelf"
+        SHELF_TO_STORE = "SHELF_TO_STORE", "Shelf to store"
+        SALE_FROM_SHELF = "SALE_FROM_SHELF", "Sale from shelf"
+        STOCK_ADJUSTMENT = "STOCK_ADJUSTMENT", "Stock adjustment"
+        RETURN_TO_SUPPLIER = "RETURN_TO_SUPPLIER", "Return to supplier"
+        DISPOSAL = "DISPOSAL", "Disposal"
+        CLEARANCE_SALE = "CLEARANCE_SALE", "Clearance sale"
+        MANUAL_REFILL = "MANUAL_REFILL", "Manual refill"
+        AUTO_REFILL = "AUTO_REFILL", "Auto refill"
+        INITIAL_STORE_STOCK = "INITIAL_STORE_STOCK", "Initial store stock"
+        INITIAL_SHELF_STOCK = "INITIAL_SHELF_STOCK", "Initial shelf stock"
+
+    product = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="stock_movements")
+    branch = models.CharField(max_length=120, default="Main Branch", db_index=True)
+    movement_type = models.CharField(max_length=32, choices=MovementType.choices)
+    source_location = models.CharField(max_length=20, blank=True)
+    destination_location = models.CharField(max_length=20, blank=True)
+    quantity = models.PositiveIntegerField()
+    store_before = models.PositiveIntegerField()
+    store_after = models.PositiveIntegerField()
+    shelf_before = models.PositiveIntegerField()
+    shelf_after = models.PositiveIntegerField()
+    reference_type = models.CharField(max_length=40, blank=True)
+    reference_id = models.CharField(max_length=80, blank=True)
+    performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="stock_movements")
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
 class InventoryTransaction(TimeStampedModel):
     class TransactionType(models.TextChoices):
         STOCK_IN = "stock_in", "Stock In"
@@ -587,6 +660,7 @@ class StoreSettings(TimeStampedModel):
     approval_threshold = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
     round_off = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.01"))
     whatsapp_enabled = models.BooleanField(default=False)
+    auto_refill_enabled = models.BooleanField(default=True)
 
     class Meta:
         verbose_name_plural = "store settings"

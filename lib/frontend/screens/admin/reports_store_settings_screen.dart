@@ -151,6 +151,17 @@ class ReportsSettingsScreen extends StatelessWidget {
             value.replaceAll('â‚¹', '').trim(),
           ),
         ),
+        const SizedBox(height: 10),
+        SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          title: const Text('Automatic Shelf Refill', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+          subtitle: const Text('After a sale, refill the shelf from available store stock.', style: TextStyle(fontSize: 10)),
+          value: state.settingsDraft['auto_refill_enabled'] != false,
+          onChanged: (value) {
+            state.updateSetting('auto_refill_enabled', value);
+            state.notifyListeners();
+          },
+        ),
         const SizedBox(height: 16),
         PrimaryAction(
           'Save Settings',

@@ -4,6 +4,7 @@ from io import StringIO
 from tempfile import TemporaryDirectory
 
 from django.core.management import call_command
+from django.core.exceptions import ValidationError
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -26,11 +27,109 @@ from .models import (
     Quotation,
     RolePermission,
     StoreSettings,
+    StoreStock,
+    ShelfStock,
+    StockMovement,
     StockAdjustment,
     StockReview,
     Supplier,
     User,
 )
+from .inventory.services.stock_service import (
+    auto_refill_shelf,
+    deduct_shelf_for_sale,
+    initialize_stock,
+    transfer_shelf_to_store,
+    transfer_store_to_shelf,
+)
+
+
+class SplitStockServiceTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="inventory-test",
+            email="inventory-test@example.com",
+            password="Test@123",
+            role=User.Role.INVENTORY,
+            branch="Main Branch",
+        )
+        category = Category.objects.create(name="Split Stock Tests")
+        self.product = Item.objects.create(
+            item_type=Item.ItemType.MATERIAL,
+            name="Milk 1L",
+            sku="SPLIT-MILK-1L",
+            category=category,
+            selling_price=Decimal("50.00"),
+            purchase_price=Decimal("40.00"),
+            stock_quantity=0,
+        )
+        StoreSettings.objects.create(auto_refill_enabled=True)
+
+    def stock(self):
+        return (
+            StoreStock.objects.get(product=self.product, branch="Main Branch"),
+            ShelfStock.objects.get(product=self.product, branch="Main Branch"),
+        )
+
+    def test_manual_transfer_preserves_total(self):
+        initialize_stock(self.product, store_quantity=100, shelf_quantity=18, target_quantity=20, user=self.user)
+        result = transfer_store_to_shelf(self.product, 2, user=self.user)
+        self.assertEqual((result["store_quantity"], result["shelf_quantity"], result["total_quantity"]), (98, 20, 118))
+        movement = StockMovement.objects.filter(movement_type="MANUAL_REFILL").latest("created_at")
+        self.assertEqual((movement.store_before, movement.store_after, movement.shelf_before, movement.shelf_after), (100, 98, 18, 20))
+
+    def test_sale_then_auto_refill_reduces_total_only_by_sale(self):
+        initialize_stock(self.product, store_quantity=100, shelf_quantity=20, target_quantity=20, user=self.user)
+        deduct_shelf_for_sale(self.product, 2, user=self.user, reference_id="BILL-1")
+        store, shelf = self.stock()
+        self.assertEqual((store.quantity, shelf.quantity, store.quantity + shelf.quantity), (98, 20, 118))
+        self.assertTrue(StockMovement.objects.filter(movement_type="SALE_FROM_SHELF", quantity=2).exists())
+        self.assertTrue(StockMovement.objects.filter(movement_type="AUTO_REFILL", quantity=2).exists())
+
+    def test_partial_refill_never_makes_store_negative(self):
+        initialize_stock(self.product, store_quantity=1, shelf_quantity=18, target_quantity=20, user=self.user)
+        result = auto_refill_shelf(self.product, user=self.user)
+        self.assertEqual((result["store_quantity"], result["shelf_quantity"], result["status"]), (0, 19, "PARTIAL_REFILL"))
+
+    def test_shelf_return_to_store_preserves_total(self):
+        initialize_stock(self.product, store_quantity=45, shelf_quantity=15, target_quantity=20, user=self.user)
+        transfer_shelf_to_store(self.product, 3, user=self.user)
+        store, shelf = self.stock()
+        self.assertEqual((store.quantity, shelf.quantity, store.quantity + shelf.quantity), (48, 12, 60))
+
+    def test_transfer_rejects_negative_store_stock(self):
+        initialize_stock(self.product, store_quantity=2, shelf_quantity=5, target_quantity=20, user=self.user)
+        with self.assertRaises(ValidationError):
+            transfer_store_to_shelf(self.product, 3, user=self.user)
+        store, shelf = self.stock()
+        self.assertEqual((store.quantity, shelf.quantity), (2, 5))
+
+    def test_pre_sale_refill_then_sale_and_target_refill(self):
+        initialize_stock(self.product, store_quantity=80, shelf_quantity=2, target_quantity=20, user=self.user)
+        deduct_shelf_for_sale(self.product, 5, user=self.user, reference_id="BILL-2")
+        store, shelf = self.stock()
+        self.assertEqual((store.quantity, shelf.quantity, store.quantity + shelf.quantity), (57, 20, 77))
+
+    def test_split_stock_apis_share_authoritative_tables(self):
+        initialize_stock(self.product, store_quantity=50, shelf_quantity=10, target_quantity=20, user=self.user)
+        self.client.force_authenticate(self.user)
+        moved = self.client.post("/api/inventory/store-to-shelf/", {"product_id": self.product.pk, "quantity": 5}, format="json")
+        self.assertEqual(moved.status_code, status.HTTP_200_OK, moved.data)
+        self.assertEqual((moved.data["store_quantity"], moved.data["shelf_quantity"], moved.data["total_quantity"]), (45, 15, 60))
+        store_rows = self.client.get(f"/api/inventory/store-stock/?product_id={self.product.pk}")
+        shelf_rows = self.client.get(f"/api/inventory/shelf-stock/?product_id={self.product.pk}")
+        self.assertEqual((store_rows.status_code, shelf_rows.status_code), (status.HTTP_200_OK, status.HTTP_200_OK))
+        store_row = next(row for row in store_rows.data["results"] if row["product_id"] == self.product.pk)
+        shelf_row = next(row for row in shelf_rows.data["results"] if row["product_id"] == self.product.pk)
+        self.assertEqual(store_row["store_quantity"], 45)
+        self.assertEqual(shelf_row["shelf_quantity"], 15)
+        summary = self.client.get("/api/inventory/stock-summary/")
+        self.assertEqual(summary.status_code, status.HTTP_200_OK)
+        row = next(item for item in summary.data if item["product_id"] == self.product.pk)
+        self.assertEqual((row["store_quantity"], row["shelf_quantity"], row["refill_required"]), (45, 15, 5))
+        refilled = self.client.post(f"/api/inventory/shelf-stock/{self.product.pk}/auto-refill/", {}, format="json")
+        self.assertEqual(refilled.status_code, status.HTTP_200_OK)
+        self.assertEqual((refilled.data["store_quantity"], refilled.data["shelf_quantity"]), (40, 20))
 
 
 class AdminLoginTests(APITestCase):

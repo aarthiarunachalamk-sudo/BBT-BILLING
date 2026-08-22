@@ -27,6 +27,9 @@ from .models import (
     ReturnRequest,
     RolePermission,
     StoreSettings,
+    StoreStock,
+    ShelfStock,
+    StockMovement,
     StockAdjustment,
     StockReview,
     WhatsAppMessage,
@@ -161,6 +164,7 @@ class ItemSerializer(serializers.ModelSerializer):
     total_stock = serializers.IntegerField(read_only=True)
     batch_number = serializers.CharField(write_only=True, required=False, allow_blank=True)
     manufactured_date = serializers.DateField(write_only=True, required=False, allow_null=True)
+    target_shelf_quantity = serializers.IntegerField(write_only=True, required=False, min_value=0)
 
     class Meta:
         model = Item
@@ -173,6 +177,7 @@ class ItemSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop("batch_number", None)
         validated_data.pop("manufactured_date", None)
+        validated_data.pop("target_shelf_quantity", None)
         return super().create(validated_data)
 
     def validate_sku(self, value):
@@ -224,6 +229,41 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
         model = InventoryTransaction
         fields = "__all__"
         read_only_fields = ["previous_stock", "new_stock", "performed_by"]
+
+
+class StoreStockSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    store_quantity = serializers.IntegerField(source="quantity", read_only=True)
+
+    class Meta:
+        model = StoreStock
+        fields = ["id", "product_id", "product_name", "branch", "store_quantity", "minimum_quantity", "updated_by", "created_at", "updated_at"]
+
+
+class ShelfStockSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    shelf_quantity = serializers.IntegerField(source="quantity", read_only=True)
+    refill_required = serializers.IntegerField(read_only=True)
+    status = serializers.CharField(source="shelf_status", read_only=True)
+    store_quantity = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ShelfStock
+        fields = ["id", "product_id", "product_name", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "last_refill_date", "updated_by", "created_at", "updated_at"]
+
+    def get_store_quantity(self, obj):
+        stock = obj.product.store_stocks.filter(branch=obj.branch).first()
+        return stock.quantity if stock else 0
+
+
+class StockMovementSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+
+    class Meta:
+        model = StockMovement
+        fields = "__all__"
 
 
 class ProductBatchSerializer(serializers.ModelSerializer):

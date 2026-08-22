@@ -15,6 +15,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final purchasePrice = TextEditingController();
   final sellingPrice = TextEditingController();
   final stock = TextEditingController(text: '0');
+  final shelfStock = TextEditingController(text: '0');
+  final shelfTarget = TextEditingController(text: '0');
   final reorderLevel = TextEditingController(text: '5');
   final expiryDate = TextEditingController();
   final mrp = TextEditingController();
@@ -60,6 +62,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     purchasePrice.dispose();
     sellingPrice.dispose();
     stock.dispose();
+    shelfStock.dispose();
+    shelfTarget.dispose();
     reorderLevel.dispose();
     expiryDate.dispose();
     mrp.dispose();
@@ -193,7 +197,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
           if (priceVerifiedAt.text.trim().isNotEmpty)
             'price_verified_at': priceVerifiedAt.text.trim(),
           'tax_percent': gst.toString(),
-          'stock_quantity': int.parse(stock.text.trim()),
+          'store_stock': int.parse(stock.text.trim()),
+          'shelf_stock': int.parse(shelfStock.text.trim()),
+          'target_shelf_quantity': int.parse(shelfTarget.text.trim()),
+          'stock_quantity': int.parse(stock.text.trim()) + int.parse(shelfStock.text.trim()),
           'reorder_level': int.parse(reorderLevel.text.trim()),
           if (expiryDate.text.trim().isNotEmpty)
             'expiry_date': expiryDate.text.trim(),
@@ -528,7 +535,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                               validator: stockValidator,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
-                                labelText: 'Opening Stock *',
+                                labelText: 'Initial Store Stock *',
                                 prefixIcon: Icon(
                                   Icons.inventory_outlined,
                                   size: 18,
@@ -553,6 +560,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        Expanded(child: TextFormField(
+                          controller: shelfStock,
+                          validator: stockValidator,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Initial Shelf Stock *', prefixIcon: Icon(Icons.shelves, size: 18)),
+                        )),
+                        const SizedBox(width: 10),
+                        Expanded(child: TextFormField(
+                          controller: shelfTarget,
+                          validator: stockValidator,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Shelf Target *', prefixIcon: Icon(Icons.track_changes, size: 18)),
+                        )),
+                      ]),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
                         initialValue: unit,

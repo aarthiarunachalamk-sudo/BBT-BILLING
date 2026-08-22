@@ -24,11 +24,12 @@ class ShelfAgingScreen extends StatelessWidget {
                 return UserCard(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      Expanded(child: Text('${product['name']}', style: const TextStyle(fontWeight: FontWeight.w800))),
-                      StatusPill(status),
+                      Expanded(child: Text('${product['product_name'] ?? product['name']}', style: const TextStyle(fontWeight: FontWeight.w800))),
+                      StatusPill('${product['status'] ?? status}'),
                     ]),
                     const SizedBox(height: 8),
-                    Text('Shelf quantity: ${number(product['shelf_stock'])}'),
+                    Text('Shelf: ${number(product['shelf_quantity'] ?? product['shelf_stock'])}  •  Target: ${number(product['target_quantity'])}'),
+                    Text('Refill required: ${number(product['refill_required'])}  •  Store: ${number(product['store_quantity'] ?? product['store_stock'])}'),
                     Text('Added: ${added == null ? 'Not recorded' : '${added.day}/${added.month}/${added.year}'}  •  Age: ${age == null ? '—' : '$age days'}'),
                     const SizedBox(height: 8),
                     Wrap(spacing: 5, children: [
@@ -48,11 +49,11 @@ class ShelfAgingScreen extends StatelessWidget {
     final quantity = await showDialog<int>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Move ${product['name']}'),
+        title: Text('Move ${product['product_name'] ?? product['name']}'),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
-          decoration: InputDecoration(labelText: 'Quantity', helperText: 'Available store stock: ${number(product['store_stock'])}'),
+          decoration: InputDecoration(labelText: 'Quantity', helperText: 'Available store stock: ${number(product['store_quantity'] ?? product['store_stock'])}\nRecommended refill: ${number(product['refill_required'])}'),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
@@ -62,7 +63,7 @@ class ShelfAgingScreen extends StatelessWidget {
     );
     controller.dispose();
     if (quantity == null || quantity <= 0) return;
-    final success = await state.moveToShelf(product['id'] as int, quantity);
+    final success = await state.moveToShelf((product['product_id'] ?? product['id']) as int, quantity);
     if (context.mounted) _notice(context, success ? 'Stock moved successfully.' : state.error ?? 'Stock move failed.');
   }
 }

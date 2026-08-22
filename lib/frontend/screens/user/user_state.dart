@@ -167,7 +167,7 @@ class UserState extends ChangeNotifier {
 
   Future<bool> moveToShelf(int itemId, int quantity) async =>
       _perform(() async {
-        await api.post('items/$itemId/move-to-shelf', {'quantity': quantity});
+        await api.post('inventory/store-to-shelf', {'product_id': itemId, 'quantity': quantity});
         products = await api.getList('inventory/shelf-stock');
       });
 
