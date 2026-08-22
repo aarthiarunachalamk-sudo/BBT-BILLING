@@ -344,7 +344,6 @@ class _AdminPage extends StatelessWidget {
                     )
                   : const Icon(Icons.refresh_rounded),
             ),
-          if (state.loggedIn) _AdminAccountMenu(state: state),
           const SizedBox(width: 8),
         ],
       ),

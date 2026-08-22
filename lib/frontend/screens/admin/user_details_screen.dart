@@ -49,7 +49,7 @@ class UserDetailsScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              '${user['employee_id'] ?? '—'} • ${_statusText(user['role'])}',
+                              '${user['employee_id'] ?? user['username'] ?? '—'} • ${_statusText(user['role'])}',
                             ),
                           ],
                         ),
@@ -127,13 +127,13 @@ class UserDetailsScreen extends StatelessWidget {
   }
 
   Widget _mobileDetails(Map<String, dynamic> user, String name) => ListView(
-    padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
+    padding: const EdgeInsets.fromLTRB(14, 10, 14, 18),
     children: [
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            radius: 30,
+            radius: 23,
             backgroundColor: const Color(0xFFDCEAFF),
             child: Text(
               name.isEmpty ? '?' : name[0],
@@ -150,7 +150,7 @@ class UserDetailsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${user['employee_id'] ?? '—'} – ${name.isEmpty ? user['username'] : name}',
+                  '${user['employee_id'] ?? user['username'] ?? '—'} — ${name.isEmpty ? user['username'] : name}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
@@ -177,7 +177,7 @@ class UserDetailsScreen extends StatelessWidget {
           ),
         ],
       ),
-      const Divider(height: 28),
+      const Divider(height: 20),
       _detail('Email', user['email']),
       _detail('Mobile', user['phone']),
       _detail('Branch', user['branch']),
@@ -193,7 +193,7 @@ class UserDetailsScreen extends StatelessWidget {
   );
 
   Widget _detail(String label, dynamic value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 7),
+    padding: const EdgeInsets.symmetric(vertical: 5),
     child: Row(
       children: [
         Expanded(

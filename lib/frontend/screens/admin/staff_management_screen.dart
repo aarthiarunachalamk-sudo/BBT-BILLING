@@ -37,7 +37,7 @@ class StaffScreen extends StatelessWidget {
 
     return _AdminPage(
       state: state,
-      title: 'Staff Management',
+      title: 'User Management',
       back: 1,
       actions: [
         IconButton(
@@ -48,7 +48,7 @@ class StaffScreen extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
             child: SearchBox(
               'Search users by name, role or email',
               onChanged: state.setStaffQuery,
@@ -61,7 +61,7 @@ class StaffScreen extends StatelessWidget {
                     child: InkWell(
                       onTap: () => state.setStaffFilter(entry.key),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
                         decoration: BoxDecoration(
                           border: Border(
                             bottom: BorderSide(
@@ -96,7 +96,7 @@ class StaffScreen extends StatelessWidget {
                     icon: Icons.people_outline,
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     itemCount: filtered.length,
                     separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (context, index) {
@@ -107,7 +107,9 @@ class StaffScreen extends StatelessWidget {
                         onTap: state.loading
                             ? null
                             : () => state.openUserDetails(user['id'] as int),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 3),
+                        dense: true,
+                        visualDensity: const VisualDensity(vertical: -2),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 1),
                         leading: CircleAvatar(
                           backgroundColor: const Color(0xFFDCEAFF),
                           child: Text(
@@ -161,7 +163,7 @@ class StaffScreen extends StatelessWidget {
                   ),
           ),
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
             child: PrimaryAction(
               'Add User',
               icon: Icons.add,

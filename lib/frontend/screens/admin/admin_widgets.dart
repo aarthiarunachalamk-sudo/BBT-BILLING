@@ -22,7 +22,7 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget>? actions;
   final bool showLeading;
   @override
-  Size get preferredSize => const Size.fromHeight(62);
+  Size get preferredSize => const Size.fromHeight(52);
   @override
   Widget build(BuildContext context) {
     final desktop = MediaQuery.sizeOf(context).width >= 1000;
@@ -71,7 +71,7 @@ class AdminBottomBar extends StatelessWidget {
   final ValueChanged<int> onTap;
   @override
   Widget build(BuildContext context) => NavigationBar(
-    height: 64,
+    height: 58,
     elevation: 4,
     backgroundColor: Colors.white,
     indicatorColor: const Color(0xFFE7F0FF),
@@ -148,7 +148,7 @@ class PrimaryAction extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               foregroundColor: color,
               side: BorderSide(color: color),
-              minimumSize: const Size.fromHeight(48),
+              minimumSize: const Size.fromHeight(44),
               shape: shape,
             ),
             child: child,
@@ -159,7 +159,7 @@ class PrimaryAction extends StatelessWidget {
               backgroundColor: color,
               foregroundColor: Colors.white,
               elevation: 0,
-              minimumSize: const Size.fromHeight(48),
+            minimumSize: const Size.fromHeight(44),
               shape: shape,
             ),
             child: child,

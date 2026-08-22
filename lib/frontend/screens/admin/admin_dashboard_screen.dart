@@ -18,10 +18,10 @@ class DashboardScreen extends StatelessWidget {
       onRefresh: state.refreshDashboard,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
         children: [
           _ReferenceSummaryGrid(state),
-          const SizedBox(height: 18),
+          const SizedBox(height: 10),
           _ReferencePaymentSummary(state),
         ],
       ),
@@ -118,9 +118,9 @@ class _ReferenceSummaryGrid extends StatelessWidget {
           itemCount: cards.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: constraints.maxWidth < 560 ? 1.45 : 1.75,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: constraints.maxWidth < 560 ? 1.62 : 1.9,
           ),
           itemBuilder: (context, index) {
             final card = cards[index];
@@ -164,7 +164,7 @@ class _ReferenceMetricCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(11),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -191,7 +191,7 @@ class _ReferenceMetricCard extends StatelessWidget {
                 color: title == 'Low Stock' || title == 'Out of Stock'
                     ? color
                     : navy,
-                fontSize: 24,
+              fontSize: 20,
                 fontWeight: FontWeight.w900,
               ),
             ),
