@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -68,9 +68,14 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "username", "employee_id", "email", "first_name", "last_name", "role", "phone", "branch", "password", "is_active", "last_login", "last_logout"]
-        read_only_fields = ["last_login", "last_logout"]
+        read_only_fields = ["employee_id", "last_login", "last_logout"]
 
+    @transaction.atomic
     def create(self, validated_data):
+        # Employee IDs are owned by the backend so every account-creation path
+        # follows one collision-safe sequence. The database primary key gives
+        # concurrent creates distinct starting values.
+        validated_data.pop("employee_id", None)
         password = validated_data.pop("password", None)
         user = User(**validated_data)
         if password:
@@ -78,6 +83,13 @@ class UserSerializer(serializers.ModelSerializer):
         else:
             user.set_unusable_password()
         user.save()
+        sequence = user.pk
+        employee_id = f"EMP{sequence:03d}"
+        while User.objects.filter(employee_id=employee_id).exclude(pk=user.pk).exists():
+            sequence += 1
+            employee_id = f"EMP{sequence:03d}"
+        user.employee_id = employee_id
+        user.save(update_fields=["employee_id"])
         return user
 
     def update(self, instance, validated_data):

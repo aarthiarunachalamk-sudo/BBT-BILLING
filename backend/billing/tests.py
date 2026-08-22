@@ -275,7 +275,6 @@ class StaffAdminIntegrationTests(APITestCase):
             "/api/admin/users/",
             {
                 "username": "emp200",
-                "employee_id": "EMP200",
                 "email": "emp200@example.com",
                 "first_name": "Integration",
                 "last_name": "Staff",
@@ -288,11 +287,13 @@ class StaffAdminIntegrationTests(APITestCase):
         )
         self.assertEqual(create_user.status_code, status.HTTP_201_CREATED, create_user.data)
         staff_id = create_user.data["id"]
+        employee_id = create_user.data["employee_id"]
+        self.assertRegex(employee_id, r"^EMP\d{3,}$")
 
         staff_client = APIClient()
         login = staff_client.post(
             "/api/auth/login/",
-            {"username": "EMP200", "password": "StaffTest@123"},
+            {"username": employee_id, "password": "StaffTest@123"},
             format="json",
         )
         self.assertEqual(login.status_code, status.HTTP_200_OK, login.data)
@@ -391,7 +392,7 @@ class StaffAdminIntegrationTests(APITestCase):
         self.assertEqual(deactivated.status_code, status.HTTP_200_OK)
         blocked_login = APIClient().post(
             "/api/auth/login/",
-            {"username": "EMP200", "password": "StaffTest@123"},
+            {"username": employee_id, "password": "StaffTest@123"},
             format="json",
         )
         self.assertEqual(blocked_login.status_code, status.HTTP_401_UNAUTHORIZED)
