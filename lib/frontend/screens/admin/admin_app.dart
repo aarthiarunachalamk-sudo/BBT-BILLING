@@ -3,17 +3,24 @@ import 'package:flutter/material.dart';
 import 'admin_screens.dart';
 import 'admin_state.dart';
 import 'admin_widgets.dart';
-import 'video_splash_screen.dart';
 
 class SupermarketAdminApp extends StatefulWidget {
-  const SupermarketAdminApp({super.key});
+  const SupermarketAdminApp({super.key, this.onLogout});
+
+  final VoidCallback? onLogout;
 
   @override
   State<SupermarketAdminApp> createState() => _SupermarketAdminAppState();
 }
 
 class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
-  final state = AdminState();
+  late final AdminState state;
+
+  @override
+  void initState() {
+    super.initState();
+    state = AdminState(onLoggedOut: widget.onLogout);
+  }
 
   @override
   void dispose() {
@@ -71,7 +78,7 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
     ),
-    home: VideoSplashScreen(destination: AdminViewport(state: state)),
+    home: AdminViewport(state: state),
   );
 }
 

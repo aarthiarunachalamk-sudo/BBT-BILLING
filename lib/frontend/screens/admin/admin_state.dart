@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'admin_api.dart';
 
 class AdminState extends ChangeNotifier {
-  AdminState({AdminApi? api}) : api = api ?? AdminApi();
+  AdminState({AdminApi? api, this.onLoggedOut}) : api = api ?? AdminApi();
+
+  final VoidCallback? onLoggedOut;
 
   bool _disposed = false;
 
@@ -859,6 +861,7 @@ class AdminState extends ChangeNotifier {
       staffActive.clear();
       categoryActive.clear();
       notifyListeners();
+      onLoggedOut?.call();
     }
   }
 

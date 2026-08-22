@@ -270,6 +270,37 @@ class StaffAdminIntegrationTests(APITestCase):
         self.admin_client = APIClient()
         self.admin_client.force_authenticate(self.admin)
 
+    def test_only_cashier_receives_generated_employee_id(self):
+        cashier = self.admin_client.post(
+            "/api/admin/users/",
+            {
+                "username": "generated-cashier",
+                "email": "generated-cashier@example.com",
+                "first_name": "Generated",
+                "role": User.Role.CASHIER,
+                "password": "CashierTest@123",
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(cashier.status_code, status.HTTP_201_CREATED, cashier.data)
+        self.assertRegex(cashier.data["employee_id"], r"^EMP\d{3,}$")
+
+        manager = self.admin_client.post(
+            "/api/admin/users/",
+            {
+                "username": "no-id-manager",
+                "email": "no-id-manager@example.com",
+                "first_name": "Manager",
+                "role": User.Role.MANAGER,
+                "password": "ManagerTest@123",
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(manager.status_code, status.HTTP_201_CREATED, manager.data)
+        self.assertIsNone(manager.data["employee_id"])
+
     def test_complete_staff_to_admin_and_admin_to_staff_flow(self):
         create_user = self.admin_client.post(
             "/api/admin/users/",
@@ -287,13 +318,12 @@ class StaffAdminIntegrationTests(APITestCase):
         )
         self.assertEqual(create_user.status_code, status.HTTP_201_CREATED, create_user.data)
         staff_id = create_user.data["id"]
-        employee_id = create_user.data["employee_id"]
-        self.assertRegex(employee_id, r"^EMP\d{3,}$")
+        self.assertIsNone(create_user.data["employee_id"])
 
         staff_client = APIClient()
         login = staff_client.post(
             "/api/auth/login/",
-            {"username": employee_id, "password": "StaffTest@123"},
+            {"username": "emp200", "password": "StaffTest@123"},
             format="json",
         )
         self.assertEqual(login.status_code, status.HTTP_200_OK, login.data)
@@ -392,7 +422,7 @@ class StaffAdminIntegrationTests(APITestCase):
         self.assertEqual(deactivated.status_code, status.HTTP_200_OK)
         blocked_login = APIClient().post(
             "/api/auth/login/",
-            {"username": employee_id, "password": "StaffTest@123"},
+            {"username": "emp200", "password": "StaffTest@123"},
             format="json",
         )
         self.assertEqual(blocked_login.status_code, status.HTTP_401_UNAUTHORIZED)

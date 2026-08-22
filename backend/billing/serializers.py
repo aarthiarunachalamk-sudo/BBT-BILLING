@@ -83,13 +83,14 @@ class UserSerializer(serializers.ModelSerializer):
         else:
             user.set_unusable_password()
         user.save()
-        sequence = user.pk
-        employee_id = f"EMP{sequence:03d}"
-        while User.objects.filter(employee_id=employee_id).exclude(pk=user.pk).exists():
-            sequence += 1
+        if user.role == User.Role.CASHIER:
+            sequence = user.pk
             employee_id = f"EMP{sequence:03d}"
-        user.employee_id = employee_id
-        user.save(update_fields=["employee_id"])
+            while User.objects.filter(employee_id=employee_id).exclude(pk=user.pk).exists():
+                sequence += 1
+                employee_id = f"EMP{sequence:03d}"
+            user.employee_id = employee_id
+            user.save(update_fields=["employee_id"])
         return user
 
     def update(self, instance, validated_data):

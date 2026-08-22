@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'frontend/screens/admin/admin_app.dart';
+import 'frontend/screens/admin/video_splash_screen.dart';
 import 'frontend/screens/user/user_app.dart';
 
 /// The single application entry point. It keeps the Admin and Staff
@@ -17,7 +18,7 @@ class SupermarketBillingPortal extends StatelessWidget {
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF075FEA)),
       scaffoldBackgroundColor: const Color(0xFFF8FAFC),
     ),
-    home: const _AccessPortal(),
+    home: const VideoSplashScreen(destination: _AccessPortal()),
   );
 }
 
@@ -60,7 +61,14 @@ class _AccessPortal extends StatelessWidget {
                   icon: Icons.admin_panel_settings_rounded,
                   title: 'Admin',
                   subtitle: 'Users, products, inventory, reports and settings',
-                  onTap: () => _open(context, const SupermarketAdminApp()),
+                  onTap: () => _open(
+                    context,
+                    SupermarketAdminApp(
+                      onLogout: () {
+                        if (context.mounted) Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _WorkspaceCard(
