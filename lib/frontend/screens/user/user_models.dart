@@ -17,6 +17,7 @@ enum UserPage {
   addProduct,
   currentStock,
   shelfAging,
+  stockMovement,
   quantityReview,
   expiry,
   billing,

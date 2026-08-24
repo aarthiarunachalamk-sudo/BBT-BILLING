@@ -11,10 +11,12 @@ class UserState extends ChangeNotifier {
   bool loading = true;
   String? error;
   Map<String, dynamic> user = {}, dashboard = {}, lastInvoice = {}, paymentSummary = {};
-  List<Map<String, dynamic>> categories = [], products = [], batches = [], reviews = [], invoices = [];
+  List<Map<String, dynamic>> categories = [], products = [], batches = [], reviews = [], invoices = [], stockMovements = [];
   final List<CartLine> cart = [];
   int navIndex = 0;
   String search = '', stockFilter = 'All', reviewFilter = 'All', expiryFilter = '30 Days';
+  String movementPeriod = 'Today';
+  DateTime? movementStartDate, movementEndDate;
   int? selectedCategoryId;
   String selectedCategoryName = '';
 
@@ -70,6 +72,9 @@ class UserState extends ChangeNotifier {
         case UserPage.shelfAging:
           products = await api.getShelfStock();
           break;
+        case UserPage.stockMovement:
+          stockMovements = await api.getList('inventory/stock-movements', query: _movementDateQuery());
+          break;
         case UserPage.billing:
           products = await api.getList('inventory/current-stock');
           break;
@@ -96,7 +101,7 @@ class UserState extends ChangeNotifier {
     page = value;
     navIndex = switch (value) {
       UserPage.dashboard => 0,
-      UserPage.inventory || UserPage.addProduct || UserPage.currentStock || UserPage.shelfAging || UserPage.quantityReview || UserPage.expiry => 1,
+      UserPage.inventory || UserPage.addProduct || UserPage.currentStock || UserPage.shelfAging || UserPage.stockMovement || UserPage.quantityReview || UserPage.expiry => 1,
       UserPage.billing || UserPage.payment || UserPage.invoice => 2,
       UserPage.reports => 3,
       UserPage.profile => 4,
@@ -132,6 +137,39 @@ class UserState extends ChangeNotifier {
   void setStockFilter(String value) { stockFilter = value; notifyListeners(); }
   void setReviewFilter(String value) { reviewFilter = value; notifyListeners(); }
   void setExpiryFilter(String value) { expiryFilter = value; notifyListeners(); }
+  void setMovementPeriod(String value) {
+    movementPeriod = value;
+    if (value != 'Custom') {
+      movementStartDate = null;
+      movementEndDate = null;
+    }
+    refresh();
+    notifyListeners();
+  }
+  void setMovementDateRange(DateTime start, DateTime end) {
+    movementPeriod = 'Custom';
+    movementStartDate = start;
+    movementEndDate = end;
+    refresh();
+    notifyListeners();
+  }
+
+  Map<String, String> _movementDateQuery() {
+    final today = DateTime.now();
+    DateTime start = today, end = today;
+    switch (movementPeriod) {
+      case 'Week': start = today.subtract(const Duration(days: 6)); break;
+      case 'Month': start = DateTime(today.year, today.month); break;
+      case 'Year': start = DateTime(today.year); break;
+      case 'Custom':
+        if (movementStartDate == null || movementEndDate == null) return {};
+        start = movementStartDate!;
+        end = movementEndDate!;
+        break;
+    }
+    String format(DateTime value) => '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+    return {'start_date': format(start), 'end_date': format(end)};
+  }
 
   List<Map<String, dynamic>> get visibleProducts => products.where((p) {
     final q = search.toLowerCase();

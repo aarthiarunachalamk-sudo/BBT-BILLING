@@ -14,6 +14,7 @@ part 'inventory_categories_screen.dart';
 part 'user_add_product_screen.dart';
 part 'current_stock_screen.dart';
 part 'shelf_aging_screen.dart';
+part 'stock_movement_screen.dart';
 part 'quantity_review_screen.dart';
 part 'expiry_products_screen.dart';
 part 'user_billing_screen.dart';
@@ -27,6 +28,7 @@ Widget buildUserScreen(UserState state) => switch (state.page) {
   UserPage.dashboard => UserDashboardScreen(state), UserPage.inventory => InventoryCategoriesScreen(state),
   UserPage.addProduct => UserAddProductScreen(state),
   UserPage.currentStock => CurrentStockScreen(state), UserPage.shelfAging => ShelfAgingScreen(state),
+  UserPage.stockMovement => StockMovementScreen(state),
   UserPage.quantityReview => QuantityReviewScreen(state), UserPage.expiry => ExpiryProductsScreen(state),
   UserPage.billing => UserBillingScreen(state), UserPage.payment => PaymentMethodScreen(state),
   UserPage.reports => SalesReportScreen(state), UserPage.invoice => InvoiceScreen(state),

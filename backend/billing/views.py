@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 import logging
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
@@ -823,7 +823,17 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = StockMovement.objects.select_related("product", "performed_by")
         branch = self.request.query_params.get("branch") or branch_for(self.request.user)
         product_id = self.request.query_params.get("product_id")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
         queryset = queryset.filter(branch=branch)
+        try:
+            if start_date:
+                queryset = queryset.filter(created_at__date__gte=date.fromisoformat(start_date))
+            if end_date:
+                queryset = queryset.filter(created_at__date__lte=date.fromisoformat(end_date))
+        except ValueError:
+            # An invalid client-side date must never return the full history.
+            return queryset.none()
         return queryset.filter(product_id=product_id) if product_id else queryset
 
 

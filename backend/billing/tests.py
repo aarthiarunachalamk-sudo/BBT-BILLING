@@ -177,6 +177,18 @@ class SplitStockServiceTests(APITestCase):
         store, shelf = self.stock()
         self.assertEqual((store.quantity, shelf.quantity), (30, 0))
 
+    def test_stock_movement_history_can_be_filtered_by_date(self):
+        initialize_stock(self.product, store_quantity=30, shelf_quantity=0, user=self.user)
+        transfer_store_to_shelf(self.product, 5, user=self.user)
+        self.client.force_authenticate(self.user)
+
+        today = timezone.localdate().isoformat()
+        response = self.client.get(f"/api/inventory/stock-movements/?start_date={today}&end_date={today}")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        records = response.data["results"]
+        self.assertTrue(any(record["movement_type"] == "MANUAL_REFILL" for record in records))
+
 
 class AdminLoginTests(APITestCase):
     def setUp(self):
