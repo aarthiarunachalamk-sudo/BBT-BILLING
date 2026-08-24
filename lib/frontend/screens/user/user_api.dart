@@ -109,12 +109,19 @@ class UserApi {
 
   Future<List<Map<String, dynamic>>> getShelfStock({Map<String, String>? query}) async {
     try {
-      return await getList('inventory/shelf-stock', query: query);
+      final current = await getList('inventory/shelf-stock', query: query);
+      if (current.isNotEmpty) return current;
+      // A freshly deployed split-stock database can have no migrated rows yet.
+      // Read the legacy quantities until the migration/backfill is completed.
+      return _legacyShelfStock(query: query);
     } on UserApiException {
+      return _legacyShelfStock(query: query);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _legacyShelfStock({Map<String, String>? query}) async {
       final legacy = await getList('inventory/current-stock', query: query);
-      return legacy
-          .where((item) => _asInt(item['shelf_stock'] ?? item['shelf_quantity']) > 0)
-          .map((item) => {
+      return legacy.map((item) => {
                 'product_id': item['id'],
                 'product_name': item['name'],
                 'image_url': item['image_url'] ?? item['image'],
@@ -124,7 +131,6 @@ class UserApi {
                 'updated_by': item['updated_by'],
               })
           .toList();
-    }
   }
 
   int _asInt(dynamic value) => int.tryParse('$value') ?? 0;

@@ -54,35 +54,29 @@ class CurrentStockScreen extends StatelessWidget {
         Expanded(
           child: rows.isEmpty
               ? const EmptyMessage('No store stock matches these filters.')
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
-                  children: [
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        headingRowColor: const WidgetStatePropertyAll(Color(0xFFEFF6FF)),
-                        columnSpacing: 24,
-                        columns: const [
-                          DataColumn(label: Text('Product')),
-                          DataColumn(label: Text('Store Qty')),
-                          DataColumn(label: Text('Minimum')),
-                          DataColumn(label: Text('Status')),
-                        ],
-                        rows: [
-                          for (final product in rows)
-                            DataRow(cells: [
-                              DataCell(SizedBox(width: 210, child: Row(children: [ProductImageWidget(imageUrl: product['image_url'] ?? product['product_image_url']), const SizedBox(width: 8), Expanded(child: Text('${product['product_name'] ?? product['name']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)))]))),
-                              DataCell(Text('${number(product['store_quantity'])}')),
-                              DataCell(Text('${number(product['minimum_quantity'])}')),
-                              DataCell(StatusPill(number(product['store_quantity']) == 0 ? 'Out of Stock' : number(product['store_quantity']) <= number(product['minimum_quantity']) ? 'Low Stock' : 'In Stock')),
-                            ]),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              : ListView(padding: const EdgeInsets.fromLTRB(12, 8, 12, 20), children: [
+                  Container(padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8), color: const Color(0xFFEFF6FF), child: const Row(children: [
+                    Expanded(flex: 5, child: Text('Product', style: TextStyle(fontWeight: FontWeight.w700))),
+                    Expanded(flex: 2, child: Text('Store Qty', textAlign: TextAlign.center)),
+                    Expanded(flex: 2, child: Text('Minimum', textAlign: TextAlign.center)),
+                    Expanded(flex: 3, child: Text('Status', textAlign: TextAlign.center)),
+                  ])),
+                  for (final product in rows) _stockRow(product),
+                ]),
         ),
       ]),
     );
+  }
+
+  Widget _stockRow(Map<String, dynamic> product) {
+    final quantity = number(product['store_quantity']);
+    final minimum = number(product['minimum_quantity']);
+    final status = quantity == 0 ? 'Out of Stock' : quantity <= minimum ? 'Low Stock' : 'In Stock';
+    return Container(padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8), decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE2E6EC)))), child: Row(children: [
+      Expanded(flex: 5, child: Row(children: [ProductImageWidget(imageUrl: product['image_url'] ?? product['product_image_url'], width: 40, height: 40), const SizedBox(width: 7), Expanded(child: Text('${product['product_name'] ?? product['name']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)))])),
+      Expanded(flex: 2, child: Text('$quantity', textAlign: TextAlign.center)),
+      Expanded(flex: 2, child: Text('$minimum', textAlign: TextAlign.center)),
+      Expanded(flex: 3, child: FittedBox(fit: BoxFit.scaleDown, child: StatusPill(status))),
+    ]));
   }
 }
