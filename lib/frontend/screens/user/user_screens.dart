@@ -6,6 +6,7 @@ import 'user_state.dart';
 import 'user_widgets.dart';
 
 part 'staff_login_screen.dart';
+part 'user_password_reset_screen.dart';
 part 'user_verification_screen.dart';
 part 'user_dashboard_screen.dart';
 part 'inventory_categories_screen.dart';

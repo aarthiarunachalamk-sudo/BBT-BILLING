@@ -130,8 +130,8 @@ def change_password(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    query = {"email__iexact": identifier} if "@" in identifier else {"username__iexact": identifier}
-    user = User.objects.filter(**query).first()
+    lookup = models.Q(email__iexact=identifier) | models.Q(username__iexact=identifier) | models.Q(employee_id__iexact=identifier)
+    user = User.objects.filter(lookup).first()
     if user is None or not user.is_active or not user.check_password(current_password):
         return Response(
             {"detail": "The username/email or current password is incorrect."},

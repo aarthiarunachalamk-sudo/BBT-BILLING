@@ -50,6 +50,18 @@ class UserApi {
     return (data['user'] as Map?)?.cast<String, dynamic>() ?? {};
   }
 
+  Future<void> changePassword({
+    required String identifier,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _request('POST', 'auth/change-password', body: {
+      'identifier': identifier.trim(),
+      'current_password': currentPassword,
+      'new_password': newPassword,
+    });
+  }
+
   Future<void> clearSession() async {
     _token = null;
     final prefs = await SharedPreferences.getInstance();

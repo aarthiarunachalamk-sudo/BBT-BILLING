@@ -39,6 +39,18 @@ class UserState extends ChangeNotifier {
     page = UserPage.verification;
   });
 
+  Future<bool> changePassword({
+    required String identifier,
+    required String currentPassword,
+    required String newPassword,
+  }) async => _perform(() async {
+    await api.changePassword(
+      identifier: identifier,
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+  });
+
   Future<void> refresh() async {
     await _perform(() async {
       switch (page) {
