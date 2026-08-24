@@ -48,6 +48,8 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: line),
@@ -68,6 +70,16 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
         ),
         iconTheme: WidgetStatePropertyAll(IconThemeData(size: 20)),
       ),
+      elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(
+        backgroundColor: blue, foregroundColor: Colors.white, elevation: 0,
+        minimumSize: const Size(0, 46), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800),
+      )),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(
+        foregroundColor: blue, minimumSize: const Size(0, 44), side: const BorderSide(color: Color(0xFFB7CAE8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), textStyle: const TextStyle(fontWeight: FontWeight.w700),
+      )),
+      cardTheme: CardThemeData(elevation: 0, margin: EdgeInsets.zero, surfaceTintColor: Colors.transparent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: line))),
       snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: ink,

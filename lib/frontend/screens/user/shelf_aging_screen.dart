@@ -17,9 +17,7 @@ class _ShelfAgingScreenState extends State<ShelfAgingScreen> {
     final matches = rows.where((row) => _id(row) == _selectedProductId);
     final selected = matches.isEmpty ? null : matches.first;
     return UserShell(state: state, title: _tab == '3+ Months' ? 'Shelf Stock (3+ Months)' : 'Shelf Stock', showBack: true, child: Column(children: [
-      SizedBox(height: 52, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), children: [
-        for (final tab in ['All Stock', 'Shelf Stock', '3+ Months', 'Low Stock']) Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: ChoiceChip(label: Text(tab), selected: _tab == tab, onSelected: (_) => setState(() { _tab = tab; _selectedProductId = null; }))),
-      ])),
+      UserFilterTabs(values: const ['All Stock', 'Shelf Stock', '3+ Months', 'Low Stock'], selected: _tab, onSelected: (tab) => setState(() { _tab = tab; _selectedProductId = null; })),
       _header(),
       Expanded(child: rows.isEmpty ? const EmptyMessage('No shelf stock records match this filter.') : RefreshIndicator(onRefresh: state.refresh, child: ListView.builder(padding: const EdgeInsets.fromLTRB(10, 0, 10, 8), itemCount: rows.length, itemBuilder: (_, index) => _row(rows[index])))),
       _actions(context, selected),

@@ -16,9 +16,25 @@ class _SupermarketUserAppState extends State<SupermarketUserApp> {
   @override void dispose() { state.dispose(); super.dispose(); }
   @override Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false, title: 'BBT Staff Billing',
-    theme: ThemeData(useMaterial3: true, scaffoldBackgroundColor: userBg, colorScheme: ColorScheme.fromSeed(seedColor: userBlue),
-      inputDecorationTheme: InputDecorationTheme(filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-      elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: userBlue, foregroundColor: Colors.white, minimumSize: const Size.fromHeight(50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+    theme: ThemeData(
+      useMaterial3: true,
+      scaffoldBackgroundColor: userBg,
+      colorScheme: ColorScheme.fromSeed(seedColor: userBlue, primary: userBlue, surface: Colors.white),
+      textTheme: ThemeData.light().textTheme.apply(bodyColor: const Color(0xFF182B49), displayColor: const Color(0xFF182B49)),
+      appBarTheme: const AppBarTheme(elevation: 0, centerTitle: false, surfaceTintColor: Colors.transparent),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true, fillColor: Colors.white, isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFD9E2EF))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFD9E2EF))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: userBlue, width: 1.6)),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: userBlue, foregroundColor: Colors.white, elevation: 0, minimumSize: const Size.fromHeight(48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), textStyle: const TextStyle(fontWeight: FontWeight.w800))),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(foregroundColor: userBlue, minimumSize: const Size.fromHeight(46), side: const BorderSide(color: Color(0xFFB8CAE4)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), textStyle: const TextStyle(fontWeight: FontWeight.w700))),
+      navigationBarTheme: NavigationBarThemeData(height: 68, backgroundColor: Colors.white, indicatorColor: userBlue.withValues(alpha: .12), labelTextStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 10, fontWeight: FontWeight.w700)), iconTheme: const WidgetStatePropertyAll(IconThemeData(size: 22))),
+      cardTheme: CardThemeData(elevation: 0, margin: EdgeInsets.zero, surfaceTintColor: Colors.transparent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Color(0xFFE0E8F2)))),
+      snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating, backgroundColor: userNavy, contentTextStyle: TextStyle(color: Colors.white)),
+      dialogTheme: DialogThemeData(backgroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))),
     ),
     home: ListenableBuilder(listenable: state, builder: (_, __) => PopScope(
       canPop: state.page == UserPage.login || state.page == UserPage.dashboard,

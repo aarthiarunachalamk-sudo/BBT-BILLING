@@ -19,20 +19,7 @@ class ExpiryProductsScreen extends StatelessWidget {
       title: 'Expiry Products',
       showBack: true,
       child: Column(children: [
-        SizedBox(
-          height: 50,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.all(6),
-            children: [
-              for (final filter in ['Expired', '7 Days', '30 Days', '90 Days'])
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: ChoiceChip(label: Text(filter), selected: state.expiryFilter == filter, onSelected: (_) => state.setExpiryFilter(filter)),
-                ),
-            ],
-          ),
-        ),
+        UserFilterTabs(values: const ['Expired', '7 Days', '30 Days', '90 Days'], selected: state.expiryFilter, onSelected: state.setExpiryFilter),
         Expanded(
           child: rows.isEmpty
               ? const EmptyMessage('No batches match this expiry window.')

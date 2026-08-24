@@ -22,15 +22,16 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget>? actions;
   final bool showLeading;
   @override
-  Size get preferredSize => const Size.fromHeight(52);
+  Size get preferredSize => const Size.fromHeight(60);
   @override
   Widget build(BuildContext context) {
     final desktop = MediaQuery.sizeOf(context).width >= 1000;
     final foreground = desktop ? ink : Colors.white;
     return AppBar(
       automaticallyImplyLeading: false,
-      backgroundColor: desktop ? Colors.white : navy,
+      backgroundColor: desktop ? Colors.white : Colors.transparent,
       foregroundColor: foreground,
+      flexibleSpace: desktop ? null : const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [navy, Color(0xFF0A4D94)], begin: Alignment.topLeft, end: Alignment.bottomRight))),
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: desktop ? const Border(bottom: BorderSide(color: line)) : null,
@@ -140,7 +141,7 @@ class PrimaryAction extends StatelessWidget {
       ],
     );
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(10),
     );
     return outlined
         ? OutlinedButton(
@@ -214,7 +215,7 @@ class SectionCard extends StatelessWidget {
     padding: padding,
     decoration: BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       border: Border.all(color: line),
       boxShadow: const [
         BoxShadow(

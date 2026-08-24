@@ -9,9 +9,7 @@ class QuantityReviewScreen extends StatelessWidget {
     final rows = state.reviews.where((row) =>
       state.reviewFilter == 'All' || '${row['status']}'.toLowerCase() == state.reviewFilter.toLowerCase()).toList();
     return UserShell(state: state, title: 'Quantity Review — 14 Days', showBack: true, child: Column(children: [
-      SizedBox(height: 50, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(6), children: [
-        for (final filter in ['All', 'Due', 'Updated', 'Overdue']) Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: ChoiceChip(label: Text(filter), selected: state.reviewFilter == filter, onSelected: (_) => state.setReviewFilter(filter))),
-      ])),
+      UserFilterTabs(values: const ['All', 'Due', 'Updated', 'Overdue'], selected: state.reviewFilter, onSelected: state.setReviewFilter),
       Expanded(child: rows.isEmpty ? const EmptyMessage('No quantity reviews match this filter.') : ListView.builder(padding: const EdgeInsets.all(12), itemCount: rows.length, itemBuilder: (_, index) {
         final row = rows[index];
         final difference = number(row['physical_quantity']) - number(row['system_quantity']);

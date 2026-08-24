@@ -17,7 +17,8 @@ class UserShell extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     drawer: showBack ? null : _UserDrawer(state: state),
     appBar: AppBar(
-      backgroundColor: userNavy, foregroundColor: Colors.white,
+      backgroundColor: Colors.transparent, foregroundColor: Colors.white,
+      flexibleSpace: const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [userNavy, Color(0xFF164A8A)], begin: Alignment.topLeft, end: Alignment.bottomRight))),
       toolbarHeight: title == 'Store Stock' ? 78 : 58,
       title: title == 'Store Stock'
           ? const Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -36,14 +37,15 @@ class UserShell extends StatelessWidget {
             ],
     ),
     body: SafeArea(top: false, child: Column(children: [
-      if (state.error != null) Material(color: const Color(0xFFFFE8E8), child: ListTile(
-        dense: true, leading: const Icon(Icons.error_outline, color: userRed), title: Text(state.error!),
-        trailing: IconButton(icon: const Icon(Icons.close), onPressed: () { state.error = null; state.notifyListeners(); }),
-      )),
-      Expanded(child: state.loading ? const Center(child: CircularProgressIndicator()) : child),
+      if (state.error != null) Container(
+        margin: const EdgeInsets.fromLTRB(12, 10, 12, 0), padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: const Color(0xFFFFF1F0), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFECACA))),
+        child: Row(children: [const Icon(Icons.error_outline_rounded, color: userRed), const SizedBox(width: 10), Expanded(child: Text(state.error!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))), TextButton(onPressed: state.refresh, child: const Text('Retry')), IconButton(tooltip: 'Dismiss error', visualDensity: VisualDensity.compact, icon: const Icon(Icons.close), onPressed: () { state.error = null; state.notifyListeners(); })]),
+      ),
+      Expanded(child: state.loading ? const _UserLoadingSurface() : child),
     ])),
     bottomNavigationBar: NavigationBar(
-      height: 60, selectedIndex: state.navIndex, onDestinationSelected: state.setNav,
+      selectedIndex: state.navIndex, onDestinationSelected: state.setNav,
       destinations: const [
         NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Dashboard'),
         NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'Inventory'),
@@ -86,8 +88,8 @@ class UserCard extends StatelessWidget {
   const UserCard({super.key, required this.child, this.onTap, this.padding = const EdgeInsets.all(14)});
   final Widget child; final VoidCallback? onTap; final EdgeInsets padding;
   @override Widget build(BuildContext context) => Card(
-    elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: Color(0xFFE2E8F0))),
-    child: InkWell(borderRadius: BorderRadius.circular(14), onTap: onTap, child: Padding(padding: padding, child: child)),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(borderRadius: BorderRadius.circular(16), onTap: onTap, child: Padding(padding: padding, child: child)),
   );
 }
 
@@ -176,7 +178,20 @@ class UserProductImage extends StatelessWidget {
 
 class EmptyMessage extends StatelessWidget {
   const EmptyMessage(this.text, {super.key}); final String text;
-  @override Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.inbox_outlined, size: 48, color: Colors.blueGrey), const SizedBox(height: 10), Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.blueGrey))])));
+  @override Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [Container(width: 64, height: 64, decoration: BoxDecoration(color: userBlue.withValues(alpha: .08), shape: BoxShape.circle), child: const Icon(Icons.inventory_2_outlined, size: 30, color: userBlue)), const SizedBox(height: 14), const Text('Nothing to show yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)), const SizedBox(height: 5), Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.blueGrey, height: 1.35))])));
+}
+
+class UserFilterTabs extends StatelessWidget {
+  const UserFilterTabs({super.key, required this.values, required this.selected, required this.onSelected});
+  final List<String> values;
+  final String selected;
+  final ValueChanged<String> onSelected;
+  @override Widget build(BuildContext context) => SizedBox(height: 48, child: ListView.separated(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5), itemCount: values.length, separatorBuilder: (_, __) => const SizedBox(width: 8), itemBuilder: (_, index) { final value = values[index]; final active = value == selected; return Semantics(selected: active, button: true, label: '$value filter', child: InkWell(borderRadius: BorderRadius.circular(10), onTap: () => onSelected(value), child: AnimatedContainer(duration: const Duration(milliseconds: 180), padding: const EdgeInsets.symmetric(horizontal: 14), alignment: Alignment.center, decoration: BoxDecoration(color: active ? userBlue.withValues(alpha: .12) : Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: active ? userBlue : const Color(0xFFD8E1EC))), child: Row(mainAxisSize: MainAxisSize.min, children: [if (active) const Padding(padding: EdgeInsets.only(right: 5), child: Icon(Icons.check_rounded, size: 16, color: userBlue)), Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: active ? userBlue : const Color(0xFF475467)))]))); }));
+}
+
+class _UserLoadingSurface extends StatelessWidget {
+  const _UserLoadingSurface();
+  @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [for (final height in [52.0, 108.0, 108.0, 108.0]) Padding(padding: const EdgeInsets.only(bottom: 12), child: Container(height: height, decoration: BoxDecoration(color: const Color(0xFFE8EEF6), borderRadius: BorderRadius.circular(14))))]);
 }
 
 String money(dynamic value) => '₹${(double.tryParse('$value') ?? 0).toStringAsFixed(2)}';
