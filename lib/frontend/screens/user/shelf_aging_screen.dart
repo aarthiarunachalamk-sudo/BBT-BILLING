@@ -8,7 +8,7 @@ class ShelfAgingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return UserShell(
       state: state,
-      title: 'Shelf Stock',
+      title: 'Shelf Stock (3+ Months)',
       showBack: true,
       child: state.products.isEmpty
           ? const EmptyMessage('No shelf stock records found.')

@@ -25,6 +25,19 @@ class QuantityReviewScreen extends StatelessWidget {
           ]),
         ]));
       })),
+      if (rows.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          child: Column(children: [
+            SizedBox(width: double.infinity, child: ElevatedButton(onPressed: state.loading ? null : () => _recordReview(context, rows.first), child: const Text('Update Quantity'))),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: OutlinedButton(style: OutlinedButton.styleFrom(foregroundColor: userGreen), onPressed: state.loading ? null : () => _confirmSystemStock(context, rows.first), child: const Text('Confirm Stock'))),
+              const SizedBox(width: 8),
+              Expanded(child: OutlinedButton(style: OutlinedButton.styleFrom(foregroundColor: userRed), onPressed: state.loading ? null : () => _recordReview(context, rows.first, reportDifference: true), child: const Text('Report Difference'))),
+            ]),
+          ]),
+        ),
     ]));
   }
 
