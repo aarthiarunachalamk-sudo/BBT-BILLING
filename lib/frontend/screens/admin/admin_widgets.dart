@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 const navy = Color(0xFF06356F);
 const blue = Color(0xFF0868F7);
@@ -29,9 +30,9 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
     final foreground = desktop ? ink : Colors.white;
     return AppBar(
       automaticallyImplyLeading: false,
-      backgroundColor: desktop ? Colors.white : Colors.transparent,
+      backgroundColor: desktop ? Colors.white : navy,
       foregroundColor: foreground,
-      flexibleSpace: desktop ? null : const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [navy, Color(0xFF0A4D94)], begin: Alignment.topLeft, end: Alignment.bottomRight))),
+      systemOverlayStyle: desktop ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: desktop ? const Border(bottom: BorderSide(color: line)) : null,

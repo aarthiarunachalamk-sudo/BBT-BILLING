@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'user_models.dart';
 import 'user_state.dart';
@@ -17,8 +18,9 @@ class UserShell extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     drawer: showBack ? null : _UserDrawer(state: state),
     appBar: AppBar(
-      backgroundColor: Colors.transparent, foregroundColor: Colors.white,
-      flexibleSpace: const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: [userNavy, Color(0xFF164A8A)], begin: Alignment.topLeft, end: Alignment.bottomRight))),
+      backgroundColor: userNavy,
+      foregroundColor: Colors.white,
+      systemOverlayStyle: SystemUiOverlayStyle.light,
       toolbarHeight: title == 'Store Stock' ? 78 : 58,
       title: title == 'Store Stock'
           ? const Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
