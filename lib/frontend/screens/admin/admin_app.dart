@@ -45,7 +45,7 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
         bodyColor: ink,
         displayColor: ink,
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: navy,
         foregroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,

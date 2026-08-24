@@ -40,7 +40,17 @@ class _ShelfAgingScreenState extends State<ShelfAgingScreen> {
     final rawDate = product['shelf_added_date']?.toString();
     final date = rawDate == null ? '-' : rawDate.length >= 10 ? rawDate.substring(5, 10) : rawDate;
     return Material(color: selected ? userBlue.withValues(alpha: .10) : Colors.transparent, child: InkWell(onTap: () => setState(() => selected ? _selectedProductIds.remove(_id(product)) : _selectedProductIds.add(_id(product))), child: Container(padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4), decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE2E6EC)))), child: Row(children: [
-      SizedBox(width: 34, child: Checkbox(value: selected, onChanged: (_) => setState(() => selected ? _selectedProductIds.remove(_id(product)) : _selectedProductIds.add(_id(product)))),
+      SizedBox(
+        width: 34,
+        child: Checkbox(
+          value: selected,
+          onChanged: (_) => setState(
+            () => selected
+                ? _selectedProductIds.remove(_id(product))
+                : _selectedProductIds.add(_id(product)),
+          ),
+        ),
+      ),
       Expanded(flex: 5, child: Row(children: [ProductImageWidget(imageUrl: product['image_url'] ?? product['product_image_url'], width: 38, height: 38), const SizedBox(width: 6), Expanded(child: Text('${product['product_name'] ?? product['name']}', maxLines: 2, overflow: TextOverflow.ellipsis))])),
       Expanded(flex: 2, child: Text('${number(product['shelf_quantity'] ?? product['shelf_stock'])}', textAlign: TextAlign.center)), Expanded(flex: 3, child: Text(date, textAlign: TextAlign.center)), Expanded(flex: 3, child: Text(_duration(number(product['age_days'])), textAlign: TextAlign.center, style: const TextStyle(fontSize: 10))), Expanded(flex: 3, child: FittedBox(fit: BoxFit.scaleDown, child: StatusPill('${product['status'] ?? 'FULL'}'))),
     ]))));
