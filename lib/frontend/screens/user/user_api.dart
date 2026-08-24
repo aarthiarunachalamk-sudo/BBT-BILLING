@@ -120,7 +120,14 @@ class UserApi {
   }
 
   Future<List<Map<String, dynamic>>> _legacyShelfStock({Map<String, String>? query}) async {
-      final legacy = await getList('inventory/current-stock', query: query);
+      List<Map<String, dynamic>> legacy;
+      try {
+        legacy = await getList('inventory/current-stock', query: query);
+      } on UserApiException {
+        // Older deployments may not expose current-stock either. Products still
+        // provide the central catalogue needed to render the shelf table.
+        legacy = await getList('products', query: query);
+      }
       return legacy.map((item) => {
                 'product_id': item['id'],
                 'product_name': item['name'],

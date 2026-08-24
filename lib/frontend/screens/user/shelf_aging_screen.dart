@@ -13,7 +13,7 @@ class ShelfAgingScreen extends StatelessWidget {
           Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: ChoiceChip(label: Text(tab), selected: tab == '3+ Months', onSelected: (_) {})),
       ])),
       Expanded(child: state.products.isEmpty ? const EmptyMessage('No shelf stock records found.') : ListView(padding: const EdgeInsets.fromLTRB(10, 6, 10, 16), children: [
-        _header(), for (final product in state.products) _row(product),
+        _header(), for (final product in state.products) _row(product), const SizedBox(height: 8), _actions(context),
       ])),
     ]),
   );
@@ -31,4 +31,16 @@ class ShelfAgingScreen extends StatelessWidget {
       Expanded(flex: 2, child: Text('${number(product['shelf_quantity'] ?? product['shelf_stock'])}', textAlign: TextAlign.center)), Expanded(flex: 3, child: Text(date, textAlign: TextAlign.center)), Expanded(flex: 2, child: Text(age == 0 ? '-' : '${age}d', textAlign: TextAlign.center)), Expanded(flex: 3, child: FittedBox(fit: BoxFit.scaleDown, child: StatusPill('${product['status'] ?? 'FULL'}'))),
     ]));
   }
+
+  String _status(Map<String, dynamic> product) {
+    final value = '${product['status'] ?? ''}'.toUpperCase();
+    if (value.contains('REFILL') || value.contains('LOW')) return 'Review';
+    if (value.contains('OUT')) return 'Clearance';
+    return value == 'FULL' || value.isEmpty ? 'Normal' : value.replaceAll('_', ' ');
+  }
+
+  Widget _actions(BuildContext context) => Column(children: [
+    Row(children: [Expanded(child: OutlinedButton(onPressed: () => _notice(context, 'Move stock selected.'), child: const Text('Move Stock'))), const SizedBox(width: 6), Expanded(child: OutlinedButton(onPressed: () => _notice(context, 'Discount action selected.'), child: const Text('Apply Discount')))]),
+    Row(children: [Expanded(child: OutlinedButton(onPressed: () => _notice(context, 'Return supplier selected.'), child: const Text('Return Supplier'))), const SizedBox(width: 6), Expanded(child: OutlinedButton(onPressed: () => _notice(context, 'Clearance action selected.'), child: const Text('Mark Clearance')))]),
+  ]);
 }
