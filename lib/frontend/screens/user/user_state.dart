@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'user_api.dart';
 import 'user_models.dart';
@@ -89,10 +90,20 @@ class UserState extends ChangeNotifier {
           batches = await api.getList('inventory/expiry');
           break;
         case UserPage.quantityReview:
-          reviews = await api.getList('inventory/quantity-reviews');
+          final results = await Future.wait([
+            api.getList('inventory/quantity-reviews'),
+            api.getShelfStock(),
+          ]);
+          reviews = results[0];
+          products = results[1];
           break;
         case UserPage.reports:
-          paymentSummary = await api.getMap('payments/summary', query: {'range': 'today'});
+          final results = await Future.wait([
+            api.getMap('payments/summary', query: {'range': 'today'}),
+            api.getList('invoices'),
+          ]);
+          paymentSummary = results[0] as Map<String, dynamic>;
+          invoices = results[1] as List<Map<String, dynamic>>;
           break;
         case UserPage.invoice || UserPage.profile:
           invoices = await api.getList('invoices');
@@ -213,6 +224,7 @@ class UserState extends ChangeNotifier {
       'items': cart.map((line) => {'item': line.id, 'quantity': line.quantity}).toList(),
       'payments': payments,
     });
+    invoices = await api.getList('invoices');
     cart.clear();
     page = UserPage.invoice;
   });
@@ -225,6 +237,7 @@ class UserState extends ChangeNotifier {
           'reason': reason,
         });
         reviews = await api.getList('inventory/quantity-reviews');
+        products = await api.getShelfStock();
       });
 
   Future<bool> moveToShelf(int itemId, int quantity) async {
@@ -299,9 +312,13 @@ class UserState extends ChangeNotifier {
   bool get canManageInventory =>
       {'inventory', 'manager', 'cashier'}.contains(user['role']?.toString().toLowerCase());
 
-  Future<bool> createProduct(Map<String, dynamic> values) async =>
+  Future<bool> createProduct(Map<String, dynamic> values, {XFile? image}) async =>
       _perform(() async {
-        await api.post('products', values);
+        if (image == null) {
+          await api.post('products', values);
+        } else {
+          await api.uploadProduct(values, image: image);
+        }
         products = await api.getStoreStock();
         categories = await api.getList('categories');
         page = UserPage.currentStock;

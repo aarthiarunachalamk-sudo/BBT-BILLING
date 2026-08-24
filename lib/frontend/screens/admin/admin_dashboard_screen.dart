@@ -9,10 +9,7 @@ class DashboardScreen extends StatelessWidget {
     state: state,
     title: 'Admin Dashboard',
     actions: [
-      IconButton(
-        onPressed: () => state.go(9),
-        icon: const Icon(Icons.notifications_none_rounded),
-      ),
+      _PaymentNotificationButton(state: state),
     ],
     child: RefreshIndicator(
       onRefresh: state.refreshDashboard,
@@ -356,30 +353,48 @@ class _Welcome extends StatelessWidget {
             ],
           ),
         ),
-        Stack(
-          children: [
-            IconButton.filledTonal(
-              onPressed: () => state.go(9),
-              icon: const Icon(Icons.notifications_none_rounded),
-            ),
-            Positioned(
-              right: 7,
-              top: 7,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: red,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-          ],
-        ),
+        _PaymentNotificationButton(state: state, filled: true),
       ],
     );
   }
 }
+
+class _PaymentNotificationButton extends StatelessWidget {
+  const _PaymentNotificationButton({required this.state, this.filled = false});
+  final AdminState state;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNotifications = state.paymentNotifications.isNotEmpty;
+    final icon = Stack(children: [
+      if (filled)
+        IconButton.filledTonal(onPressed: () => _showPaymentNotifications(context, state), icon: const Icon(Icons.notifications_none_rounded))
+      else
+        IconButton(onPressed: () => _showPaymentNotifications(context, state), icon: const Icon(Icons.notifications_none_rounded)),
+      if (hasNotifications)
+        Positioned(right: 7, top: 7, child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: red, shape: BoxShape.circle))),
+    ]);
+    return icon;
+  }
+}
+
+Future<void> _showPaymentNotifications(BuildContext context, AdminState state) => showModalBottomSheet<void>(
+  context: context,
+  showDragHandle: true,
+  builder: (sheetContext) => SafeArea(child: ListView(shrinkWrap: true, children: [
+    const ListTile(leading: Icon(Icons.payments_outlined, color: green), title: Text('Payment Notifications', style: TextStyle(fontWeight: FontWeight.w900))),
+    if (state.paymentNotifications.isEmpty)
+      const ListTile(title: Text('No user payments received yet.')),
+    for (final notice in state.paymentNotifications.take(20))
+      ListTile(
+        leading: const Icon(Icons.check_circle_outline, color: green),
+        title: Text('Payment received${(notice['metadata'] as Map?)?['invoice_number'] == null ? '' : ' • ${(notice['metadata'] as Map)['invoice_number']}'}'),
+        subtitle: Text('${notice['user_name'] ?? 'User'} • ${_dateText(notice['created_at'])}'),
+        trailing: Text('₹${(notice['metadata'] as Map?)?['amount'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800)),
+      ),
+  ])),
+);
 
 class _Revenue extends StatelessWidget {
   const _Revenue(this.data, this.tap);

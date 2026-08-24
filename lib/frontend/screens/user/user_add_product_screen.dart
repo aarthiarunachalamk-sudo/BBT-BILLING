@@ -14,6 +14,8 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
       name: TextEditingController(),
   };
   int? category;
+  XFile? productImage;
+  Uint8List? imagePreview;
 
   @override
   void dispose() {
@@ -41,6 +43,8 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
             validator: (value) => value == null ? 'Select a category.' : null,
           ),
           const SizedBox(height: 10),
+          _imagePicker(),
+          const SizedBox(height: 10),
           _text('purchase_price', 'Purchase Price', numeric: true),
           _text('selling_price', 'Selling Price', numeric: true),
           _text('tax_percent', 'GST %', numeric: true, initial: '5'),
@@ -49,8 +53,8 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
           _text('target_shelf_quantity', 'Shelf Target Quantity', numeric: true, initial: '0'),
           _text('reorder_level', 'Minimum Stock', numeric: true, initial: '5'),
           _text('batch_number', 'Batch Number', isRequired: false),
-          _text('manufactured_date', 'Manufacturing Date (YYYY-MM-DD)', isRequired: false),
-          _text('expiry_date', 'Expiry Date (YYYY-MM-DD)', isRequired: false),
+          _dateField('manufactured_date', 'Manufacturing Date', firstDate: DateTime(2000), lastDate: DateTime.now()),
+          _dateField('expiry_date', 'Expiry Date', firstDate: DateTime.now(), lastDate: DateTime(2100)),
           const SizedBox(height: 8),
           ElevatedButton(onPressed: widget.state.loading ? null : _save, child: const Text('Save Product')),
         ],
@@ -71,6 +75,58 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
     );
   }
 
+  Widget _imagePicker() => UserCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Product Photo', style: TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        const Text('Capture a clear photo or choose one from the gallery.', style: TextStyle(fontSize: 11, color: Colors.blueGrey)),
+        const SizedBox(height: 10),
+        Row(children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: imagePreview == null
+                  ? const ColoredBox(color: Color(0xFFEAF1FA), child: Icon(Icons.inventory_2_outlined, color: userBlue, size: 30))
+                  : Image.memory(imagePreview!, fit: BoxFit.cover),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Wrap(spacing: 8, runSpacing: 8, children: [
+            OutlinedButton.icon(onPressed: () => _pickImage(ImageSource.camera), icon: const Icon(Icons.camera_alt_outlined), label: const Text('Camera')),
+            OutlinedButton.icon(onPressed: () => _pickImage(ImageSource.gallery), icon: const Icon(Icons.photo_library_outlined), label: const Text('Gallery')),
+          ])),
+        ]),
+      ],
+    ),
+  );
+
+  Widget _dateField(String key, String label, {required DateTime firstDate, required DateTime lastDate}) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: TextFormField(
+      controller: fields[key],
+      readOnly: true,
+      onTap: () async {
+        final initial = DateTime.tryParse(fields[key]!.text) ?? DateTime.now();
+        final selected = await showDatePicker(context: context, firstDate: firstDate, lastDate: lastDate, initialDate: initial.isBefore(firstDate) ? firstDate : initial.isAfter(lastDate) ? lastDate : initial);
+        if (selected != null) setState(() => fields[key]!.text = _apiDate(selected));
+      },
+      decoration: InputDecoration(labelText: label, hintText: 'Select date', prefixIcon: const Icon(Icons.calendar_month_outlined)),
+    ),
+  );
+
+  String _apiDate(DateTime value) => '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
+  Future<void> _pickImage(ImageSource source) async {
+    final image = await ImagePicker().pickImage(source: source, imageQuality: 85, maxWidth: 1600);
+    if (image == null) return;
+    final bytes = await image.readAsBytes();
+    if (mounted) setState(() { productImage = image; imagePreview = bytes; });
+  }
+
   Future<void> _save() async {
     if (!(formKey.currentState?.validate() ?? false)) return;
     final store = int.tryParse(fields['store_stock']!.text) ?? 0;
@@ -86,7 +142,7 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
       if (fields['manufactured_date']!.text.trim().isNotEmpty) 'manufactured_date': fields['manufactured_date']!.text.trim(),
       if (fields['expiry_date']!.text.trim().isNotEmpty) 'expiry_date': fields['expiry_date']!.text.trim(),
     };
-    final success = await widget.state.createProduct(body);
+    final success = await widget.state.createProduct(body, image: productImage);
     if (mounted) _notice(context, success ? 'Product created and shared with Admin.' : widget.state.error ?? 'Unable to create product.');
   }
 }

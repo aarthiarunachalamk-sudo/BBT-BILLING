@@ -156,6 +156,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
     return null;
   }
 
+  Future<void> _pickDate(TextEditingController controller, {required DateTime firstDate, required DateTime lastDate}) async {
+    final parsed = DateTime.tryParse(controller.text);
+    final selected = await showDatePicker(
+      context: context,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      initialDate: parsed == null ? DateTime.now() : parsed.isBefore(firstDate) ? firstDate : parsed.isAfter(lastDate) ? lastDate : parsed,
+    );
+    if (selected != null) controller.text = '${selected.year.toString().padLeft(4, '0')}-${selected.month.toString().padLeft(2, '0')}-${selected.day.toString().padLeft(2, '0')}';
+  }
+
   String? dateValidator(String? value) {
     if (value == null || value.trim().isEmpty) return null;
     return DateTime.tryParse(value.trim()) == null ? 'Use YYYY-MM-DD' : null;
@@ -651,7 +662,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       TextFormField(
                         controller: expiryDate,
                         validator: expiryValidator,
-                        keyboardType: TextInputType.datetime,
+                        readOnly: true,
+                        onTap: () => _pickDate(expiryDate, firstDate: DateTime.now(), lastDate: DateTime(2100)),
                         decoration: const InputDecoration(
                           labelText: 'Expiry Date',
                           hintText: 'YYYY-MM-DD',
@@ -674,11 +686,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       TextFormField(
                         controller: priceVerifiedAt,
                         validator: dateValidator,
-                        keyboardType: TextInputType.datetime,
+                        readOnly: true,
+                        onTap: () => _pickDate(priceVerifiedAt, firstDate: DateTime(2000), lastDate: DateTime.now()),
                         decoration: const InputDecoration(
                           labelText: 'Price verified date',
                           hintText: 'YYYY-MM-DD',
-                          prefixIcon: Icon(Icons.verified_outlined, size: 18),
+                          prefixIcon: Icon(Icons.calendar_month_outlined, size: 18),
                         ),
                       ),
                       const SizedBox(height: 8),

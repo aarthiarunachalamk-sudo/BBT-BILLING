@@ -362,7 +362,18 @@ def checkout(request):
             stock_processed=True,
         )
     record_audit(request, "New Bill Created", "Billing", invoice, {"total": str(grand_total)})
-    record_audit(request, "Payment Received", "Payments", invoice, {"payments": len(parsed_payments)})
+    record_audit(
+        request,
+        "Payment Received",
+        "Payments",
+        invoice,
+        {
+            "invoice_number": invoice.number,
+            "amount": str(grand_total),
+            "payment_methods": [method for method, _, _ in parsed_payments],
+            "cashier": request.user.get_full_name() or request.user.username,
+        },
+    )
     return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
 
 

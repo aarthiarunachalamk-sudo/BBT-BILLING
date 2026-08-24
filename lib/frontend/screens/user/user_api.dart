@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserApiException implements Exception {
@@ -149,6 +151,45 @@ class UserApi {
 
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) =>
       _request('POST', path, body: body);
+
+  Future<Map<String, dynamic>> uploadProduct(
+    Map<String, dynamic> values, {
+    required XFile image,
+  }) async {
+    final uri = Uri.parse('$baseUrl/products/');
+    try {
+      final request = http.MultipartRequest('POST', uri);
+      if (_token != null) request.headers['Authorization'] = 'Bearer ${_token!.replaceFirst(RegExp(r'^Bearer\s+'), '').trim()}';
+      for (final entry in values.entries) {
+        if (entry.value != null) request.fields[entry.key] = '${entry.value}';
+      }
+      final bytes = await image.readAsBytes();
+      final contentType = image.mimeType == null ? MediaType('image', 'jpeg') : MediaType.parse(image.mimeType!);
+      request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: image.name, contentType: contentType));
+      final response = await http.Response.fromStream(await request.send().timeout(const Duration(seconds: 45)));
+      dynamic decoded;
+      try {
+        decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
+      } on FormatException {
+        throw UserApiException('Server returned an invalid response (HTTP ${response.statusCode}).');
+      }
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return decoded is Map<String, dynamic> ? decoded : (decoded as Map).cast<String, dynamic>();
+      }
+      final message = decoded is Map
+          ? (decoded['message'] ?? decoded['detail'] ?? _firstErrorValue(decoded) ?? 'Product image upload failed').toString()
+          : 'Product image upload failed (${response.statusCode})';
+      throw UserApiException(message);
+    } on UserApiException {
+      rethrow;
+    } on TimeoutException {
+      throw const UserApiException('Image upload took too long. Please retry.');
+    } on SocketException {
+      throw const UserApiException('No network connection. Check your internet and retry.');
+    } on http.ClientException {
+      throw const UserApiException('Unable to upload the product image.');
+    }
+  }
 
   Future<Map<String, dynamic>> patch(
     String path,

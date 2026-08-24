@@ -10,6 +10,7 @@ class AdminState extends ChangeNotifier {
   final VoidCallback? onLoggedOut;
 
   bool _disposed = false;
+  Timer? _paymentNotificationPoller;
 
   @override
   void notifyListeners() {
@@ -138,6 +139,7 @@ class AdminState extends ChangeNotifier {
       loggedIn = true;
       passwordChangeIdentifier = email;
       screen = 1;
+      _startPaymentNotificationPolling();
       notifyListeners();
       unawaited(reloadAll());
       return true;
@@ -216,6 +218,23 @@ class AdminState extends ChangeNotifier {
     }
     _hydrateControls();
     notifyListeners();
+  }
+
+  List<Map<String, dynamic>> get paymentNotifications => auditLogs
+      .where((entry) => entry['module']?.toString() == 'Payments' && entry['action']?.toString() == 'Payment Received')
+      .toList();
+
+  void _startPaymentNotificationPolling() {
+    _paymentNotificationPoller?.cancel();
+    _paymentNotificationPoller = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (!loggedIn || _disposed) return;
+      try {
+        auditLogs = await api.getList('audit-logs');
+        notifyListeners();
+      } catch (_) {
+        // A temporary network failure must not interrupt the admin workspace.
+      }
+    });
   }
 
   Future<bool> refreshCategories() async {
@@ -823,6 +842,8 @@ class AdminState extends ChangeNotifier {
       // Local logout must still complete if the server is temporarily offline.
     } finally {
       api.clearSession();
+      _paymentNotificationPoller?.cancel();
+      _paymentNotificationPoller = null;
       loggedIn = false;
       screen = 0;
       navIndex = 0;
@@ -868,6 +889,7 @@ class AdminState extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _paymentNotificationPoller?.cancel();
     api.dispose();
     super.dispose();
   }

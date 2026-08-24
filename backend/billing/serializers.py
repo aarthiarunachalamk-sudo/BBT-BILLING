@@ -255,10 +255,11 @@ class ShelfStockSerializer(serializers.ModelSerializer):
     store_quantity = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
     age_days = serializers.SerializerMethodField()
+    last_stock_review_date = serializers.DateField(source="product.last_stock_review_date", read_only=True)
 
     class Meta:
         model = ShelfStock
-        fields = ["id", "product_id", "product_name", "image_url", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "age_days", "last_refill_date", "updated_by", "created_at", "updated_at"]
+        fields = ["id", "product_id", "product_name", "image_url", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "age_days", "last_stock_review_date", "last_refill_date", "updated_by", "created_at", "updated_at"]
 
     def get_age_days(self, obj):
         if not obj.shelf_added_date:
