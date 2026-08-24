@@ -18,10 +18,10 @@ class DashboardScreen extends StatelessWidget {
       onRefresh: state.refreshDashboard,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           _ReferenceSummaryGrid(state),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
           _ReferencePaymentSummary(state),
         ],
       ),
@@ -118,8 +118,8 @@ class _ReferenceSummaryGrid extends StatelessWidget {
           itemCount: cards.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
             childAspectRatio: constraints.maxWidth < 560 ? 1.62 : 1.9,
           ),
           itemBuilder: (context, index) {
@@ -157,14 +157,14 @@ class _ReferenceMetricCard extends StatelessWidget {
   Widget build(BuildContext context) => Material(
     color: Colors.white,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       side: const BorderSide(color: line),
     ),
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Padding(
-        padding: const EdgeInsets.all(11),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

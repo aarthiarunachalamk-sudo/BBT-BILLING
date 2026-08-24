@@ -14,15 +14,15 @@ class UserDashboardScreen extends StatelessWidget {
         onRefresh: state.refresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 18),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
             GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1.72,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.62,
               children: [
                 _DashboardMetric(
                   label: "Today's Sales",
@@ -57,12 +57,12 @@ class UserDashboardScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 20),
             const Text(
               'Inventory Quick Access',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
             ),
-            const SizedBox(height: 9),
+            const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -95,7 +95,7 @@ class UserDashboardScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 20),
             const Text(
               "Today's Payments",
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
@@ -130,12 +130,12 @@ class _DashboardMetric extends StatelessWidget {
   Widget build(BuildContext context) => Material(
     color: color.withValues(alpha: .065),
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(14),
       side: BorderSide(color: color.withValues(alpha: .24)),
     ),
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(14),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(11, 9, 9, 9),
         child: Column(

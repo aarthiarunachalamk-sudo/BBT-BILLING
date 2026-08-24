@@ -182,11 +182,70 @@ class EmptyMessage extends StatelessWidget {
 }
 
 class UserFilterTabs extends StatelessWidget {
-  const UserFilterTabs({super.key, required this.values, required this.selected, required this.onSelected});
+  const UserFilterTabs({
+    super.key,
+    required this.values,
+    required this.selected,
+    required this.onSelected,
+  });
+
   final List<String> values;
   final String selected;
   final ValueChanged<String> onSelected;
-  @override Widget build(BuildContext context) => SizedBox(height: 48, child: ListView.separated(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5), itemCount: values.length, separatorBuilder: (_, __) => const SizedBox(width: 8), itemBuilder: (_, index) { final value = values[index]; final active = value == selected; return Semantics(selected: active, button: true, label: '$value filter', child: InkWell(borderRadius: BorderRadius.circular(10), onTap: () => onSelected(value), child: AnimatedContainer(duration: const Duration(milliseconds: 180), padding: const EdgeInsets.symmetric(horizontal: 14), alignment: Alignment.center, decoration: BoxDecoration(color: active ? userBlue.withValues(alpha: .12) : Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: active ? userBlue : const Color(0xFFD8E1EC))), child: Row(mainAxisSize: MainAxisSize.min, children: [if (active) const Padding(padding: EdgeInsets.only(right: 5), child: Icon(Icons.check_rounded, size: 16, color: userBlue)), Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: active ? userBlue : const Color(0xFF475467)))]))); }));
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 48,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      itemCount: values.length,
+      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      itemBuilder: (_, index) {
+        final value = values[index];
+        final active = value == selected;
+        return Semantics(
+          selected: active,
+          button: true,
+          label: '$value filter',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => onSelected(value),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active ? userBlue.withValues(alpha: .12) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: active ? userBlue : const Color(0xFFD8E1EC),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (active)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 5),
+                      child: Icon(Icons.check_rounded, size: 16, color: userBlue),
+                    ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: active ? userBlue : const Color(0xFF475467),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class _UserLoadingSurface extends StatelessWidget {

@@ -313,6 +313,7 @@ class _AdminPage extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 1000;
     final showBottomBar = bottom && MediaQuery.sizeOf(context).width < 700;
     return Scaffold(
+      backgroundColor: page,
       drawer: compact && state.loggedIn
           ? AdminNavigationPanel(state: state, inDrawer: true)
           : null,
@@ -356,15 +357,7 @@ class _AdminPage extends StatelessWidget {
                 message: state.error!,
                 onDismiss: state.clearError,
               ),
-            Expanded(
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1480),
-                  child: child,
-                ),
-              ),
-            ),
+            Expanded(child: Align(alignment: Alignment.topCenter, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1480), child: child))),
           ],
         ),
       ),
@@ -430,10 +423,11 @@ class _AdminErrorBanner extends StatelessWidget {
   final VoidCallback onDismiss;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: const Color(0xFFFFECEE),
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+    decoration: BoxDecoration(color: const Color(0xFFFFECEE), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFECACA))),
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       child: Row(
         children: [
           const Icon(Icons.error_outline_rounded, size: 19, color: red),
@@ -472,8 +466,10 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 42, color: muted),
-          const SizedBox(height: 12),
+          Container(width: 64, height: 64, decoration: BoxDecoration(color: blue.withValues(alpha: .08), shape: BoxShape.circle), child: Icon(icon, size: 30, color: blue)),
+          const SizedBox(height: 14),
+          const Text('Nothing to show yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: ink)),
+          const SizedBox(height: 5),
           Text(
             message,
             textAlign: TextAlign.center,
