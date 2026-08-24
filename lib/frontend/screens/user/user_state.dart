@@ -182,11 +182,27 @@ class UserState extends ChangeNotifier {
         reviews = await api.getList('inventory/quantity-reviews');
       });
 
-  Future<bool> moveToShelf(int itemId, int quantity) async =>
-      _perform(() async {
-        await api.post('inventory/store-to-shelf', {'product_id': itemId, 'quantity': quantity});
+  Future<bool> moveToShelf(int itemId, int quantity) async {
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await api.post('inventory/store-to-shelf', {'product_id': itemId, 'quantity': quantity});
+      try {
         products = await api.getStoreStock();
-      });
+      } catch (_) {
+        // The transfer already committed; a refresh failure must not report
+        // the completed transaction as unsuccessful.
+      }
+      return true;
+    } on UserApiException catch (exception) {
+      error = exception.message;
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
 
   Future<bool> updateBatchStatus(int batchId, String action) async =>
       _perform(() async {
