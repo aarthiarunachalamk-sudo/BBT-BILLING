@@ -90,6 +90,11 @@ class CurrentStockScreen extends StatelessWidget {
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(context, int.tryParse(controller.text)), child: const Text('Move'))],
     ));
     if (quantity == null || quantity <= 0) return;
+    final available = number(product['store_quantity']);
+    if (quantity > available) {
+      if (context.mounted) _notice(context, 'Only $available units are available in Store Stock.');
+      return;
+    }
     final success = await state.moveToShelf((product['product_id'] ?? product['id']) as int, quantity);
     if (context.mounted) _notice(context, success ? 'Stock moved to shelf.' : state.error ?? 'Unable to move stock.');
   }

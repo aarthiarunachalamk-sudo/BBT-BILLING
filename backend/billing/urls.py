@@ -68,6 +68,7 @@ urlpatterns = [
     path("inventory/current-stock/", ItemViewSet.as_view({"get": "current_stock"}), name="current-stock"),
     path("inventory/shelf-stock/", ShelfStockViewSet.as_view({"get": "list"}), name="shelf-stock"),
     path("inventory/store-to-shelf/", store_to_shelf, name="store-to-shelf"),
+    path("inventory/move-to-shelf/", store_to_shelf, name="move-to-shelf"),
     path("inventory/shelf-to-store/", shelf_to_store, name="shelf-to-store"),
     path("inventory/shelf-stock/<int:product_id>/auto-refill/", auto_refill_product, name="auto-refill-shelf"),
     path("inventory/stock-summary/", stock_summary, name="stock-summary"),

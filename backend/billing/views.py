@@ -830,7 +830,7 @@ def store_to_shelf(request):
     try:
         product = Item.objects.get(pk=int(request.data.get("product_id")))
         result = transfer_store_to_shelf(product, request.data.get("quantity"), branch=branch_for(request.user), user=request.user)
-        return Response(result)
+        return Response({"success": True, "message": f"{result['transferred_quantity']} units moved successfully to shelf stock.", **result})
     except (Item.DoesNotExist, TypeError, ValueError):
         return Response({"product_id": "Select a valid product."}, status=status.HTTP_400_BAD_REQUEST)
     except ValidationError as exception:
