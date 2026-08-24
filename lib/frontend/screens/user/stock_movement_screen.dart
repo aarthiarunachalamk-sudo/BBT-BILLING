@@ -11,39 +11,12 @@ class StockMovementScreen extends StatelessWidget {
     showBack: true,
     backPage: UserPage.currentStock,
     child: Column(children: [
-      SizedBox(
-        height: 54,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          children: [
-            for (final period in ['Today', 'Week', 'Month', 'Year', 'Custom'])
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: ChoiceChip(
-                  label: Text(period),
-                  selected: state.movementPeriod == period,
-                  onSelected: (_) async {
-                    if (period != 'Custom') {
-                      state.setMovementPeriod(period);
-                      return;
-                    }
-                    final today = DateTime.now();
-                    final range = await showDateRangePicker(
-                      context: context,
-                      firstDate: DateTime(2020),
-                      lastDate: today,
-                      initialDateRange: state.movementStartDate == null || state.movementEndDate == null
-                          ? null
-                          : DateTimeRange(start: state.movementStartDate!, end: state.movementEndDate!),
-                    );
-                    if (range != null) state.setMovementDateRange(range.start, range.end);
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
+      UserFilterTabs(values: const ['Today', 'Week', 'Month', 'Year', 'Custom'], selected: state.movementPeriod, onSelected: (period) async {
+        if (period != 'Custom') { state.setMovementPeriod(period); return; }
+        final today = DateTime.now();
+        final range = await showDateRangePicker(context: context, firstDate: DateTime(2020), lastDate: today, initialDateRange: state.movementStartDate == null || state.movementEndDate == null ? null : DateTimeRange(start: state.movementStartDate!, end: state.movementEndDate!));
+        if (range != null) state.setMovementDateRange(range.start, range.end);
+      }),
       if (state.movementPeriod == 'Custom' && state.movementStartDate != null)
         Padding(
           padding: const EdgeInsets.only(bottom: 6),

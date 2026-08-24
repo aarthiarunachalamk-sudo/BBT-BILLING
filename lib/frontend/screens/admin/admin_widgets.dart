@@ -14,16 +14,18 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
   const AdminTopBar({
     super.key,
     required this.title,
+    this.subtitle = 'BBT Billing Admin',
     this.back,
     this.actions,
     this.showLeading = true,
   });
   final String title;
+  final String subtitle;
   final VoidCallback? back;
   final List<Widget>? actions;
   final bool showLeading;
   @override
-  Size get preferredSize => const Size.fromHeight(60);
+  Size get preferredSize => const Size.fromHeight(76);
   @override
   Widget build(BuildContext context) {
     final desktop = MediaQuery.sizeOf(context).width >= 1000;
@@ -50,13 +52,30 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
             )
           : null,
       titleSpacing: showLeading ? 0 : 24,
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: desktop ? 18 : 16,
-          fontWeight: FontWeight.w800,
-          color: foreground,
-        ),
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: desktop ? 18 : 17,
+              fontWeight: FontWeight.w900,
+              color: foreground,
+            ),
+          ),
+          if (!desktop) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFFC7D9EF),
+              ),
+            ),
+          ],
+        ],
       ),
       actions: actions,
     );

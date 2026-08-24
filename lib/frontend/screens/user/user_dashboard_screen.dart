@@ -47,6 +47,11 @@ class UserDashboardScreen extends StatelessWidget {
                   color: userOrange,
                   icon: Icons.warning_rounded,
                   warning: true,
+                  onTap: () {
+                    state.clearSelectedCategory();
+                    state.setStockFilter('Low Stock');
+                    state.go(UserPage.currentStock);
+                  },
                 ),
                 _DashboardMetric(
                   label: 'Expiring Soon',
@@ -54,6 +59,10 @@ class UserDashboardScreen extends StatelessWidget {
                   color: userRed,
                   icon: Icons.warning_rounded,
                   warning: true,
+                  onTap: () {
+                    state.setExpiryFilter('30 Days');
+                    state.go(UserPage.expiry);
+                  },
                 ),
               ],
             ),

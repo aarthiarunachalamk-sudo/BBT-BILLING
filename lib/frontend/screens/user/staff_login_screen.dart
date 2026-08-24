@@ -4,7 +4,7 @@ class StaffLoginScreen extends StatefulWidget { const StaffLoginScreen(this.stat
 class _StaffLoginScreenState extends State<StaffLoginScreen> {
   final id = TextEditingController(), password = TextEditingController(); bool obscure = true;
   @override void dispose() { id.dispose(); password.dispose(); super.dispose(); }
-  @override Widget build(BuildContext context) => Scaffold(body: SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 430), child: Column(children: [
+  @override Widget build(BuildContext context) => Scaffold(backgroundColor: userBg, body: SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 430), child: Column(children: [
     Container(width: 72, height: 72, decoration: BoxDecoration(color: userNavy, borderRadius: BorderRadius.circular(22), boxShadow: [BoxShadow(color: userNavy.withValues(alpha: .20), blurRadius: 18, offset: const Offset(0, 8))]), child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 38)), const SizedBox(height: 20),
     const Text('Welcome Back!', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: userNavy)), const SizedBox(height: 5), const Text('Sign in to your billing and inventory workspace', textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey)), const SizedBox(height: 30),
     TextField(controller: id, textInputAction: TextInputAction.next, decoration: const InputDecoration(labelText: 'Employee ID / Mobile Number', prefixIcon: Icon(Icons.badge_outlined))), const SizedBox(height: 14),

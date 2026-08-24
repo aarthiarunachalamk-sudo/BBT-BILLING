@@ -3,6 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'user_api.dart';
 import 'user_models.dart';
 
+class BulkShelfActionResult {
+  const BulkShelfActionResult(this.completed, this.failed);
+  final int completed;
+  final int failed;
+  bool get isComplete => failed == 0;
+}
+
 class UserState extends ChangeNotifier {
   UserState({UserApi? api}) : api = api ?? UserApi();
   final UserApi api;
@@ -253,6 +260,30 @@ class UserState extends ChangeNotifier {
     } on UserApiException catch (exception) {
       error = exception.message;
       return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<BulkShelfActionResult> bulkShelfProductAction(List<int> productIds, String action, Map<String, dynamic> values) async {
+    loading = true;
+    error = null;
+    notifyListeners();
+    var completed = 0;
+    var failed = 0;
+    try {
+      for (final productId in productIds) {
+        try {
+          await api.post('inventory/shelf-stock/$productId/$action', values);
+          completed++;
+        } on UserApiException {
+          failed++;
+        }
+      }
+      products = await api.getShelfStock();
+      if (failed > 0) error = '$failed selected product${failed == 1 ? '' : 's'} could not be updated.';
+      return BulkShelfActionResult(completed, failed);
     } finally {
       loading = false;
       notifyListeners();
