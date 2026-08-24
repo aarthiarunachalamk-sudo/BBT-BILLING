@@ -23,7 +23,7 @@ class UserApi {
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
-    if (_token != null) 'Authorization': 'Bearer $_token',
+    if (_token != null) 'Authorization': 'Bearer ${_token!.replaceFirst(RegExp(r'^Bearer\s+'), '').trim()}',
   };
 
   Future<Map<String, dynamic>> restore() async {
@@ -33,6 +33,9 @@ class UserApi {
     try {
       return await getMap('auth/me');
     } catch (_) {
+      if (await _refreshToken()) {
+        try { return await getMap('auth/me'); } catch (_) {}
+      }
       await clearSession();
       return {};
     }
@@ -47,6 +50,7 @@ class UserApi {
     if (_token == null) throw const UserApiException('The server did not return an access token.');
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('staff_access_token', _token!);
+    if (data['refresh'] != null) await prefs.setString('staff_refresh_token', data['refresh'].toString());
     return (data['user'] as Map?)?.cast<String, dynamic>() ?? {};
   }
 
@@ -66,6 +70,7 @@ class UserApi {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('staff_access_token');
+    await prefs.remove('staff_refresh_token');
   }
 
   Future<void> logout() async {
@@ -159,7 +164,7 @@ class UserApi {
   }
 
   Future<dynamic> _requestRaw(String method, String path,
-      {Map<String, dynamic>? body, Map<String, String>? query}) async {
+      {Map<String, dynamic>? body, Map<String, String>? query, bool retried = false}) async {
     final uri = Uri.parse('$baseUrl/${path.replaceAll(RegExp(r'^/|/$'), '')}/')
         .replace(queryParameters: query);
     try {
@@ -174,6 +179,9 @@ class UserApi {
             .get(uri, headers: _headers)
             .timeout(const Duration(seconds: 30)),
       };
+      if (response.statusCode == 401 && !retried && !path.startsWith('auth/login') && await _refreshToken()) {
+        return _requestRaw(method, path, body: body, query: query, retried: true);
+      }
       dynamic decoded;
       try {
         decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
@@ -198,5 +206,21 @@ class UserApi {
     } on http.ClientException {
       throw const UserApiException('Unable to connect to the server.');
     }
+  }
+
+  Future<bool> _refreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final refresh = prefs.getString('staff_refresh_token');
+    if (refresh == null || refresh.isEmpty) return false;
+    try {
+      final response = await _client.post(Uri.parse('$baseUrl/auth/refresh/'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'refresh': refresh})).timeout(const Duration(seconds: 15));
+      if (response.statusCode < 200 || response.statusCode >= 300) return false;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final access = data['access']?.toString();
+      if (access == null || access.isEmpty) return false;
+      _token = access;
+      await prefs.setString('staff_access_token', access);
+      return true;
+    } catch (_) { return false; }
   }
 }
