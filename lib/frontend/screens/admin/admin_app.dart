@@ -64,11 +64,11 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
         ),
         labelStyle: const TextStyle(fontSize: 12, color: ink),
       ),
-      navigationBarTheme: const NavigationBarThemeData(
-        labelTextStyle: WidgetStatePropertyAll(
-          TextStyle(fontSize: 9, fontWeight: FontWeight.w600),
-        ),
-        iconTheme: WidgetStatePropertyAll(IconThemeData(size: 20)),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: navy,
+        indicatorColor: const Color(0xFF174E8F),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: states.contains(WidgetState.selected) ? Colors.white : const Color(0xFFB9CBE3))),
+        iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(size: 20, color: states.contains(WidgetState.selected) ? Colors.white : const Color(0xFFB9CBE3))),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(
         backgroundColor: blue, foregroundColor: Colors.white, elevation: 0,

@@ -74,8 +74,8 @@ class AdminBottomBar extends StatelessWidget {
   Widget build(BuildContext context) => NavigationBar(
     height: 58,
     elevation: 4,
-    backgroundColor: Colors.white,
-    indicatorColor: const Color(0xFFE7F0FF),
+    backgroundColor: navy,
+    indicatorColor: const Color(0xFF174E8F),
     labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
     selectedIndex: selected,
     onDestinationSelected: onTap,
