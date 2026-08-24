@@ -131,6 +131,52 @@ class SplitStockServiceTests(APITestCase):
         self.assertEqual(refilled.status_code, status.HTTP_200_OK)
         self.assertEqual((refilled.data["store_quantity"], refilled.data["shelf_quantity"]), (40, 20))
 
+    def test_store_to_shelf_endpoint_returns_success_response_and_movement_id(self):
+        initialize_stock(self.product, store_quantity=30, shelf_quantity=0, user=self.user)
+        self.client.force_authenticate(self.user)
+
+        response = self.client.post(
+            "/api/inventory/move-to-shelf/",
+            {"product_id": self.product.pk, "quantity": 5},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data["message"], "Stock transferred successfully.")
+        self.assertEqual(response.data["remaining_stock"], 25)
+        self.assertTrue(response.data["stock_movement_id"])
+        self.assertTrue(StockMovement.objects.filter(pk=response.data["stock_movement_id"]).exists())
+
+    def test_store_to_shelf_endpoint_rejects_invalid_quantities_without_changes(self):
+        initialize_stock(self.product, store_quantity=30, shelf_quantity=0, user=self.user)
+        self.client.force_authenticate(self.user)
+
+        for quantity, expected_message in (
+            (31, "Insufficient store stock. Available: 30."),
+            (0, "Quantity must be greater than zero."),
+            (-5, "Quantity must be greater than zero."),
+        ):
+            response = self.client.post(
+                "/api/inventory/move-to-shelf/",
+                {"product_id": self.product.pk, "quantity": quantity},
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+            self.assertFalse(response.data["success"])
+            self.assertEqual(response.data["message"], expected_message)
+            store, shelf = self.stock()
+            self.assertEqual((store.quantity, shelf.quantity), (30, 0))
+
+        response = self.client.post(
+            "/api/inventory/move-to-shelf/",
+            {"product_id": 999999, "quantity": 1},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertEqual(response.data["message"], "Select a valid product.")
+        store, shelf = self.stock()
+        self.assertEqual((store.quantity, shelf.quantity), (30, 0))
+
 
 class AdminLoginTests(APITestCase):
     def setUp(self):

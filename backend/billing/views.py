@@ -833,15 +833,29 @@ def store_to_shelf(request):
     try:
         product = Item.objects.get(pk=int(request.data.get("product_id")))
         result = transfer_store_to_shelf(product, request.data.get("quantity"), branch=branch_for(request.user), user=request.user)
-        moved = result.get("transferred_quantity", result.get("transferred", quantity))
-        return Response({"success": True, "message": f"{moved} units moved successfully to shelf stock.", **result})
+        return Response({
+            "success": True,
+            "message": "Stock transferred successfully.",
+            "remaining_stock": result["store_quantity"],
+            **result,
+        })
     except (Item.DoesNotExist, TypeError, ValueError):
-        return Response({"product_id": "Select a valid product."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"success": False, "message": "Select a valid product.", "product_id": "Select a valid product."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     except ValidationError as exception:
-        return Response({"quantity": exception.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        message = exception.messages[0]
+        return Response(
+            {"success": False, "message": message, "quantity": message},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     except Exception:
         logger.exception("Store-to-shelf transfer failed. request_data=%s", request.data)
-        return Response({"success": False, "message": "Unable to complete stock transfer."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"success": False, "message": "Unable to complete stock transfer. Please try again."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(["POST"])

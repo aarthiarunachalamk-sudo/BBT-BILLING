@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'user_models.dart';
 import 'user_state.dart';
 
-const userNavy = Color(0xFF06245A), userBlue = Color(0xFF075DEB), userGreen = Color(0xFF16A34A);
-const userOrange = Color(0xFFF59E0B), userRed = Color(0xFFEF4444), userBg = Color(0xFFF8FAFC);
+const userNavy = Color(0xFF0B2A5B), userBlue = Color(0xFF123A7A), userGreen = Color(0xFF138A5B);
+const userOrange = Color(0xFFF97316), userRed = Color(0xFFDC2626), userBg = Color(0xFFF3F6FC);
 
 class UserShell extends StatelessWidget {
   const UserShell({super.key, required this.state, required this.title, required this.child, this.showBack = false, this.backPage = UserPage.inventory});
@@ -18,8 +18,13 @@ class UserShell extends StatelessWidget {
     drawer: showBack ? null : _UserDrawer(state: state),
     appBar: AppBar(
       backgroundColor: userNavy, foregroundColor: Colors.white,
-      toolbarHeight: 52,
-      title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+      toolbarHeight: title == 'Store Stock' ? 78 : 58,
+      title: title == 'Store Stock'
+          ? const Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text('Store Stock', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+              Text('Manage & transfer products to shelf', style: TextStyle(fontSize: 12, color: Color(0xFFDCE3EE))),
+            ])
+          : Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
       leading: showBack
           ? IconButton(onPressed: () => state.back(fallback: backPage), icon: const Icon(Icons.arrow_back))
           : Builder(builder: (context) => IconButton(onPressed: () => Scaffold.of(context).openDrawer(), icon: const Icon(Icons.menu_rounded))),

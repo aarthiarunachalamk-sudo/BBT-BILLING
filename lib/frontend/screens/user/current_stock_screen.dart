@@ -51,6 +51,18 @@ class CurrentStockScreen extends StatelessWidget {
             ],
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Row(children: [
+            Expanded(child: _summary('${rows.length}', 'Total Products', userBlue)),
+            const SizedBox(width: 6),
+            Expanded(child: _summary('${rows.where((p) => number(p['store_quantity']) > number(p['minimum_quantity'])).length}', 'In Stock', userGreen)),
+            const SizedBox(width: 6),
+            Expanded(child: _summary('${rows.where((p) { final q = number(p['store_quantity']); return q > 0 && q <= number(p['minimum_quantity']); }).length}', 'Low Stock', userOrange)),
+            const SizedBox(width: 6),
+            Expanded(child: _summary('${rows.where((p) => number(p['store_quantity']) == 0).length}', 'Out', userRed)),
+          ]),
+        ),
         Expanded(
           child: rows.isEmpty
               ? const EmptyMessage('No store stock matches these filters.')
@@ -68,6 +80,12 @@ class CurrentStockScreen extends StatelessWidget {
       ]),
     );
   }
+
+  Widget _summary(String value, String label, Color color) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 5),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: .18))),
+    child: Column(children: [Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color)), Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 9, color: Colors.blueGrey))]),
+  );
 
   Widget _stockRow(BuildContext context, Map<String, dynamic> product) {
     final quantity = number(product['store_quantity']);
@@ -89,7 +107,11 @@ class CurrentStockScreen extends StatelessWidget {
       content: TextField(controller: controller, autofocus: true, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Quantity (available: ${number(product['store_quantity'])})')),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(context, int.tryParse(controller.text)), child: const Text('Move'))],
     ));
-    if (quantity == null || quantity <= 0) return;
+    if (quantity == null) return;
+    if (quantity <= 0) {
+      if (context.mounted) _notice(context, 'Enter a quantity greater than zero.');
+      return;
+    }
     final available = number(product['store_quantity']);
     if (quantity > available) {
       if (context.mounted) _notice(context, 'Only $available units are available in Store Stock.');
@@ -98,7 +120,7 @@ class CurrentStockScreen extends StatelessWidget {
     final success = await state.moveToShelf((product['product_id'] ?? product['id']) as int, quantity);
     if (context.mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      _notice(context, success ? 'Stock moved to shelf.' : state.error ?? 'Unable to move stock.');
+      _notice(context, success ? 'Stock transferred successfully.' : state.error ?? 'Unable to complete stock transfer. Please try again.');
     }
   }
 }

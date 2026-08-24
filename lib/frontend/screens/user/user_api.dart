@@ -179,6 +179,10 @@ class UserApi {
             .get(uri, headers: _headers)
             .timeout(const Duration(seconds: 30)),
       };
+      if (path.contains('move-to-shelf') || path.contains('store-to-shelf')) {
+        // Development diagnostics: never print Authorization/token values.
+        print('TRANSFER $method ${uri.path} body=${body ?? {}} status=${response.statusCode} response=${response.body}');
+      }
       if (response.statusCode == 401 && !path.startsWith('auth/login') && !path.startsWith('auth/refresh')) {
         if (!retried && await _refreshToken()) {
           return _requestRaw(method, path, body: body, query: query, retried: true);

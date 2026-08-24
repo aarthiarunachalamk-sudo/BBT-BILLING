@@ -104,8 +104,11 @@ def transfer_store_to_shelf(product, quantity, *, branch=DEFAULT_BRANCH, user=No
     store.save()
     shelf.save()
     _sync_legacy(product, store, shelf)
-    _movement(product, branch, movement_type, quantity, store_before, store, shelf_before, shelf, user=user, source="STORE", destination="SHELF", notes=notes)
-    return stock_result(store, shelf, transferred=quantity)
+    movement = _movement(product, branch, movement_type, quantity, store_before, store, shelf_before, shelf, user=user, source="STORE", destination="SHELF", notes=notes)
+    return {
+        **stock_result(store, shelf, transferred=quantity),
+        "stock_movement_id": movement.pk,
+    }
 
 
 @transaction.atomic
