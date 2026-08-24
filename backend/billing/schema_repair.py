@@ -1,10 +1,24 @@
 """Targeted recovery for legacy Render databases with broken migration history."""
 
-from django.db import connection
+from django.db import connection, transaction
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.models import F
+from django.utils import timezone
 
-from .models import AuditLog, Brand, Item, Payment, ProductBatch, StockAdjustment, StockReview, User
+from .models import (
+    AuditLog,
+    Brand,
+    Item,
+    Payment,
+    ProductBatch,
+    ShelfStock,
+    StockAdjustment,
+    StockMovement,
+    StockReview,
+    StoreSettings,
+    StoreStock,
+    User,
+)
 
 
 MIGRATIONS = (
@@ -31,6 +45,7 @@ FIELD_NAMES = {
     AuditLog: ("description",),
 }
 NEW_MODELS = (StockAdjustment, StockReview, ProductBatch, Brand)
+SPLIT_STOCK_MODELS = (StoreStock, ShelfStock, StockMovement)
 
 
 def admin_visibility_schema_status():
@@ -101,3 +116,82 @@ def repair_admin_visibility_schema():
     recorder = MigrationRecorder(connection)
     for migration in MIGRATIONS:
         recorder.record_applied("billing", migration)
+
+
+def split_stock_schema_status():
+    """Return missing split-stock tables/fields for legacy databases."""
+    missing = []
+    tables = set(connection.introspection.table_names())
+    missing.extend(model._meta.db_table for model in SPLIT_STOCK_MODELS if model._meta.db_table not in tables)
+    settings_table = StoreSettings._meta.db_table
+    if settings_table in tables:
+        with connection.cursor() as cursor:
+            columns = {column.name for column in connection.introspection.get_table_description(cursor, settings_table)}
+        field = StoreSettings._meta.get_field("auto_refill_enabled")
+        if field.column not in columns:
+            missing.append(f"{settings_table}.{field.column}")
+    return missing
+
+
+def repair_split_stock_schema():
+    """Repair migrations marked applied before the split-stock tables existed.
+
+    Some legacy Render databases have migration 0010/0011 in django_migrations
+    even though their DDL was never committed.  This is deliberately
+    idempotent so it is safe to execute at every deployment.
+    """
+    existing_tables = set(connection.introspection.table_names())
+    with connection.schema_editor() as editor:
+        for model in SPLIT_STOCK_MODELS:
+            if model._meta.db_table not in existing_tables:
+                editor.create_model(model)
+                existing_tables.add(model._meta.db_table)
+
+        settings_table = StoreSettings._meta.db_table
+        if settings_table in existing_tables:
+            with connection.cursor() as cursor:
+                columns = {column.name for column in connection.introspection.get_table_description(cursor, settings_table)}
+            field = StoreSettings._meta.get_field("auto_refill_enabled")
+            if field.column not in columns:
+                editor.add_field(StoreSettings, field)
+
+    # Migration 0011 cannot backfill data when it was incorrectly recorded as
+    # applied.  Create only missing per-product records; existing production
+    # quantities and movement history are never overwritten or duplicated.
+    with transaction.atomic():
+        for product in Item.objects.filter(item_type=Item.ItemType.MATERIAL).iterator():
+            store_quantity = product.store_stock
+            shelf_quantity = product.shelf_stock
+            if store_quantity == 0 and shelf_quantity == 0 and product.stock_quantity:
+                store_quantity = product.stock_quantity
+            store, store_created = StoreStock.objects.get_or_create(
+                product=product,
+                branch="Main Branch",
+                defaults={"quantity": store_quantity, "minimum_quantity": product.reorder_level},
+            )
+            shelf, shelf_created = ShelfStock.objects.get_or_create(
+                product=product,
+                branch="Main Branch",
+                defaults={
+                    "quantity": shelf_quantity,
+                    "target_quantity": shelf_quantity,
+                    "minimum_quantity": min(product.reorder_level, shelf_quantity),
+                    "shelf_added_date": timezone.now() if shelf_quantity else None,
+                },
+            )
+            if store_created and store.quantity:
+                StockMovement.objects.create(
+                    product=product, branch="Main Branch", movement_type=StockMovement.MovementType.INITIAL_STORE_STOCK,
+                    source_location="", destination_location="STORE", quantity=store.quantity,
+                    store_before=0, store_after=store.quantity, shelf_before=0, shelf_after=0,
+                    reference_type="MIGRATION_REPAIR", reference_id=str(product.pk),
+                    notes="Recovered from legacy Item store stock.",
+                )
+            if shelf_created and shelf.quantity:
+                StockMovement.objects.create(
+                    product=product, branch="Main Branch", movement_type=StockMovement.MovementType.INITIAL_SHELF_STOCK,
+                    source_location="", destination_location="SHELF", quantity=shelf.quantity,
+                    store_before=store.quantity, store_after=store.quantity, shelf_before=0, shelf_after=shelf.quantity,
+                    reference_type="MIGRATION_REPAIR", reference_id=str(product.pk),
+                    notes="Recovered from legacy Item shelf stock.",
+                )

@@ -32,5 +32,6 @@ if ! python manage.py migrate; then
   echo "Normal migration history is inconsistent; applying targeted additive repair."
   python manage.py shell -c "from billing.schema_repair import repair_admin_visibility_schema; repair_admin_visibility_schema()"
 fi
+python manage.py shell -c "from billing.schema_repair import repair_split_stock_schema; repair_split_stock_schema()"
 python manage.py seed_weight_products
 python manage.py seed_brand_catalog

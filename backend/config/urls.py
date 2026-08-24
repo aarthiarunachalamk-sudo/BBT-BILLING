@@ -7,7 +7,12 @@ from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from billing.schema_repair import admin_visibility_schema_status, repair_admin_visibility_schema
+from billing.schema_repair import (
+    admin_visibility_schema_status,
+    repair_admin_visibility_schema,
+    repair_split_stock_schema,
+    split_stock_schema_status,
+)
 from billing.views import AdminTokenObtainPairView, change_password, checkout, current_user, dashboard, logout_view
 
 
@@ -26,16 +31,17 @@ def health_check(request):
     def schema_is_ready():
         applied = MigrationRecorder(connection).migration_qs.filter(
             app="billing",
-            name="0008_brand_categories",
+            name="0011_migrate_split_stock_data",
         ).exists()
-        return applied and not admin_visibility_schema_status()
+        return applied and not admin_visibility_schema_status() and not split_stock_schema_status()
 
     try:
         schema_ready = schema_is_ready()
         if not schema_ready:
             # This legacy database has an inconsistent migration history, so
-            # repair only the known additive admin/brand schema changes.
+            # repair the known additive schema changes before serving traffic.
             repair_admin_visibility_schema()
+            repair_split_stock_schema()
             connection.close()
             schema_ready = schema_is_ready()
     except Exception as exception:
@@ -48,8 +54,8 @@ def health_check(request):
             "status": "ok" if schema_ready else "error",
             "service": "bbt-billing-api",
             "database": "ready" if schema_ready else "migration_required",
-            "schema": "0008",
-            "missing": admin_visibility_schema_status() if not schema_ready else [],
+            "schema": "0011",
+            "missing": (admin_visibility_schema_status() + split_stock_schema_status()) if not schema_ready else [],
         },
         status=200 if schema_ready else 503,
     )
