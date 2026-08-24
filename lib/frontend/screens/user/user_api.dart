@@ -88,6 +88,24 @@ class UserApi {
     return [];
   }
 
+  Future<List<Map<String, dynamic>>> getStoreStock({Map<String, String>? query}) async {
+    try {
+      return await getList('inventory/store-stock', query: query);
+    } on UserApiException {
+      // Keep older deployed servers usable until the split-stock migrations
+      // have been applied. The returned shape matches StoreStockSerializer.
+      final legacy = await getList('inventory/current-stock', query: query);
+      return legacy.map((item) => {
+        'product_id': item['id'],
+        'product_name': item['name'],
+        'branch': item['branch'] ?? 'Main Branch',
+        'store_quantity': item['store_stock'] ?? item['stock_quantity'] ?? 0,
+        'minimum_quantity': item['reorder_level'] ?? 0,
+        'updated_by': item['updated_by'],
+      }).toList();
+    }
+  }
+
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) =>
       _request('POST', path, body: body);
 
