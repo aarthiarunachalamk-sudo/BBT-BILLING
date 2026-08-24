@@ -32,3 +32,8 @@ Widget buildUserScreen(UserState state) => switch (state.page) {
   UserPage.reports => SalesReportScreen(state), UserPage.invoice => InvoiceScreen(state),
   UserPage.profile => UserProfileScreen(state),
 };
+
+// Shared feedback helper used by the user-module screens.
+void _notice(BuildContext context, String text) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+}
