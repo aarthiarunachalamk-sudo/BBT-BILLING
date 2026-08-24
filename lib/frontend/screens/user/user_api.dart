@@ -98,6 +98,7 @@ class UserApi {
       return legacy.map((item) => {
         'product_id': item['id'],
         'product_name': item['name'],
+        'image_url': item['image_url'] ?? item['image'],
         'branch': item['branch'] ?? 'Main Branch',
         'store_quantity': item['store_stock'] ?? item['stock_quantity'] ?? 0,
         'minimum_quantity': item['reorder_level'] ?? 0,
@@ -105,6 +106,28 @@ class UserApi {
       }).toList();
     }
   }
+
+  Future<List<Map<String, dynamic>>> getShelfStock({Map<String, String>? query}) async {
+    try {
+      return await getList('inventory/shelf-stock', query: query);
+    } on UserApiException {
+      final legacy = await getList('inventory/current-stock', query: query);
+      return legacy
+          .where((item) => _asInt(item['shelf_stock'] ?? item['shelf_quantity']) > 0)
+          .map((item) => {
+                'product_id': item['id'],
+                'product_name': item['name'],
+                'image_url': item['image_url'] ?? item['image'],
+                'branch': item['branch'] ?? 'Main Branch',
+                'shelf_quantity': item['shelf_stock'] ?? item['shelf_quantity'] ?? 0,
+                'target_quantity': item['target_shelf_quantity'] ?? item['reorder_level'] ?? 0,
+                'updated_by': item['updated_by'],
+              })
+          .toList();
+    }
+  }
+
+  int _asInt(dynamic value) => int.tryParse('$value') ?? 0;
 
   Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) =>
       _request('POST', path, body: body);

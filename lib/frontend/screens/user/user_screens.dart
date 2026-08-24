@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../widgets/product_image_widget.dart';
 
 import 'user_api.dart';
 import 'user_models.dart';

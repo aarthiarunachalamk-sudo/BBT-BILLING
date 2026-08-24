@@ -68,7 +68,7 @@ class UserState extends ChangeNotifier {
           );
           break;
         case UserPage.shelfAging:
-          products = await api.getList('inventory/shelf-stock');
+          products = await api.getShelfStock();
           break;
         case UserPage.billing:
           products = await api.getList('inventory/current-stock');
@@ -185,7 +185,7 @@ class UserState extends ChangeNotifier {
   Future<bool> moveToShelf(int itemId, int quantity) async =>
       _perform(() async {
         await api.post('inventory/store-to-shelf', {'product_id': itemId, 'quantity': quantity});
-        products = await api.getList('inventory/shelf-stock');
+        products = await api.getShelfStock();
       });
 
   Future<bool> updateBatchStatus(int batchId, String action) async =>

@@ -5,75 +5,30 @@ class ShelfAgingScreen extends StatelessWidget {
   final UserState state;
 
   @override
-  Widget build(BuildContext context) {
-    return UserShell(
-      state: state,
-      title: 'Shelf Stock (3+ Months)',
-      showBack: true,
-      child: state.products.isEmpty
-          ? const EmptyMessage('No shelf stock records found.')
-          : ListView(
-              padding: const EdgeInsets.all(12),
-              children: [
-                const Text('Shelf Stock Table', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 4),
-                const Text('Shelf quantities are maintained separately from Store Stock.', style: TextStyle(fontSize: 11, color: Colors.blueGrey)),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: WidgetStatePropertyAll(Color(0xFFEFF6FF)),
-                    columnSpacing: 20,
-                    columns: const [
-                      DataColumn(label: Text('Product')),
-                      DataColumn(label: Text('Shelf')),
-                      DataColumn(label: Text('Target')),
-                      DataColumn(label: Text('Refill')),
-                      DataColumn(label: Text('Store')),
-                      DataColumn(label: Text('Status')),
-                      DataColumn(label: Text('Action')),
-                    ],
-                    rows: [
-                      for (final product in state.products)
-                        DataRow(cells: [
-                          DataCell(SizedBox(width: 150, child: Text('${product['product_name'] ?? product['name']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)))),
-                          DataCell(Text('${number(product['shelf_quantity'] ?? product['shelf_stock'])}')),
-                          DataCell(Text('${number(product['target_quantity'])}')),
-                          DataCell(Text('${number(product['refill_required'])}')),
-                          DataCell(Text('${number(product['store_quantity'] ?? product['store_stock'])}')),
-                          DataCell(StatusPill('${product['status'] ?? 'FULL'}')),
-                          DataCell(OutlinedButton(onPressed: state.loading ? null : () => _moveStock(context, product), child: const Text('Move'))),
-                        ]),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
+  Widget build(BuildContext context) => UserShell(
+    state: state, title: 'Shelf Stock (3+ Months)', showBack: true,
+    child: Column(children: [
+      SizedBox(height: 44, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 10), children: [
+        for (final tab in ['All Stock', 'Shelf Stock', '3+ Months', 'Low Stock'])
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: ChoiceChip(label: Text(tab), selected: tab == '3+ Months', onSelected: (_) {})),
+      ])),
+      Expanded(child: state.products.isEmpty ? const EmptyMessage('No shelf stock records found.') : ListView(padding: const EdgeInsets.fromLTRB(10, 6, 10, 16), children: [
+        _header(), for (final product in state.products) _row(product),
+      ])),
+    ]),
+  );
 
-  Future<void> _moveStock(BuildContext context, Map<String, dynamic> product) async {
-    final controller = TextEditingController();
-    final quantity = await showDialog<int>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Move ${product['product_name'] ?? product['name']}'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(labelText: 'Quantity', helperText: 'Available store stock: ${number(product['store_quantity'] ?? product['store_stock'])}\nRecommended refill: ${number(product['refill_required'])}'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, int.tryParse(controller.text)), child: const Text('Confirm')),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (quantity == null || quantity <= 0) return;
-    final success = await state.moveToShelf((product['product_id'] ?? product['id']) as int, quantity);
-    if (context.mounted) _notice(context, success ? 'Stock moved successfully.' : state.error ?? 'Stock move failed.');
+  Widget _header() => Container(padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4), color: const Color(0xFFEFF6FF), child: const Row(children: [
+    Expanded(flex: 5, child: Text('Product', style: TextStyle(fontWeight: FontWeight.w700))), Expanded(flex: 2, child: Text('Shelf Qty', textAlign: TextAlign.center)), Expanded(flex: 3, child: Text('Added Date', textAlign: TextAlign.center)), Expanded(flex: 2, child: Text('Age', textAlign: TextAlign.center)), Expanded(flex: 3, child: Text('Status', textAlign: TextAlign.center)),
+  ]));
+
+  Widget _row(Map<String, dynamic> product) {
+    final rawDate = product['shelf_added_date']?.toString();
+    final date = rawDate == null ? '-' : rawDate.length >= 10 ? rawDate.substring(5, 10) : rawDate;
+    final age = number(product['age_days'] ?? 0);
+    return Container(padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4), decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE2E6EC)))), child: Row(children: [
+      Expanded(flex: 5, child: Row(children: [ProductImageWidget(imageUrl: product['image_url'] ?? product['product_image_url'], width: 38, height: 38), const SizedBox(width: 6), Expanded(child: Text('${product['product_name'] ?? product['name']}', maxLines: 2, overflow: TextOverflow.ellipsis))])),
+      Expanded(flex: 2, child: Text('${number(product['shelf_quantity'] ?? product['shelf_stock'])}', textAlign: TextAlign.center)), Expanded(flex: 3, child: Text(date, textAlign: TextAlign.center)), Expanded(flex: 2, child: Text(age == 0 ? '-' : '${age}d', textAlign: TextAlign.center)), Expanded(flex: 3, child: FittedBox(fit: BoxFit.scaleDown, child: StatusPill('${product['status'] ?? 'FULL'}'))),
+    ]));
   }
 }
-
-void _notice(BuildContext context, String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));

@@ -235,10 +235,15 @@ class StoreStockSerializer(serializers.ModelSerializer):
     product_id = serializers.IntegerField(read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
     store_quantity = serializers.IntegerField(source="quantity", read_only=True)
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreStock
-        fields = ["id", "product_id", "product_name", "branch", "store_quantity", "minimum_quantity", "updated_by", "created_at", "updated_at"]
+        fields = ["id", "product_id", "product_name", "image_url", "branch", "store_quantity", "minimum_quantity", "updated_by", "created_at", "updated_at"]
+
+    def get_image_url(self, obj):
+        image = getattr(obj.product, "image", None)
+        return self.context["request"].build_absolute_uri(image.url) if image else None
 
 
 class ShelfStockSerializer(serializers.ModelSerializer):
@@ -248,10 +253,21 @@ class ShelfStockSerializer(serializers.ModelSerializer):
     refill_required = serializers.IntegerField(read_only=True)
     status = serializers.CharField(source="shelf_status", read_only=True)
     store_quantity = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
+    age_days = serializers.SerializerMethodField()
 
     class Meta:
         model = ShelfStock
-        fields = ["id", "product_id", "product_name", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "last_refill_date", "updated_by", "created_at", "updated_at"]
+        fields = ["id", "product_id", "product_name", "image_url", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "age_days", "last_refill_date", "updated_by", "created_at", "updated_at"]
+
+    def get_age_days(self, obj):
+        if not obj.shelf_added_date:
+            return 0
+        return max((timezone.now() - obj.shelf_added_date).days, 0)
+
+    def get_image_url(self, obj):
+        image = getattr(obj.product, "image", None)
+        return self.context["request"].build_absolute_uri(image.url) if image else None
 
     def get_store_quantity(self, obj):
         stock = obj.product.store_stocks.filter(branch=obj.branch).first()

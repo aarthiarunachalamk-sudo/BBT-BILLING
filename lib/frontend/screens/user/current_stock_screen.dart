@@ -57,10 +57,6 @@ class CurrentStockScreen extends StatelessWidget {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
                   children: [
-                    const Text('Store Stock Table', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 4),
-                    const Text('Store quantities are maintained separately from Shelf Stock.', style: TextStyle(fontSize: 11, color: Colors.blueGrey)),
-                    const SizedBox(height: 12),
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: DataTable(
@@ -75,7 +71,7 @@ class CurrentStockScreen extends StatelessWidget {
                         rows: [
                           for (final product in rows)
                             DataRow(cells: [
-                              DataCell(SizedBox(width: 170, child: Text('${product['product_name'] ?? product['name']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)))),
+                              DataCell(SizedBox(width: 210, child: Row(children: [ProductImageWidget(imageUrl: product['image_url'] ?? product['product_image_url']), const SizedBox(width: 8), Expanded(child: Text('${product['product_name'] ?? product['name']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)))]))),
                               DataCell(Text('${number(product['store_quantity'])}')),
                               DataCell(Text('${number(product['minimum_quantity'])}')),
                               DataCell(StatusPill(number(product['store_quantity']) == 0 ? 'Out of Stock' : number(product['store_quantity']) <= number(product['minimum_quantity']) ? 'Low Stock' : 'In Stock')),
