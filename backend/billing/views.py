@@ -79,6 +79,7 @@ from .inventory.services.stock_service import (
     transfer_shelf_to_store,
     transfer_store_to_shelf,
 )
+from .schema_repair import repair_split_stock_schema, split_stock_schema_status
 
 
 User = get_user_model()
@@ -841,6 +842,13 @@ class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):
 @permission_classes([IsInventoryEditor])
 def store_to_shelf(request):
     try:
+        # Some legacy Render databases recorded migration 0010 as applied
+        # without committing its tables.  Do the idempotent repair here too,
+        # so a service with stale Render start-command settings can recover on
+        # its first stock transfer without paid shell access.
+        if split_stock_schema_status():
+            logger.warning("Repairing missing split-stock schema before transfer: %s", split_stock_schema_status())
+            repair_split_stock_schema()
         product = Item.objects.get(pk=int(request.data.get("product_id")))
         result = transfer_store_to_shelf(product, request.data.get("quantity"), branch=branch_for(request.user), user=request.user)
         return Response({
