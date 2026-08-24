@@ -60,15 +60,16 @@ class CurrentStockScreen extends StatelessWidget {
                     Expanded(flex: 2, child: Text('Store Qty', textAlign: TextAlign.center)),
                     Expanded(flex: 2, child: Text('Minimum', textAlign: TextAlign.center)),
                     Expanded(flex: 3, child: Text('Status', textAlign: TextAlign.center)),
+                    Expanded(flex: 2, child: Text('Move', textAlign: TextAlign.center)),
                   ])),
-                  for (final product in rows) _stockRow(product),
+                  for (final product in rows) _stockRow(context, product),
                 ]),
         ),
       ]),
     );
   }
 
-  Widget _stockRow(Map<String, dynamic> product) {
+  Widget _stockRow(BuildContext context, Map<String, dynamic> product) {
     final quantity = number(product['store_quantity']);
     final minimum = number(product['minimum_quantity']);
     final status = quantity == 0 ? 'Out of Stock' : quantity <= minimum ? 'Low Stock' : 'In Stock';
@@ -77,6 +78,20 @@ class CurrentStockScreen extends StatelessWidget {
       Expanded(flex: 2, child: Text('$quantity', textAlign: TextAlign.center)),
       Expanded(flex: 2, child: Text('$minimum', textAlign: TextAlign.center)),
       Expanded(flex: 3, child: FittedBox(fit: BoxFit.scaleDown, child: StatusPill(status))),
+      Expanded(flex: 2, child: IconButton(tooltip: 'Move to shelf', icon: const Icon(Icons.add_box_outlined, size: 20), onPressed: quantity <= 0 ? null : () => _moveToShelf(context, product))),
     ]));
+  }
+
+  Future<void> _moveToShelf(BuildContext context, Map<String, dynamic> product) async {
+    final controller = TextEditingController(text: '1');
+    final quantity = await showDialog<int>(context: context, builder: (context) => AlertDialog(
+      title: Text('Move ${product['product_name'] ?? product['name']} to shelf'),
+      content: TextField(controller: controller, autofocus: true, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Quantity (available: ${number(product['store_quantity'])})')),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(context, int.tryParse(controller.text)), child: const Text('Move'))],
+    ));
+    controller.dispose();
+    if (quantity == null || quantity <= 0) return;
+    final success = await state.moveToShelf((product['product_id'] ?? product['id']) as int, quantity);
+    if (context.mounted) _notice(context, success ? 'Stock moved to shelf.' : state.error ?? 'Unable to move stock.');
   }
 }
