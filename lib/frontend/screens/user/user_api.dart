@@ -196,7 +196,7 @@ class UserApi {
       }
       if (response.statusCode >= 200 && response.statusCode < 300) return decoded;
       final message = decoded is Map
-          ? (decoded['detail'] ?? decoded.values.firstOrNull ?? 'Request failed').toString()
+          ? (decoded['message'] ?? decoded['detail'] ?? _firstErrorValue(decoded) ?? 'Request failed').toString()
           : 'Request failed (${response.statusCode})';
       throw UserApiException(message);
     } on UserApiException {
@@ -210,6 +210,14 @@ class UserApi {
     } on http.ClientException {
       throw const UserApiException('Unable to connect to the server.');
     }
+  }
+
+  dynamic _firstErrorValue(Map<dynamic, dynamic> data) {
+    for (final value in data.values) {
+      if (value is String && value.trim().isNotEmpty) return value;
+      if (value is List && value.isNotEmpty) return value.first;
+    }
+    return null;
   }
 
   Future<bool> _refreshToken() async {
