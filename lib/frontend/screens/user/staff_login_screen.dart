@@ -12,7 +12,6 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
     Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserPasswordResetScreen(widget.state))), child: const Text('Forgot Password?'))),
     if (widget.state.error != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(widget.state.error!, style: const TextStyle(color: userRed))),
     ElevatedButton(onPressed: widget.state.loading ? null : _login, child: widget.state.loading ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Login')),
-    const SizedBox(height: 10), OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OTP login is not enabled by the server.'))), child: const Text('Login with OTP')),
     const SizedBox(height: 24), const Text('App Version 1.0.4', style: TextStyle(fontSize: 11, color: Colors.blueGrey)),
   ]))))));
   Future<void> _login() async { if (id.text.trim().isEmpty || password.text.isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your employee ID and password.'))); return; } await widget.state.login(id.text, password.text); }

@@ -76,7 +76,7 @@ Severity summary:
 | 36 | Admin → Staff price sync | Staff reads ₹110 | Admin PATCH updated shared Item; Staff GET returned 110.00 | PASS | — |
 | 37 | Historical price | Old invoice retains price | `InvoiceItem.unit_price` is persisted as a checkout snapshot | PASS | — |
 | 44 | Admin payment aggregation | Totals derive from Payment | Dashboard and user summary aggregated verified UPI payment 231.00 | PASS | — |
-| 2 | OTP login | Complete OTP flow | UI explicitly reports OTP is not enabled; no OTP endpoints | FAIL | High |
+| 2 | OTP login | No unsupported OTP control is shown | OTP login control removed; password login remains the supported path | PASS | — |
 | 5 | Category filtering | Selected category filters products | Category tap opens all current stock and does not pass category ID | FAIL | Medium |
 | 9 | Staff stock update | Editable store quantity | Staff UI has no direct stock-adjustment control | FAIL | High |
 | 11 | Shelf aging actions | Four working mutations | Apply Discount, Return Supplier, and Clearance remain disabled/placeholders | FAIL | High |

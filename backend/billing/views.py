@@ -93,7 +93,7 @@ class IsAdminOrManager(permissions.BasePermission):
 class IsInventoryEditor(permissions.BasePermission):
     """Allow stock/catalog writes only to operational inventory roles."""
 
-    allowed_roles = {User.Role.ADMIN, User.Role.MANAGER, User.Role.INVENTORY}
+    allowed_roles = {User.Role.ADMIN, User.Role.MANAGER, User.Role.INVENTORY, User.Role.CASHIER}
 
     def has_permission(self, request, view):
         return bool(

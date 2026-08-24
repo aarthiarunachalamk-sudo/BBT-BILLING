@@ -120,7 +120,14 @@ class UserApi {
             .get(uri, headers: _headers)
             .timeout(const Duration(seconds: 30)),
       };
-      final decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
+      dynamic decoded;
+      try {
+        decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);
+      } on FormatException {
+        throw UserApiException(
+          'Server returned an invalid response (HTTP ${response.statusCode}). Please retry or contact the administrator.',
+        );
+      }
       if (response.statusCode >= 200 && response.statusCode < 300) return decoded;
       final message = decoded is Map
           ? (decoded['detail'] ?? decoded.values.firstOrNull ?? 'Request failed').toString()

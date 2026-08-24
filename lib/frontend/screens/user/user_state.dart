@@ -194,7 +194,7 @@ class UserState extends ChangeNotifier {
       });
 
   bool get canManageInventory =>
-      {'inventory', 'manager'}.contains(user['role']?.toString().toLowerCase());
+      {'inventory', 'manager', 'cashier'}.contains(user['role']?.toString().toLowerCase());
 
   Future<bool> createProduct(Map<String, dynamic> values) async =>
       _perform(() async {
