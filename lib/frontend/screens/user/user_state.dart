@@ -50,7 +50,11 @@ class UserState extends ChangeNotifier {
           break;
         case UserPage.currentStock || UserPage.shelfAging || UserPage.billing:
           products = await api.getList(
-            page == UserPage.shelfAging ? 'inventory/shelf-stock' : 'inventory/current-stock',
+            page == UserPage.currentStock
+                ? 'inventory/store-stock'
+                : page == UserPage.shelfAging
+                ? 'inventory/shelf-stock'
+                : 'inventory/current-stock',
             query: page != UserPage.currentStock || selectedCategoryId == null
                 ? null
                 : {'category': '$selectedCategoryId'},
@@ -183,7 +187,7 @@ class UserState extends ChangeNotifier {
   Future<bool> createProduct(Map<String, dynamic> values) async =>
       _perform(() async {
         await api.post('products', values);
-        products = await api.getList('inventory/current-stock');
+        products = await api.getList('inventory/store-stock');
         categories = await api.getList('categories');
         page = UserPage.currentStock;
       });

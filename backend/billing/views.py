@@ -786,8 +786,13 @@ class StoreStockViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = StoreStock.objects.select_related("product", "updated_by")
         branch = self.request.query_params.get("branch") or branch_for(self.request.user)
         product_id = self.request.query_params.get("product_id")
+        category = self.request.query_params.get("category")
         queryset = queryset.filter(branch=branch)
-        return (queryset.filter(product_id=product_id) if product_id else queryset).order_by("product__name")
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
+        if category:
+            queryset = queryset.filter(product__category_id=category)
+        return queryset.order_by("product__name")
 
 
 class ShelfStockViewSet(viewsets.ReadOnlyModelViewSet):
@@ -798,8 +803,13 @@ class ShelfStockViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = ShelfStock.objects.select_related("product", "updated_by").prefetch_related("product__store_stocks")
         branch = self.request.query_params.get("branch") or branch_for(self.request.user)
         product_id = self.request.query_params.get("product_id")
+        category = self.request.query_params.get("category")
         queryset = queryset.filter(branch=branch)
-        return (queryset.filter(product_id=product_id) if product_id else queryset).order_by("product__name")
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
+        if category:
+            queryset = queryset.filter(product__category_id=category)
+        return queryset.order_by("product__name")
 
 
 class StockMovementViewSet(viewsets.ReadOnlyModelViewSet):

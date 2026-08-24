@@ -6,40 +6,48 @@ class ShelfAgingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final today = DateTime.now();
     return UserShell(
       state: state,
-      title: 'Shelf Stock — 3+ Months',
+      title: 'Shelf Stock',
       showBack: true,
       child: state.products.isEmpty
           ? const EmptyMessage('No shelf stock records found.')
-          : ListView.builder(
+          : ListView(
               padding: const EdgeInsets.all(12),
-              itemCount: state.products.length,
-              itemBuilder: (_, index) {
-                final product = state.products[index];
-                final added = DateTime.tryParse('${product['shelf_added_date']}');
-                final age = added == null ? null : today.difference(added).inDays;
-                final status = age == null ? 'Review' : age >= 90 ? 'Slow Moving' : 'Normal';
-                return UserCard(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Expanded(child: Text('${product['product_name'] ?? product['name']}', style: const TextStyle(fontWeight: FontWeight.w800))),
-                      StatusPill('${product['status'] ?? status}'),
-                    ]),
-                    const SizedBox(height: 8),
-                    Text('Shelf: ${number(product['shelf_quantity'] ?? product['shelf_stock'])}  •  Target: ${number(product['target_quantity'])}'),
-                    Text('Refill required: ${number(product['refill_required'])}  •  Store: ${number(product['store_quantity'] ?? product['store_stock'])}'),
-                    Text('Added: ${added == null ? 'Not recorded' : '${added.day}/${added.month}/${added.year}'}  •  Age: ${age == null ? '—' : '$age days'}'),
-                    const SizedBox(height: 8),
-                    Wrap(spacing: 5, children: [
-                      OutlinedButton(onPressed: state.loading ? null : () => _moveStock(context, product), child: const Text('Move Stock', style: TextStyle(fontSize: 10))),
-                      for (final action in ['Apply Discount', 'Return Supplier', 'Mark Clearance'])
-                        OutlinedButton(onPressed: () => _notice(context, '$action requires manager approval and is unavailable for this staff role.'), child: Text(action, style: const TextStyle(fontSize: 10))),
-                    ]),
-                  ]),
-                );
-              },
+              children: [
+                const Text('Shelf Stock Table', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                const Text('Shelf quantities are maintained separately from Store Stock.', style: TextStyle(fontSize: 11, color: Colors.blueGrey)),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    headingRowColor: WidgetStatePropertyAll(Color(0xFFEFF6FF)),
+                    columnSpacing: 20,
+                    columns: const [
+                      DataColumn(label: Text('Product')),
+                      DataColumn(label: Text('Shelf')),
+                      DataColumn(label: Text('Target')),
+                      DataColumn(label: Text('Refill')),
+                      DataColumn(label: Text('Store')),
+                      DataColumn(label: Text('Status')),
+                      DataColumn(label: Text('Action')),
+                    ],
+                    rows: [
+                      for (final product in state.products)
+                        DataRow(cells: [
+                          DataCell(SizedBox(width: 150, child: Text('${product['product_name'] ?? product['name']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)))),
+                          DataCell(Text('${number(product['shelf_quantity'] ?? product['shelf_stock'])}')),
+                          DataCell(Text('${number(product['target_quantity'])}')),
+                          DataCell(Text('${number(product['refill_required'])}')),
+                          DataCell(Text('${number(product['store_quantity'] ?? product['store_stock'])}')),
+                          DataCell(StatusPill('${product['status'] ?? 'FULL'}')),
+                          DataCell(OutlinedButton(onPressed: state.loading ? null : () => _moveStock(context, product), child: const Text('Move'))),
+                        ]),
+                    ],
+                  ),
+                ),
+              ],
             ),
     );
   }

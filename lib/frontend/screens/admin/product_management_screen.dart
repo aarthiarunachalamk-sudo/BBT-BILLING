@@ -275,7 +275,7 @@ class _MobileProductList extends StatelessWidget {
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        '${product['brand_name']?.toString().isNotEmpty == true ? '${product['brand_name']} • ' : ''}SKU: ${product['sku'] ?? '—'}\nStock: ${product['stock_quantity'] ?? 0}  |  Shelf: ${product['shelf_quantity'] ?? product['shelf_stock'] ?? 0}',
+                        '${product['brand_name']?.toString().isNotEmpty == true ? '${product['brand_name']} • ' : ''}SKU: ${product['sku'] ?? '—'}\nStore: ${product['store_stock'] ?? 0}  |  Shelf: ${product['shelf_stock'] ?? 0}  |  Total: ${product['total_stock'] ?? product['stock_quantity'] ?? 0}',
                         style: const TextStyle(fontSize: 9, height: 1.45),
                       ),
                     ),

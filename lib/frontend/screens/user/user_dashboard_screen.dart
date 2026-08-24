@@ -76,7 +76,7 @@ class UserDashboardScreen extends StatelessWidget {
                   },
                 ),
                 _QuickAction(
-                  label: 'Shelf Stock\n3+ Months',
+                  label: 'Shelf Stock',
                   icon: Icons.shelves,
                   color: userGreen,
                   onTap: () => state.go(UserPage.shelfAging),
