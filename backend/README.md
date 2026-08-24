@@ -4,7 +4,7 @@ This backend provides the REST API, admin panel, JWT login, billing workflow, pa
 
 ## Database design
 
-The application has 13 main business tables:
+<!-- The application has 13 main business tables: -->
 
 1. User
 2. Client
