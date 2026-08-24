@@ -1,4 +1,5 @@
 from datetime import timedelta
+import logging
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.contrib.auth import get_user_model
@@ -38,6 +39,8 @@ from .models import (
     StockReview,
     WhatsAppMessage,
 )
+
+logger = logging.getLogger(__name__)
 from .serializers import (
     AuditLogSerializer,
     BrandSerializer,
@@ -835,6 +838,9 @@ def store_to_shelf(request):
         return Response({"product_id": "Select a valid product."}, status=status.HTTP_400_BAD_REQUEST)
     except ValidationError as exception:
         return Response({"quantity": exception.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        logger.exception("Store-to-shelf transfer failed. request_data=%s", request.data)
+        return Response({"success": False, "message": "Unable to complete stock transfer."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
