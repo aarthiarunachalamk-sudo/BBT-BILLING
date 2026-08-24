@@ -89,7 +89,6 @@ class CurrentStockScreen extends StatelessWidget {
       content: TextField(controller: controller, autofocus: true, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Quantity (available: ${number(product['store_quantity'])})')),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(context, int.tryParse(controller.text)), child: const Text('Move'))],
     ));
-    controller.dispose();
     if (quantity == null || quantity <= 0) return;
     final success = await state.moveToShelf((product['product_id'] ?? product['id']) as int, quantity);
     if (context.mounted) _notice(context, success ? 'Stock moved to shelf.' : state.error ?? 'Unable to move stock.');
