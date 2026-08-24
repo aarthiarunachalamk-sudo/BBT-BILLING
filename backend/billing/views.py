@@ -891,6 +891,49 @@ def shelf_to_store(request):
 
 @api_view(["POST"])
 @permission_classes([IsInventoryEditor])
+def shelf_product_action(request, product_id, action):
+    """Apply an explicit, selected-product action from the Shelf Stock page."""
+    product = Item.objects.filter(pk=product_id, item_type=Item.ItemType.MATERIAL).first()
+    if product is None:
+        return Response({"message": "Product was not found."}, status=status.HTTP_404_NOT_FOUND)
+    branch = branch_for(request.user)
+    try:
+        if action == "move-to-store":
+            result = transfer_shelf_to_store(product, request.data.get("quantity"), branch=branch, user=request.user)
+            message = "Stock moved back to store successfully."
+        elif action == "return-supplier":
+            quantity = int(request.data.get("quantity"))
+            result = adjust_shelf_stock(
+                product, -quantity, branch=branch, user=request.user,
+                movement_type=StockMovement.MovementType.RETURN_TO_SUPPLIER,
+                notes="Returned to supplier from shelf stock.",
+            )
+            message = "Shelf stock returned to supplier successfully."
+        elif action in {"apply-discount", "clearance"}:
+            percent = Decimal(str(request.data.get("discount_percent")))
+            if percent <= 0 or percent > 100:
+                raise ValidationError("Discount must be greater than 0 and at most 100 percent.")
+            details = dict(product.manual_details or {})
+            details["shelf_discount_percent"] = str(percent)
+            details["clearance"] = action == "clearance"
+            product.manual_details = details
+            product.selling_price = (product.selling_price * (Decimal("100") - percent) / Decimal("100")).quantize(Decimal("0.01"))
+            product.save(update_fields=["manual_details", "selling_price", "updated_at"])
+            result = stock_result(*get_stock(product, branch))
+            message = "Product marked for clearance successfully." if action == "clearance" else "Product discount applied successfully."
+        else:
+            return Response({"message": "Unsupported shelf action."}, status=status.HTTP_400_BAD_REQUEST)
+    except (TypeError, ValueError, InvalidOperation):
+        return Response({"message": "Enter a valid positive whole quantity or discount percentage."}, status=status.HTTP_400_BAD_REQUEST)
+    except ValidationError as exception:
+        return Response({"message": exception.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+    record_audit(request, f"Shelf product {action}", "Inventory", product, {"action": action, **request.data})
+    return Response({"success": True, "message": message, **result})
+
+
+@api_view(["POST"])
+@permission_classes([IsInventoryEditor])
 def auto_refill_product(request, product_id):
     product = Item.objects.filter(pk=product_id).first()
     if product is None:

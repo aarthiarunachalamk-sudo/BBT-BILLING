@@ -28,6 +28,7 @@ from .views import (
     dashboard,
     store_to_shelf,
     shelf_to_store,
+    shelf_product_action,
     auto_refill_product,
     stock_summary,
 )
@@ -71,6 +72,7 @@ urlpatterns = [
     path("inventory/move-to-shelf/", store_to_shelf, name="move-to-shelf"),
     path("inventory/shelf-to-store/", shelf_to_store, name="shelf-to-store"),
     path("inventory/shelf-stock/<int:product_id>/auto-refill/", auto_refill_product, name="auto-refill-shelf"),
+    path("inventory/shelf-stock/<int:product_id>/<str:action>/", shelf_product_action, name="shelf-product-action"),
     path("inventory/stock-summary/", stock_summary, name="stock-summary"),
     path("inventory/expiry/", ProductBatchViewSet.as_view({"get": "list"}), name="expiry-products"),
     path("", include(router.urls)),

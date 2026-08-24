@@ -242,6 +242,23 @@ class UserState extends ChangeNotifier {
     }
   }
 
+  Future<bool> shelfProductAction(int productId, String action, Map<String, dynamic> values) async {
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      await api.post('inventory/shelf-stock/$productId/$action', values);
+      products = await api.getShelfStock();
+      return true;
+    } on UserApiException catch (exception) {
+      error = exception.message;
+      return false;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> updateBatchStatus(int batchId, String action) async =>
       _perform(() async {
         await api.post('inventory/batches/$batchId/$action', const {});

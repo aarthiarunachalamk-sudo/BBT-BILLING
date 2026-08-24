@@ -189,6 +189,25 @@ class SplitStockServiceTests(APITestCase):
         records = response.data["results"]
         self.assertTrue(any(record["movement_type"] == "MANUAL_REFILL" for record in records))
 
+    def test_selected_shelf_product_actions_update_stock_and_product(self):
+        initialize_stock(self.product, store_quantity=20, shelf_quantity=10, user=self.user)
+        self.client.force_authenticate(self.user)
+
+        moved = self.client.post(f"/api/inventory/shelf-stock/{self.product.pk}/move-to-store/", {"quantity": 3}, format="json")
+        self.assertEqual(moved.status_code, status.HTTP_200_OK, moved.data)
+        returned = self.client.post(f"/api/inventory/shelf-stock/{self.product.pk}/return-supplier/", {"quantity": 2}, format="json")
+        self.assertEqual(returned.status_code, status.HTTP_200_OK, returned.data)
+        discounted = self.client.post(f"/api/inventory/shelf-stock/{self.product.pk}/apply-discount/", {"discount_percent": 10}, format="json")
+        self.assertEqual(discounted.status_code, status.HTTP_200_OK, discounted.data)
+        clearance = self.client.post(f"/api/inventory/shelf-stock/{self.product.pk}/clearance/", {"discount_percent": 5}, format="json")
+        self.assertEqual(clearance.status_code, status.HTTP_200_OK, clearance.data)
+
+        store, shelf = self.stock()
+        self.product.refresh_from_db()
+        self.assertEqual((store.quantity, shelf.quantity), (23, 5))
+        self.assertEqual(self.product.manual_details["clearance"], True)
+        self.assertTrue(StockMovement.objects.filter(product=self.product, movement_type="RETURN_TO_SUPPLIER", quantity=2).exists())
+
 
 class AdminLoginTests(APITestCase):
     def setUp(self):
