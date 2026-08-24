@@ -187,7 +187,7 @@ class UserState extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      await api.post('inventory/store-to-shelf', {'product_id': itemId, 'quantity': quantity});
+      await api.post('inventory/move-to-shelf', {'product_id': itemId, 'quantity': quantity});
       try {
         products = await api.getStoreStock();
       } catch (_) {
