@@ -232,7 +232,11 @@ class UserState extends ChangeNotifier {
     error = null;
     notifyListeners();
     try { await action(); return true; }
-    on UserApiException catch (e) { error = e.message; return false; }
+    on UserApiException catch (e) {
+      error = e.message;
+      if (e.message.contains('session has expired')) page = UserPage.login;
+      return false;
+    }
     catch (_) { error = 'Something went wrong. Please retry.'; return false; }
     finally { loading = false; notifyListeners(); }
   }

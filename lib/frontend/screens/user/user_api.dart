@@ -179,8 +179,12 @@ class UserApi {
             .get(uri, headers: _headers)
             .timeout(const Duration(seconds: 30)),
       };
-      if (response.statusCode == 401 && !retried && !path.startsWith('auth/login') && await _refreshToken()) {
-        return _requestRaw(method, path, body: body, query: query, retried: true);
+      if (response.statusCode == 401 && !path.startsWith('auth/login') && !path.startsWith('auth/refresh')) {
+        if (!retried && await _refreshToken()) {
+          return _requestRaw(method, path, body: body, query: query, retried: true);
+        }
+        await clearSession();
+        throw const UserApiException('Your session has expired. Please log in again.');
       }
       dynamic decoded;
       try {
