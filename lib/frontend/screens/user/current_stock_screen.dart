@@ -96,6 +96,9 @@ class CurrentStockScreen extends StatelessWidget {
       return;
     }
     final success = await state.moveToShelf((product['product_id'] ?? product['id']) as int, quantity);
-    if (context.mounted) _notice(context, success ? 'Stock moved to shelf.' : state.error ?? 'Unable to move stock.');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _notice(context, success ? 'Stock moved to shelf.' : state.error ?? 'Unable to move stock.');
+    }
   }
 }
