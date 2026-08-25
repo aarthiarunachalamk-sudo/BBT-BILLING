@@ -9,7 +9,7 @@ class CurrentStockScreen extends StatelessWidget {
     final query = state.search.toLowerCase().trim();
     final rows = state.products.where((product) {
       final name = '${product['product_name'] ?? product['name']}';
-      final matchesSearch = query.isEmpty || '$name ${product['product_id']}'.toLowerCase().contains(query);
+      final matchesSearch = query.isEmpty || '$name ${product['product_id']} ${product['location_label'] ?? product['store_section'] ?? ''} ${product['rack_location'] ?? ''}'.toLowerCase().contains(query);
       final quantity = number(product['store_quantity']);
       final matchesFilter = state.stockFilter == 'All' ||
           (state.stockFilter == 'In Stock' && quantity > 0) ||
@@ -28,7 +28,7 @@ class CurrentStockScreen extends StatelessWidget {
           child: TextField(
             onChanged: state.setSearch,
             decoration: const InputDecoration(
-              hintText: 'Search store products',
+              hintText: 'Search product, section or rack',
               prefixIcon: Icon(Icons.search),
             ),
           ),
@@ -72,6 +72,22 @@ class CurrentStockScreen extends StatelessWidget {
         Row(children: [Expanded(child: Text('${product['product_name'] ?? product['name']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800))), const SizedBox(width: 8), StatusPill(status)]),
         const SizedBox(height: 7),
         Text('Product ID: ${product['product_id'] ?? product['id']}', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
+        if ('${product['location_label'] ?? ''}'.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: userBlue.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: userBlue.withValues(alpha: .18)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.location_on_outlined, size: 13, color: userBlue),
+              const SizedBox(width: 4),
+              Text('${product['location_label']}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: userBlue)),
+            ]),
+          ),
+        ],
         const SizedBox(height: 5),
         Row(children: [_stockValue('Store', quantity, userBlue), const SizedBox(width: 18), _stockValue('Minimum', minimum, userOrange), const Spacer(), IconButton(tooltip: 'Move to shelf', visualDensity: VisualDensity.compact, icon: const Icon(Icons.add_box_outlined, color: userBlue), onPressed: quantity <= 0 ? null : () => _moveToShelf(context, product)), if (state.canManageInventory) IconButton(tooltip: 'Schedule product price', visualDensity: VisualDensity.compact, icon: const Icon(Icons.currency_rupee_rounded, color: userGreen), onPressed: () => _schedulePrice(context, product)), if (state.canManageInventory) IconButton(tooltip: 'Delete product', icon: const Icon(Icons.delete_outline, color: userRed), onPressed: () => _deleteProduct(context, product))]),
       ])),

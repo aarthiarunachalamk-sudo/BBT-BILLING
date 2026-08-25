@@ -22,6 +22,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final mrp = TextEditingController();
   final priceSource = TextEditingController();
   final priceVerifiedAt = TextEditingController();
+  final storeSection = TextEditingController(text: 'General');
+  final rackLocation = TextEditingController();
   final Map<String, TextEditingController> manualDetails = {};
   int gst = 0;
   int? categoryId;
@@ -69,6 +71,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     mrp.dispose();
     priceSource.dispose();
     priceVerifiedAt.dispose();
+    storeSection.dispose();
+    rackLocation.dispose();
     for (final controller in manualDetails.values) {
       controller.dispose();
     }
@@ -200,6 +204,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 field.key: _manualDetailController(field.key).text.trim(),
           },
           'unit': unit ?? 'Pack',
+          'store_section': storeSection.text.trim().isEmpty ? 'General' : storeSection.text.trim(),
+          'rack_location': rackLocation.text.trim(),
           'purchase_price': purchasePrice.text.trim(),
           'selling_price': sellingPrice.text.trim(),
           if (mrp.text.trim().isNotEmpty) 'mrp': mrp.text.trim(),
@@ -615,6 +621,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         onChanged: (v) => setState(() => unit = v),
                         validator: (v) => v == null ? 'Required' : null,
                       ),
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        Expanded(child: TextFormField(
+                          controller: storeSection,
+                          decoration: const InputDecoration(labelText: 'Store Section', prefixIcon: Icon(Icons.storefront_outlined, size: 18), hintText: 'e.g. Soap Section'),
+                        )),
+                        const SizedBox(width: 10),
+                        Expanded(child: TextFormField(
+                          controller: rackLocation,
+                          decoration: const InputDecoration(labelText: 'Rack / Bay', prefixIcon: Icon(Icons.view_week_outlined, size: 18), hintText: 'e.g. Rack 2'),
+                        )),
+                      ]),
 
                       const SizedBox(height: 20),
 

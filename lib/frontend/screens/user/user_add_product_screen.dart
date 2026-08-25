@@ -10,7 +10,7 @@ class UserAddProductScreen extends StatefulWidget {
 class _UserAddProductScreenState extends State<UserAddProductScreen> {
   final formKey = GlobalKey<FormState>();
   final fields = <String, TextEditingController>{
-    for (final name in ['name', 'sku', 'barcode', 'purchase_price', 'selling_price', 'tax_percent', 'store_stock', 'shelf_stock', 'target_shelf_quantity', 'reorder_level', 'batch_number', 'manufactured_date', 'expiry_date'])
+    for (final name in ['name', 'sku', 'barcode', 'store_section', 'rack_location', 'purchase_price', 'selling_price', 'tax_percent', 'store_stock', 'shelf_stock', 'target_shelf_quantity', 'reorder_level', 'batch_number', 'manufactured_date', 'expiry_date'])
       name: TextEditingController(),
   };
   int? category;
@@ -35,6 +35,8 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
         children: [
           _text('name', 'Product Name'), _text('sku', 'SKU'),
           _text('barcode', 'Barcode', isRequired: false),
+          _text('store_section', 'Store Section', initial: 'General'),
+          _text('rack_location', 'Rack / Bay', isRequired: false),
           DropdownButtonFormField<int>(
             initialValue: category,
             decoration: const InputDecoration(labelText: 'Category'),
@@ -134,6 +136,8 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
     final body = <String, dynamic>{
       'item_type': 'material', 'name': fields['name']!.text.trim(), 'sku': fields['sku']!.text.trim(),
       'barcode': fields['barcode']!.text.trim().isEmpty ? null : fields['barcode']!.text.trim(), 'category': category,
+      'store_section': fields['store_section']!.text.trim().isEmpty ? 'General' : fields['store_section']!.text.trim(),
+      'rack_location': fields['rack_location']!.text.trim(),
       'unit': 'unit', 'purchase_price': fields['purchase_price']!.text, 'selling_price': fields['selling_price']!.text,
       'tax_percent': fields['tax_percent']!.text, 'store_stock': store, 'shelf_stock': shelf,
       'target_shelf_quantity': int.tryParse(fields['target_shelf_quantity']!.text) ?? shelf,

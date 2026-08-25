@@ -533,7 +533,7 @@ class SupplierViewSet(SearchableModelViewSet):
 class ItemViewSet(SearchableModelViewSet):
     queryset = Item.objects.select_related("category", "brand", "supplier").all()
     serializer_class = ItemSerializer
-    search_fields = ["name", "sku", "description", "category__name", "brand__name"]
+    search_fields = ["name", "sku", "description", "store_section", "rack_location", "category__name", "brand__name"]
     ordering_fields = ["name", "selling_price", "stock_quantity", "created_at"]
 
     def get_permissions(self):

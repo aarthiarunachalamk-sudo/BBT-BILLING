@@ -80,6 +80,8 @@ class _ProductsScreenState extends State<ProductsScreen>
         product['name'],
         product['sku'],
         product['category_name'],
+        product['store_section'],
+        product['rack_location'],
       ].map((v) => v?.toString().toLowerCase() ?? '').join(' ');
       final status = product['stock_status']?.toString();
       final matchesStock = switch (state.productStockFilter) {
@@ -619,6 +621,21 @@ class _ProductCatalogCard extends StatelessWidget {
                             fontFamily: 'monospace',
                           ),
                         ),
+                        if ('${product['store_section'] ?? ''}${product['rack_location'] ?? ''}'.trim().isNotEmpty) ...[
+                          const SizedBox(height: 5),
+                          Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.location_on_outlined, size: 12, color: blue),
+                            const SizedBox(width: 3),
+                            Flexible(child: Text(
+                              [product['store_section'], product['rack_location']]
+                                  .where((value) => value != null && value.toString().trim().isNotEmpty)
+                                  .join(' • '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: blue, fontSize: 9, fontWeight: FontWeight.w700),
+                            )),
+                          ]),
+                        ],
                       ],
                     ),
                   ),

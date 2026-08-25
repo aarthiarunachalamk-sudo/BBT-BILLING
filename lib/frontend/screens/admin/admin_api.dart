@@ -255,7 +255,12 @@ class AdminApi {
     }
     for (final entry in body.entries) {
       if (entry.value != null) {
-        request.fields[entry.key] = entry.value.toString();
+        // Multipart fields are strings. JSONField values (such as product
+        // manual_details) must be encoded as valid JSON rather than Dart's
+        // Map.toString() output, e.g. `{brand: Acme}`, which Django rejects.
+        request.fields[entry.key] = entry.value is Map || entry.value is List
+            ? jsonEncode(entry.value)
+            : entry.value.toString();
       }
     }
     final ext = imageName.split('.').last.toLowerCase();

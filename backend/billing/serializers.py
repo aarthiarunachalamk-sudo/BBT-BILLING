@@ -259,14 +259,20 @@ class StoreStockSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     store_quantity = serializers.IntegerField(source="quantity", read_only=True)
     image_url = serializers.SerializerMethodField()
+    store_section = serializers.CharField(source="product.store_section", read_only=True)
+    rack_location = serializers.CharField(source="product.rack_location", read_only=True)
+    location_label = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreStock
-        fields = ["id", "product_id", "product_name", "image_url", "branch", "store_quantity", "minimum_quantity", "updated_by", "created_at", "updated_at"]
+        fields = ["id", "product_id", "product_name", "image_url", "store_section", "rack_location", "location_label", "branch", "store_quantity", "minimum_quantity", "updated_by", "created_at", "updated_at"]
 
     def get_image_url(self, obj):
         image = getattr(obj.product, "image", None)
         return self.context["request"].build_absolute_uri(image.url) if image else None
+
+    def get_location_label(self, obj):
+        return " • ".join(part for part in [obj.product.store_section, obj.product.rack_location] if part)
 
 
 class ShelfStockSerializer(serializers.ModelSerializer):
@@ -279,10 +285,13 @@ class ShelfStockSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     age_days = serializers.SerializerMethodField()
     last_stock_review_date = serializers.DateField(source="product.last_stock_review_date", read_only=True)
+    store_section = serializers.CharField(source="product.store_section", read_only=True)
+    rack_location = serializers.CharField(source="product.rack_location", read_only=True)
+    location_label = serializers.SerializerMethodField()
 
     class Meta:
         model = ShelfStock
-        fields = ["id", "product_id", "product_name", "image_url", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "age_days", "last_stock_review_date", "last_refill_date", "updated_by", "created_at", "updated_at"]
+        fields = ["id", "product_id", "product_name", "image_url", "store_section", "rack_location", "location_label", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "age_days", "last_stock_review_date", "last_refill_date", "updated_by", "created_at", "updated_at"]
 
     def get_age_days(self, obj):
         if not obj.shelf_added_date:
@@ -292,6 +301,9 @@ class ShelfStockSerializer(serializers.ModelSerializer):
     def get_image_url(self, obj):
         image = getattr(obj.product, "image", None)
         return self.context["request"].build_absolute_uri(image.url) if image else None
+
+    def get_location_label(self, obj):
+        return " • ".join(part for part in [obj.product.store_section, obj.product.rack_location] if part)
 
     def get_store_quantity(self, obj):
         stock = obj.product.store_stocks.filter(branch=obj.branch).first()
