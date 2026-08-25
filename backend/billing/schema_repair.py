@@ -110,7 +110,11 @@ def repair_admin_visibility_schema():
     Item.objects.filter(store_stock=0, shelf_stock=0, stock_quantity__gt=0).update(
         store_stock=F("stock_quantity")
     )
-    for item in Item.objects.filter(brand__isnull=True).iterator():
+    # This repair runs before the normal migration chain. Legacy databases may
+    # not yet have the later location columns, so do not select them here.
+    for item in Item.objects.filter(brand__isnull=True).defer(
+        "store_section", "rack_location"
+    ).iterator():
         brand_name = str((item.manual_details or {}).get("brand", "")).strip()
         if brand_name:
             brand, _ = Brand.objects.get_or_create(name=brand_name)
