@@ -29,7 +29,11 @@ class _ProductsScreenState extends State<ProductsScreen>
   Future<void> _loadProductsOnEntry() async {
     if (widget.state.products.isNotEmpty || _loadingProducts) return;
     setState(() => _loadingProducts = true);
-    while (mounted && widget.state.refreshing) {
+    // Do not hold the product page until every unrelated admin endpoint has
+    // refreshed. Once the catalogue arrives, the user can start working.
+    while (
+      mounted && widget.state.refreshing && widget.state.products.isEmpty
+    ) {
       await Future<void>.delayed(const Duration(milliseconds: 250));
     }
     if (!mounted) return;

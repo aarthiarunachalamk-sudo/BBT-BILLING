@@ -13,7 +13,7 @@ from billing.schema_repair import (
     repair_split_stock_schema,
     split_stock_schema_status,
 )
-from billing.views import AdminTokenObtainPairView, change_password, checkout, current_user, dashboard, logout_view
+from billing.views import AdminTokenObtainPairView, change_password, checkout, current_user, dashboard, logout_view, razorpay_order
 
 
 def api_root(request):
@@ -71,6 +71,7 @@ urlpatterns = [
     path("api/auth/me/", current_user, name="current-user"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/billing/checkout/", checkout, name="billing-checkout"),
+    path("api/billing/razorpay/order/", razorpay_order, name="razorpay-order"),
     path("api/dashboard/admin-summary/", dashboard, name="admin-dashboard-summary"),
     path("api/", include("billing.urls")),
 ]

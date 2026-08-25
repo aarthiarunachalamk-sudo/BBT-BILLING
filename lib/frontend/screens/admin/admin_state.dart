@@ -170,7 +170,10 @@ class AdminState extends ChangeNotifier {
     }
 
     // Load sequentially. A Render free-tier instance can abort connections
-    // when the phone opens all dashboard requests at the same time.
+    // when the phone opens all dashboard requests at the same time. Products
+    // come first because the catalogue is the most commonly opened screen.
+    final newProducts = await load(() => api.getList('items'));
+    if (newProducts != null) products = newProducts;
     final newCategories = await load(() => api.getList('categories'));
     if (newCategories != null) categories = newCategories;
     final newBrands = await load(() => api.getList('brands'));
@@ -179,8 +182,6 @@ class AdminState extends ChangeNotifier {
     if (newDashboard != null) dashboard = newDashboard;
     final newUsers = await load(() => api.getList('users'));
     if (newUsers != null) users = newUsers;
-    final newProducts = await load(() => api.getList('items'));
-    if (newProducts != null) products = newProducts;
     final newSuppliers = await load(() => api.getList('suppliers'));
     if (newSuppliers != null) suppliers = newSuppliers;
     final newPurchaseOrders = await load(() => api.getList('purchase-orders'));

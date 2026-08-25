@@ -1,4 +1,9 @@
 from datetime import date, timedelta
+import base64
+import json
+import os
+from urllib import error as urlerror
+from urllib import request as urlrequest
 import logging
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
@@ -121,6 +126,48 @@ class AdminTokenObtainPairView(TokenObtainPairView):
             forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
             AuditLog.objects.create(user=user, action="Login", module="Auth", ip_address=forwarded or request.META.get("REMOTE_ADDR"), device=request.META.get("HTTP_USER_AGENT", "")[:255])
         return response
+
+
+def _razorpay_credentials():
+    key_id = os.environ.get("RAZORPAY_KEY_ID", "").strip()
+    key_secret = os.environ.get("RAZORPAY_KEY_SECRET", "").strip()
+    if not key_id or not key_secret:
+        return None
+    return key_id, key_secret
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def razorpay_order(request):
+    """Create a Razorpay order. The secret remains only in Render variables."""
+    credentials = _razorpay_credentials()
+    if credentials is None:
+        return Response({"detail": "Razorpay is not configured on the server."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    try:
+        amount = _money(request.data.get("amount"))
+    except ValueError as exception:
+        return Response({"amount": str(exception)}, status=status.HTTP_400_BAD_REQUEST)
+    if amount <= 0:
+        return Response({"amount": "Amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
+    key_id, key_secret = credentials
+    payload = json.dumps({
+        "amount": int((amount * 100).quantize(Decimal("1"))),
+        "currency": "INR",
+        "receipt": f"bbt-{request.user.pk}-{timezone.now():%Y%m%d%H%M%S}",
+        "notes": {"cashier_id": str(request.user.pk)},
+    }).encode()
+    token = base64.b64encode(f"{key_id}:{key_secret}".encode()).decode()
+    gateway_request = urlrequest.Request(
+        "https://api.razorpay.com/v1/orders", data=payload, method="POST",
+        headers={"Content-Type": "application/json", "Authorization": f"Basic {token}"},
+    )
+    try:
+        with urlrequest.urlopen(gateway_request, timeout=20) as gateway_response:
+            order = json.loads(gateway_response.read().decode())
+    except (urlerror.URLError, urlerror.HTTPError, TimeoutError, ValueError) as exception:
+        logger.exception("Razorpay order creation failed")
+        return Response({"detail": "Could not start Razorpay payment. Please retry."}, status=status.HTTP_502_BAD_GATEWAY)
+    return Response({"key_id": key_id, "order_id": order["id"], "amount": order["amount"], "currency": "INR"}, status=status.HTTP_201_CREATED)
 
 
 @api_view(["POST"])
