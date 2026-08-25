@@ -1011,6 +1011,23 @@ Future<void> _showEditPriceSheet(
                       }
                     },
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: saving ? null : () async {
+                final confirmed = await showDialog<bool>(context: sheetCtx, builder: (dialogContext) => AlertDialog(title: const Text('Delete product?'), content: Text('Delete ${product['name']} permanently? This cannot be undone.'), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialogContext, true), style: FilledButton.styleFrom(backgroundColor: red), child: const Text('Delete'))])) ?? false;
+                if (!confirmed) return;
+                try {
+                  await state.deleteProduct(productId);
+                  if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                  if (context.mounted) showNotice(context, 'Product deleted.');
+                } catch (error) {
+                  setSheet(() => errorText = error.toString());
+                }
+              },
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Delete Product'),
+              style: OutlinedButton.styleFrom(foregroundColor: red),
+            ),
           ],
         ),
       ),

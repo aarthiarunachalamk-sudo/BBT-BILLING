@@ -43,3 +43,19 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+// Keep a stable, easily shareable release artifact name.  Flutter supplies
+// versionCode from pubspec.yaml (for example: 1.0.4+5 -> VERSION5).
+val releaseApkName = "SUPERMARKET-BILLING-VERSION${android.defaultConfig.versionCode}.apk"
+val copyNamedReleaseApk by tasks.registering(Copy::class) {
+    from(rootProject.layout.projectDirectory.dir("../build/app/outputs/apk/release"))
+    include("app-release.apk")
+    into(rootProject.layout.projectDirectory.dir("../build/app/outputs/named-apk"))
+    rename { releaseApkName }
+}
+
+// Flutter creates assembleRelease after this script is evaluated. Configure
+// it lazily, so this naming step never prevents a normal release build.
+tasks.configureEach {
+    if (name == "assembleRelease") finalizedBy(copyNamedReleaseApk)
+}

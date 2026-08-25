@@ -324,6 +324,11 @@ class UserState extends ChangeNotifier {
         page = UserPage.currentStock;
       });
 
+  Future<bool> deleteProduct(int productId) async => _perform(() async {
+        await api.delete('products/$productId');
+        products.removeWhere((product) => '${product['product_id'] ?? product['id']}' == '$productId');
+      });
+
   Future<void> logout() async {
     await api.logout();
     user = {}; dashboard = {}; cart.clear(); page = UserPage.login; navIndex = 0; error = null;

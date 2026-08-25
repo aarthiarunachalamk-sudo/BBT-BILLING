@@ -611,6 +611,12 @@ class AdminState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteProduct(int productId) async {
+    await api.delete('items', productId);
+    products.removeWhere((product) => product['id'] == productId);
+    notifyListeners();
+  }
+
   Future<Map<String, dynamic>> createCategory(String name) async {
     final normalized = name.trim().toLowerCase();
     final existing = categories.where(

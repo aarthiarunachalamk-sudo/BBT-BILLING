@@ -73,7 +73,7 @@ class CurrentStockScreen extends StatelessWidget {
         const SizedBox(height: 7),
         Text('Product ID: ${product['product_id'] ?? product['id']}', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
         const SizedBox(height: 5),
-        Row(children: [_stockValue('Store', quantity, userBlue), const SizedBox(width: 18), _stockValue('Minimum', minimum, userOrange), const Spacer(), IconButton(tooltip: 'Move to shelf', visualDensity: VisualDensity.compact, icon: const Icon(Icons.add_box_outlined, color: userBlue), onPressed: quantity <= 0 ? null : () => _moveToShelf(context, product))]),
+        Row(children: [_stockValue('Store', quantity, userBlue), const SizedBox(width: 18), _stockValue('Minimum', minimum, userOrange), const Spacer(), IconButton(tooltip: 'Move to shelf', visualDensity: VisualDensity.compact, icon: const Icon(Icons.add_box_outlined, color: userBlue), onPressed: quantity <= 0 ? null : () => _moveToShelf(context, product)), if (state.canManageInventory) IconButton(tooltip: 'Delete product', icon: const Icon(Icons.delete_outline, color: userRed), onPressed: () => _deleteProduct(context, product))]),
       ])),
     ]));
   }
@@ -102,5 +102,12 @@ class CurrentStockScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _notice(context, success ? 'Stock transferred successfully.' : state.error ?? 'Unable to complete stock transfer. Please try again.');
     }
+  }
+
+  Future<void> _deleteProduct(BuildContext context, Map<String, dynamic> product) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(title: const Text('Delete product?'), content: Text('Delete ${product['product_name'] ?? product['name']} permanently?'), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')), FilledButton(style: FilledButton.styleFrom(backgroundColor: userRed), onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Delete'))])) ?? false;
+    if (!confirmed) return;
+    final success = await state.deleteProduct(number(product['product_id'] ?? product['id']));
+    if (context.mounted) _notice(context, success ? 'Product deleted.' : state.error ?? 'Product could not be deleted.');
   }
 }

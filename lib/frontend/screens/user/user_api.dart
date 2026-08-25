@@ -196,6 +196,10 @@ class UserApi {
     Map<String, dynamic> body,
   ) => _request('PATCH', path, body: body);
 
+  Future<void> delete(String path) async {
+    await _requestRaw('DELETE', path);
+  }
+
   Future<Map<String, dynamic>> _request(String method, String path,
       {Map<String, dynamic>? body, Map<String, String>? query}) async {
     final value = await _requestRaw(method, path, body: body, query: query);
@@ -216,6 +220,7 @@ class UserApi {
         'PATCH' => await _client
             .patch(uri, headers: _headers, body: jsonEncode(body))
             .timeout(const Duration(seconds: 30)),
+        'DELETE' => await _client.delete(uri, headers: _headers).timeout(const Duration(seconds: 30)),
         _ => await _client
             .get(uri, headers: _headers)
             .timeout(const Duration(seconds: 30)),

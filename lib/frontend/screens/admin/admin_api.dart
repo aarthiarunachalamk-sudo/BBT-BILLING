@@ -288,6 +288,11 @@ class AdminApi {
       body: jsonEncode(body),
     ),
   );
+
+  Future<void> delete(String path, int id) async {
+    final response = await _client.delete(Uri.parse('$baseUrl/$path/$id/'), headers: _headers);
+    _decode(response);
+  }
   Future<Map<String, dynamic>> action(
     String path,
     int id,
