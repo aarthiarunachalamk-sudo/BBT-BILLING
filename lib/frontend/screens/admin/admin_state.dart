@@ -611,6 +611,15 @@ class AdminState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Schedule purchase price, selling price and GST for a specific date.
+  /// The backend keeps existing invoices unchanged and uses this rate on/after
+  /// its effective date.
+  Future<void> scheduleProductPrice(int productId, Map<String, dynamic> fields) async {
+    await api.action('items', productId, 'price-schedule', fields);
+    products = await api.getList('items');
+    notifyListeners();
+  }
+
   Future<void> deleteProduct(int productId) async {
     await api.delete('items', productId);
     products.removeWhere((product) => product['id'] == productId);

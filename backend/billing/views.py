@@ -26,6 +26,7 @@ from .models import (
     Item,
     Payment,
     ProductBatch,
+    ProductPriceHistory,
     PurchaseOrder,
     Quotation,
     Supplier,
@@ -240,11 +241,19 @@ def checkout(request):
                 {"items": f"Not enough stock for {product.name}. Available: {available}."},
                 status=status.HTTP_409_CONFLICT,
             )
-        line_total = (product.selling_price * quantity).quantize(Decimal("0.01"))
-        line_tax = (line_total * product.tax_percent / Decimal("100")).quantize(Decimal("0.01"))
+        # Price schedules preserve the price that was active on the sale day.
+        # A price configured for tomorrow must never change today's invoice.
+        scheduled_price = ProductPriceHistory.objects.filter(
+            item=product,
+            effective_date__lte=timezone.localdate(),
+        ).order_by("-effective_date", "-created_at").first()
+        selling_price = scheduled_price.selling_price if scheduled_price else product.selling_price
+        tax_percent = scheduled_price.tax_percent if scheduled_price else product.tax_percent
+        line_total = (selling_price * quantity).quantize(Decimal("0.01"))
+        line_tax = (line_total * tax_percent / Decimal("100")).quantize(Decimal("0.01"))
         subtotal += line_total
         tax_total += line_tax
-        invoice_lines.append((product, quantity, line_total))
+        invoice_lines.append((product, quantity, line_total, selling_price))
 
     try:
         discount_percent = _money(request.data.get("discount_percent", 0))
@@ -317,13 +326,13 @@ def checkout(request):
             name=product.name,
             sku=product.sku,
             quantity=quantity,
-            unit_price=product.selling_price,
+            unit_price=selling_price,
             amount=line_total,
         )
-        for product, quantity, line_total in invoice_lines
+        for product, quantity, line_total, selling_price in invoice_lines
     ])
 
-    for product, quantity, _ in invoice_lines:
+    for product, quantity, _, _ in invoice_lines:
         if product.item_type != Item.ItemType.MATERIAL:
             continue
         previous = product.stock_quantity
@@ -601,6 +610,86 @@ class ItemViewSet(SearchableModelViewSet):
             "Item",
             item,
             metadata={"price_cascaded": item.selling_price != old_price},
+        )
+
+    @action(detail=True, methods=["get", "post"], url_path="price-schedule")
+    @transaction.atomic
+    def price_schedule(self, request, pk=None):
+        """List or set a dated purchase/selling price and GST slab."""
+        item = self.get_object()
+        if request.method == "GET":
+            schedules = ProductPriceHistory.objects.filter(item=item).order_by(
+                "-effective_date", "-created_at"
+            )
+            return Response([
+                {
+                    "id": row.pk,
+                    "effective_date": row.effective_date.isoformat(),
+                    "purchase_price": str(row.purchase_price),
+                    "selling_price": str(row.selling_price),
+                    "tax_percent": str(row.tax_percent),
+                    "created_at": row.created_at.isoformat(),
+                    "created_by": row.created_by.get_full_name() or row.created_by.username if row.created_by else None,
+                }
+                for row in schedules
+            ])
+
+        try:
+            effective_date = date.fromisoformat(str(request.data.get("effective_date", "")))
+            purchase_price = _money(request.data.get("purchase_price", item.purchase_price))
+            selling_price = _money(request.data.get("selling_price", item.selling_price))
+            tax_percent = _money(request.data.get("tax_percent", item.tax_percent))
+        except (TypeError, ValueError) as exception:
+            return Response({"detail": f"Invalid price schedule: {exception}"}, status=status.HTTP_400_BAD_REQUEST)
+        if purchase_price < 0 or selling_price <= 0 or tax_percent < 0 or tax_percent > 100:
+            return Response(
+                {"detail": "Purchase price must be zero or more; selling price must be positive; GST must be 0-100%."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        schedule, created = ProductPriceHistory.objects.update_or_create(
+            item=item,
+            effective_date=effective_date,
+            defaults={
+                "purchase_price": purchase_price,
+                "selling_price": selling_price,
+                "tax_percent": tax_percent,
+                "created_by": request.user,
+            },
+        )
+        # Keep the stored catalogue fields aligned to the *latest* active
+        # schedule. This also handles a correction to an older schedule.
+        active_schedule = ProductPriceHistory.objects.filter(
+            item=item,
+            effective_date__lte=timezone.localdate(),
+        ).order_by("-effective_date", "-created_at").first()
+        if active_schedule:
+            item.purchase_price = active_schedule.purchase_price
+            item.selling_price = active_schedule.selling_price
+            item.tax_percent = active_schedule.tax_percent
+            item.save(update_fields=["purchase_price", "selling_price", "tax_percent", "updated_at"])
+        record_audit(
+            request,
+            "Price schedule created" if created else "Price schedule updated",
+            "Item",
+            item,
+            metadata={
+                "effective_date": effective_date.isoformat(),
+                "purchase_price": str(purchase_price),
+                "selling_price": str(selling_price),
+                "tax_percent": str(tax_percent),
+            },
+        )
+        return Response(
+            {
+                "id": schedule.pk,
+                "effective_date": schedule.effective_date.isoformat(),
+                "purchase_price": str(schedule.purchase_price),
+                "selling_price": str(schedule.selling_price),
+                "tax_percent": str(schedule.tax_percent),
+                "is_active": effective_date <= timezone.localdate(),
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
     def get_queryset(self):

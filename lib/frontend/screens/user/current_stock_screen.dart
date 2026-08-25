@@ -73,7 +73,7 @@ class CurrentStockScreen extends StatelessWidget {
         const SizedBox(height: 7),
         Text('Product ID: ${product['product_id'] ?? product['id']}', style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
         const SizedBox(height: 5),
-        Row(children: [_stockValue('Store', quantity, userBlue), const SizedBox(width: 18), _stockValue('Minimum', minimum, userOrange), const Spacer(), IconButton(tooltip: 'Move to shelf', visualDensity: VisualDensity.compact, icon: const Icon(Icons.add_box_outlined, color: userBlue), onPressed: quantity <= 0 ? null : () => _moveToShelf(context, product)), if (state.canManageInventory) IconButton(tooltip: 'Delete product', icon: const Icon(Icons.delete_outline, color: userRed), onPressed: () => _deleteProduct(context, product))]),
+        Row(children: [_stockValue('Store', quantity, userBlue), const SizedBox(width: 18), _stockValue('Minimum', minimum, userOrange), const Spacer(), IconButton(tooltip: 'Move to shelf', visualDensity: VisualDensity.compact, icon: const Icon(Icons.add_box_outlined, color: userBlue), onPressed: quantity <= 0 ? null : () => _moveToShelf(context, product)), if (state.canManageInventory) IconButton(tooltip: 'Schedule product price', visualDensity: VisualDensity.compact, icon: const Icon(Icons.currency_rupee_rounded, color: userGreen), onPressed: () => _schedulePrice(context, product)), if (state.canManageInventory) IconButton(tooltip: 'Delete product', icon: const Icon(Icons.delete_outline, color: userRed), onPressed: () => _deleteProduct(context, product))]),
       ])),
     ]));
   }
@@ -109,5 +109,58 @@ class CurrentStockScreen extends StatelessWidget {
     if (!confirmed) return;
     final success = await state.deleteProduct(number(product['product_id'] ?? product['id']));
     if (context.mounted) _notice(context, success ? 'Product deleted.' : state.error ?? 'Product could not be deleted.');
+  }
+
+  Future<void> _schedulePrice(BuildContext context, Map<String, dynamic> stock) async {
+    final productId = number(stock['product_id'] ?? stock['id']);
+    Map<String, dynamic> product;
+    try {
+      product = await state.api.getMap('products/$productId');
+    } on UserApiException catch (error) {
+      if (context.mounted) _notice(context, error.message);
+      return;
+    }
+    if (!context.mounted) return;
+    final purchase = TextEditingController(text: '${product['purchase_price'] ?? 0}');
+    final selling = TextEditingController(text: '${product['selling_price'] ?? 0}');
+    final gst = TextEditingController(text: '${product['tax_percent'] ?? 0}');
+    var effectiveDate = DateTime.now();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialog) => AlertDialog(
+          title: Text('Schedule price — ${product['name'] ?? stock['product_name']}'),
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('This rate is used for bills from the selected date. Existing invoices are unchanged.', style: Theme.of(dialogContext).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            TextField(controller: purchase, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Buying price', prefixText: '₹ ')),
+            const SizedBox(height: 10),
+            TextField(controller: selling, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Selling price', prefixText: '₹ ')),
+            const SizedBox(height: 10),
+            TextField(controller: gst, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'GST %')),
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(context: dialogContext, initialDate: effectiveDate, firstDate: DateTime(2020), lastDate: DateTime(2100));
+                if (picked != null) setDialog(() => effectiveDate = picked);
+              },
+              child: InputDecorator(decoration: const InputDecoration(labelText: 'Price effective from', prefixIcon: Icon(Icons.calendar_month_outlined)), child: Text('${effectiveDate.day.toString().padLeft(2, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.year}')),
+            ),
+          ])),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Save schedule')),
+          ],
+        ),
+      ),
+    );
+    if (saved != true) return;
+    final success = await state.scheduleProductPrice(productId, {
+      'purchase_price': purchase.text.trim(),
+      'selling_price': selling.text.trim(),
+      'tax_percent': gst.text.trim(),
+      'effective_date': '${effectiveDate.year.toString().padLeft(4, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.day.toString().padLeft(2, '0')}',
+    });
+    if (context.mounted) _notice(context, success ? 'Price schedule saved.' : state.error ?? 'Could not save price schedule.');
   }
 }

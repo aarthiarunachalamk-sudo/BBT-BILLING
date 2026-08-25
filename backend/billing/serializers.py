@@ -18,6 +18,7 @@ from .models import (
     Item,
     Payment,
     ProductBatch,
+    ProductPriceHistory,
     PurchaseOrder,
     PurchaseOrderItem,
     Quotation,
@@ -173,6 +174,21 @@ class ItemSerializer(serializers.ModelSerializer):
 
     def validate_name(self, value):
         return value.strip()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # The catalogue automatically displays the rate active today.  Future
+        # schedules stay hidden until their effective date, while invoices keep
+        # their already stored unit price.
+        active_schedule = ProductPriceHistory.objects.filter(
+            item=instance,
+            effective_date__lte=timezone.localdate(),
+        ).order_by("-effective_date", "-created_at").first()
+        if active_schedule:
+            data["purchase_price"] = str(active_schedule.purchase_price)
+            data["selling_price"] = str(active_schedule.selling_price)
+            data["tax_percent"] = str(active_schedule.tax_percent)
+        return data
 
     def create(self, validated_data):
         validated_data.pop("batch_number", None)

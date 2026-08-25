@@ -814,6 +814,7 @@ Future<void> _showEditPriceSheet(
     text: product['purchase_price']?.toString() ?? '',
   );
   final mrpCtrl = TextEditingController(text: product['mrp']?.toString() ?? '');
+  var effectiveDate = DateTime.now();
   var gst =
       int.tryParse(
         double.tryParse(
@@ -868,7 +869,7 @@ Future<void> _showEditPriceSheet(
             ),
             const SizedBox(height: 4),
             Text(
-              'Changes apply to the catalog and all open quotations instantly.',
+              'Choose when this purchase price, selling price and GST should start.',
               style: const TextStyle(fontSize: 11, color: muted),
             ),
             const SizedBox(height: 16),
@@ -904,6 +905,17 @@ Future<void> _showEditPriceSheet(
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: saving ? null : () async {
+                final picked = await showDatePicker(context: sheetCtx, initialDate: effectiveDate, firstDate: DateTime(2020), lastDate: DateTime(2100));
+                if (picked != null) setSheet(() => effectiveDate = picked);
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(labelText: 'Price effective from', prefixIcon: Icon(Icons.calendar_month_outlined)),
+                child: Text('${effectiveDate.day.toString().padLeft(2, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.year}'),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -984,18 +996,13 @@ Future<void> _showEditPriceSheet(
                       try {
                         final body = <String, dynamic>{
                           'selling_price': sellingCtrl.text.trim(),
+                          'purchase_price': purchaseCtrl.text.trim().isEmpty ? '0' : purchaseCtrl.text.trim(),
                           'tax_percent': gst.toString(),
+                          'effective_date': '${effectiveDate.year.toString().padLeft(4, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.day.toString().padLeft(2, '0')}',
                         };
-                        final pp = purchaseCtrl.text.trim();
-                        if (pp.isNotEmpty) body['purchase_price'] = pp;
                         final mrp = mrpCtrl.text.trim();
-                        if (mrp.isNotEmpty) {
-                          body['mrp'] = mrp;
-                        } else {
-                          // Explicitly clear MRP if field was wiped
-                          body['mrp'] = null;
-                        }
-                        await state.updateProduct(productId, body);
+                        await state.scheduleProductPrice(productId, body);
+                        await state.updateProduct(productId, {'mrp': mrp.isEmpty ? null : mrp});
                         if (sheetCtx.mounted) Navigator.pop(sheetCtx);
                         if (context.mounted) {
                           showNotice(

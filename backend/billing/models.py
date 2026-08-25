@@ -186,6 +186,20 @@ class Item(TimeStampedModel):
         return f"{self.name} ({self.sku})"
 
 
+class ProductPriceHistory(TimeStampedModel):
+    """A manual price schedule.  Future prices never rewrite old invoices."""
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="price_history")
+    purchase_price = models.DecimalField(**MONEY)
+    selling_price = models.DecimalField(**MONEY)
+    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("18.00"))
+    effective_date = models.DateField(db_index=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="product_price_changes")
+
+    class Meta:
+        ordering = ["-effective_date", "-created_at"]
+        constraints = [models.UniqueConstraint(fields=["item", "effective_date"], name="unique_item_price_effective_date")]
+
+
 class StoreStock(TimeStampedModel):
     product = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="store_stocks")
     branch = models.CharField(max_length=120, default="Main Branch", db_index=True)

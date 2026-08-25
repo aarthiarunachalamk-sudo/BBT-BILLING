@@ -329,6 +329,12 @@ class UserState extends ChangeNotifier {
         products.removeWhere((product) => '${product['product_id'] ?? product['id']}' == '$productId');
       });
 
+  Future<bool> scheduleProductPrice(int productId, Map<String, dynamic> fields) async =>
+      _perform(() async {
+        await api.post('products/$productId/price-schedule', fields);
+        products = await api.getStoreStock();
+      });
+
   Future<void> logout() async {
     await api.logout();
     user = {}; dashboard = {}; cart.clear(); page = UserPage.login; navIndex = 0; error = null;
