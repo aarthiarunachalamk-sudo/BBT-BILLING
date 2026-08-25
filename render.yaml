@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: bash build.sh
-    startCommand: python manage.py migrate --noinput && python manage.py shell -c "from billing.schema_repair import repair_split_stock_schema; repair_split_stock_schema()" && python manage.py seed_weight_products && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers $WEB_CONCURRENCY --timeout 120 --access-logfile - --error-logfile -
+    startCommand: python manage.py shell -c "from billing.schema_repair import repair_admin_visibility_schema; repair_admin_visibility_schema()" && python manage.py migrate --noinput && python manage.py shell -c "from billing.schema_repair import repair_split_stock_schema; repair_split_stock_schema()" && python manage.py seed_weight_products && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers $WEB_CONCURRENCY --timeout 120 --access-logfile - --error-logfile -
     healthCheckPath: /health/
     envVars:
       - key: PIP_DEFAULT_TIMEOUT

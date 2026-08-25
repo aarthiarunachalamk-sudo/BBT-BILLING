@@ -22,6 +22,9 @@ from .models import (
 
 
 MIGRATIONS = (
+    # 0006 depends on 0005. Some legacy Render databases recorded 0006 first,
+    # which prevents Django from running any later migration at all.
+    "0005_item_manual_details",
     "0006_admin_visibility_inventory",
     "0007_brand_item_brand",
     "0008_brand_categories",
