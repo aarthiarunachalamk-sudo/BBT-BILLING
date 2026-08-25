@@ -172,7 +172,7 @@ class AdminState extends ChangeNotifier {
     // Load sequentially. A Render free-tier instance can abort connections
     // when the phone opens all dashboard requests at the same time. Products
     // come first because the catalogue is the most commonly opened screen.
-    final newProducts = await load(() => api.getList('items'));
+    final newProducts = await load(_loadProductsWithStoreStock);
     if (newProducts != null) products = newProducts;
     final newCategories = await load(() => api.getList('categories'));
     if (newCategories != null) categories = newCategories;
@@ -254,7 +254,7 @@ class AdminState extends ChangeNotifier {
 
   Future<bool> refreshProducts() async {
     try {
-      products = await api.getList('items');
+      products = await _loadProductsWithStoreStock();
       productQuery = '';
       error = null;
       notifyListeners();
@@ -267,6 +267,32 @@ class AdminState extends ChangeNotifier {
       error = 'Cannot reach ${api.baseUrl}';
       notifyListeners();
       return false;
+    }
+  }
+
+  /// The catalogue owns product details; StoreStock owns the live quantity at
+  /// the current branch. Keep both in one card model for Product Management.
+  Future<List<Map<String, dynamic>>> _loadProductsWithStoreStock() async {
+    final catalogue = await api.getList('items');
+    try {
+      final storeRows = await api.getList('inventory/store-stock');
+      final byProductId = <String, Map<String, dynamic>>{
+        for (final row in storeRows) '${row['product_id']}': row,
+      };
+      return catalogue.map((product) {
+        final stock = byProductId['${product['id']}'];
+        if (stock == null) return product;
+        return {
+          ...product,
+          'store_stock': stock['store_quantity'] ?? 0,
+          'minimum_quantity': stock['minimum_quantity'] ?? product['reorder_level'] ?? 0,
+          'store_stock_updated_at': stock['updated_at'],
+        };
+      }).toList();
+    } on ApiException {
+      // The catalogue remains usable if a server is temporarily upgrading the
+      // split-stock endpoint. A later refresh will show the live store values.
+      return catalogue;
     }
   }
 

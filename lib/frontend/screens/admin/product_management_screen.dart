@@ -704,7 +704,7 @@ class _ProductCatalogCard extends StatelessWidget {
                   _StockBadge(status: status),
                   const SizedBox(width: 8),
                   Text(
-                    '${product['stock_quantity'] ?? 0} in stock',
+                    'Store: ${product['store_stock'] ?? product['stock_quantity'] ?? 0}',
                     style: const TextStyle(fontSize: 9, color: muted),
                   ),
                   const Spacer(),
