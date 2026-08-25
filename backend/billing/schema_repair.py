@@ -123,7 +123,9 @@ def repair_admin_visibility_schema():
             item.save(update_fields=["brand"])
     recorder = MigrationRecorder(connection)
     for migration in MIGRATIONS:
-        recorder.record_applied("billing", migration)
+        if not recorder.migration_qs.filter(app="billing", name=migration).exists():
+            recorder.record_applied("billing", migration)
+            print(f"Repaired legacy billing migration record: {migration}")
 
 
 def split_stock_schema_status():
