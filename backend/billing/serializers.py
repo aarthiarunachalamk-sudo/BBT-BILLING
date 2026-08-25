@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.db import models, transaction
+from django.db import DatabaseError, models, transaction
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -180,10 +180,17 @@ class ItemSerializer(serializers.ModelSerializer):
         # The catalogue automatically displays the rate active today.  Future
         # schedules stay hidden until their effective date, while invoices keep
         # their already stored unit price.
-        active_schedule = ProductPriceHistory.objects.filter(
-            item=instance,
-            effective_date__lte=timezone.localdate(),
-        ).order_by("-effective_date", "-created_at").first()
+        try:
+            active_schedule = ProductPriceHistory.objects.filter(
+                item=instance,
+                effective_date__lte=timezone.localdate(),
+            ).order_by("-effective_date", "-created_at").first()
+        except DatabaseError:
+            # Keep catalogue/list screens usable during a rolling deployment
+            # where application code is live just before its additive
+            # price-history migration. Scheduled pricing itself still reports
+            # a clear migration requirement from its dedicated endpoint.
+            active_schedule = None
         if active_schedule:
             data["purchase_price"] = str(active_schedule.purchase_price)
             data["selling_price"] = str(active_schedule.selling_price)

@@ -191,6 +191,23 @@ def _money(value):
         raise ValueError("Enter a valid monetary amount.")
 
 
+def _active_price_schedule(product):
+    """Return today's scheduled price without breaking legacy deployments.
+
+    The nested atomic block rolls back only the failed lookup savepoint if a
+    rolling deployment has not yet applied the additive history migration.
+    """
+    try:
+        with transaction.atomic():
+            return ProductPriceHistory.objects.filter(
+                item=product,
+                effective_date__lte=timezone.localdate(),
+            ).order_by("-effective_date", "-created_at").first()
+    except DatabaseError:
+        logger.warning("Price-history table is unavailable; using catalogue price.")
+        return None
+
+
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 @transaction.atomic
@@ -243,10 +260,7 @@ def checkout(request):
             )
         # Price schedules preserve the price that was active on the sale day.
         # A price configured for tomorrow must never change today's invoice.
-        scheduled_price = ProductPriceHistory.objects.filter(
-            item=product,
-            effective_date__lte=timezone.localdate(),
-        ).order_by("-effective_date", "-created_at").first()
+        scheduled_price = _active_price_schedule(product)
         selling_price = scheduled_price.selling_price if scheduled_price else product.selling_price
         tax_percent = scheduled_price.tax_percent if scheduled_price else product.tax_percent
         line_total = (selling_price * quantity).quantize(Decimal("0.01"))
@@ -613,14 +627,19 @@ class ItemViewSet(SearchableModelViewSet):
         )
 
     @action(detail=True, methods=["get", "post"], url_path="price-schedule")
-    @transaction.atomic
     def price_schedule(self, request, pk=None):
         """List or set a dated purchase/selling price and GST slab."""
         item = self.get_object()
         if request.method == "GET":
-            schedules = ProductPriceHistory.objects.filter(item=item).order_by(
-                "-effective_date", "-created_at"
-            )
+            try:
+                schedules = list(ProductPriceHistory.objects.filter(item=item).order_by(
+                    "-effective_date", "-created_at"
+                ))
+            except DatabaseError:
+                return Response(
+                    {"detail": "Price schedules are not ready. Apply the pending database migration and retry."},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
             return Response([
                 {
                     "id": row.pk,
@@ -647,27 +666,34 @@ class ItemViewSet(SearchableModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        schedule, created = ProductPriceHistory.objects.update_or_create(
-            item=item,
-            effective_date=effective_date,
-            defaults={
-                "purchase_price": purchase_price,
-                "selling_price": selling_price,
-                "tax_percent": tax_percent,
-                "created_by": request.user,
-            },
-        )
-        # Keep the stored catalogue fields aligned to the *latest* active
-        # schedule. This also handles a correction to an older schedule.
-        active_schedule = ProductPriceHistory.objects.filter(
-            item=item,
-            effective_date__lte=timezone.localdate(),
-        ).order_by("-effective_date", "-created_at").first()
-        if active_schedule:
-            item.purchase_price = active_schedule.purchase_price
-            item.selling_price = active_schedule.selling_price
-            item.tax_percent = active_schedule.tax_percent
-            item.save(update_fields=["purchase_price", "selling_price", "tax_percent", "updated_at"])
+        try:
+            with transaction.atomic():
+                schedule, created = ProductPriceHistory.objects.update_or_create(
+                    item=item,
+                    effective_date=effective_date,
+                    defaults={
+                        "purchase_price": purchase_price,
+                        "selling_price": selling_price,
+                        "tax_percent": tax_percent,
+                        "created_by": request.user,
+                    },
+                )
+                # Keep the stored catalogue fields aligned to the *latest* active
+                # schedule. This also handles a correction to an older schedule.
+                active_schedule = ProductPriceHistory.objects.filter(
+                    item=item,
+                    effective_date__lte=timezone.localdate(),
+                ).order_by("-effective_date", "-created_at").first()
+                if active_schedule:
+                    item.purchase_price = active_schedule.purchase_price
+                    item.selling_price = active_schedule.selling_price
+                    item.tax_percent = active_schedule.tax_percent
+                    item.save(update_fields=["purchase_price", "selling_price", "tax_percent", "updated_at"])
+        except DatabaseError:
+            return Response(
+                {"detail": "Price schedules are not ready. Apply the pending database migration and retry."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         record_audit(
             request,
             "Price schedule created" if created else "Price schedule updated",
