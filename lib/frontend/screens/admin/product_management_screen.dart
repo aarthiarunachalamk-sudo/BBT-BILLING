@@ -74,7 +74,10 @@ class _ProductsScreenState extends State<ProductsScreen>
   @override
   Widget build(BuildContext context) {
     final state = widget.state;
-    final mobile = MediaQuery.sizeOf(context).width < 620;
+    // Some Android devices report a wide logical width in portrait. Treat
+    // those as mobile too; the desktop header cannot fit their short height.
+    final mediaSize = MediaQuery.sizeOf(context);
+    final mobile = mediaSize.width < 900 || mediaSize.height < 700;
     final waitingForProducts =
         state.products.isEmpty && (_loadingProducts || state.refreshing);
     final query = state.productQuery.trim().toLowerCase();
