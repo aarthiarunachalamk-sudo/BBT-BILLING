@@ -23,6 +23,7 @@ from .models import (
     PurchaseOrderItem,
     Quotation,
     QuotationItem,
+    Rack,
     Supplier,
     ReturnItem,
     ReturnRequest,
@@ -65,7 +66,21 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         })
         return data
 
+class RackSerializer(serializers.ModelSerializer):
+    product_count = serializers.IntegerField(source="items.count", read_only=True)
 
+    class Meta:
+        model = Rack
+        fields = "__all__"
+
+    def validate_name(self, value):
+        name = value.strip()
+        queryset = Rack.objects.filter(name__iexact=name, branch=self.initial_data.get("branch", "Main Branch"))
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("Rack with this name already exists for this branch.")
+        return name
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
 
@@ -162,18 +177,16 @@ class ItemSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
     brand_name = serializers.CharField(source="brand.name", read_only=True)
+    rack_name = serializers.CharField(source="rack.name", read_only=True)
     total_stock = serializers.IntegerField(read_only=True)
     batch_number = serializers.CharField(write_only=True, required=False, allow_blank=True)
     manufactured_date = serializers.DateField(write_only=True, required=False, allow_null=True)
     target_shelf_quantity = serializers.IntegerField(write_only=True, required=False, min_value=0)
 
-    class Meta:
+     class Meta:
         model = Item
         fields = "__all__"
         extra_kwargs = {"sku": {"validators": []}}
-
-    def validate_name(self, value):
-        return value.strip()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -259,20 +272,22 @@ class StoreStockSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     store_quantity = serializers.IntegerField(source="quantity", read_only=True)
     image_url = serializers.SerializerMethodField()
-    store_section = serializers.CharField(source="product.store_section", read_only=True)
-    rack_location = serializers.CharField(source="product.rack_location", read_only=True)
+    rack_name = serializers.CharField(source="product.rack.name", read_only=True, default=None)
+    category_name = serializers.CharField(source="product.category.name", read_only=True, default=None)
     location_label = serializers.SerializerMethodField()
 
     class Meta:
         model = StoreStock
-        fields = ["id", "product_id", "product_name", "image_url", "store_section", "rack_location", "location_label", "branch", "store_quantity", "minimum_quantity", "updated_by", "created_at", "updated_at"]
+        fields = ["id", "product_id", "product_name", "image_url", "rack_name", "category_name", "location_label", "branch", "store_quantity", "minimum_quantity", "updated_by", "created_at", "updated_at"]
 
     def get_image_url(self, obj):
         image = getattr(obj.product, "image", None)
         return self.context["request"].build_absolute_uri(image.url) if image else None
 
     def get_location_label(self, obj):
-        return " • ".join(part for part in [obj.product.store_section, obj.product.rack_location] if part)
+        rack = obj.product.rack.name if obj.product.rack else None
+        category = obj.product.category.name if obj.product.category else None
+        return " • ".join(part for part in [rack, category] if part)
 
 
 class ShelfStockSerializer(serializers.ModelSerializer):
@@ -285,13 +300,13 @@ class ShelfStockSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     age_days = serializers.SerializerMethodField()
     last_stock_review_date = serializers.DateField(source="product.last_stock_review_date", read_only=True)
-    store_section = serializers.CharField(source="product.store_section", read_only=True)
-    rack_location = serializers.CharField(source="product.rack_location", read_only=True)
+    rack_name = serializers.CharField(source="product.rack.name", read_only=True, default=None)
+    category_name = serializers.CharField(source="product.category.name", read_only=True, default=None)
     location_label = serializers.SerializerMethodField()
 
     class Meta:
         model = ShelfStock
-        fields = ["id", "product_id", "product_name", "image_url", "store_section", "rack_location", "location_label", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "age_days", "last_stock_review_date", "last_refill_date", "updated_by", "created_at", "updated_at"]
+        fields = ["id", "product_id", "product_name", "image_url", "rack_name", "category_name", "location_label", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "age_days", "last_stock_review_date", "last_refill_date", "updated_by", "created_at", "updated_at"]
 
     def get_age_days(self, obj):
         if not obj.shelf_added_date:
@@ -303,13 +318,13 @@ class ShelfStockSerializer(serializers.ModelSerializer):
         return self.context["request"].build_absolute_uri(image.url) if image else None
 
     def get_location_label(self, obj):
-        return " • ".join(part for part in [obj.product.store_section, obj.product.rack_location] if part)
+        rack = obj.product.rack.name if obj.product.rack else None
+        category = obj.product.category.name if obj.product.category else None
+        return " • ".join(part for part in [rack, category] if part)
 
     def get_store_quantity(self, obj):
         stock = obj.product.store_stocks.filter(branch=obj.branch).first()
         return stock.quantity if stock else 0
-
-
 class StockMovementSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
 

@@ -14,6 +14,7 @@ from .views import (
     ProductBatchViewSet,
     PurchaseOrderViewSet,
     QuotationViewSet,
+    RackViewSet,
     SupplierViewSet,
     ReturnRequestViewSet,
     RolePermissionViewSet,
@@ -31,9 +32,9 @@ from .views import (
     shelf_product_action,
     auto_refill_product,
     stock_summary,
+    rack_wise_products,
     health_check,
 )
-
 
 router = DefaultRouter()
 router.register("users", UserViewSet)
@@ -42,6 +43,7 @@ router.register("categories", CategoryViewSet)
 router.register("brands", BrandViewSet)
 router.register("suppliers", SupplierViewSet)
 router.register("items", ItemViewSet)
+router.register("racks", RackViewSet)
 router.register("inventory-transactions", InventoryTransactionViewSet)
 router.register("inventory/store-stock", StoreStockViewSet, basename="store-stock")
 router.register("inventory/shelf-stock-records", ShelfStockViewSet, basename="shelf-stock-records")
@@ -69,7 +71,8 @@ urlpatterns = [
     path("products/", ItemViewSet.as_view({"get": "list", "post": "create"}), name="products"),
     path("products/<int:pk>/", ItemViewSet.as_view({"get": "retrieve", "patch": "partial_update", "delete": "destroy"}), name="product-detail"),
     path("products/<int:pk>/price-schedule/", ItemViewSet.as_view({"get": "price_schedule", "post": "price_schedule"}), name="product-price-schedule"),
-    path("inventory/current-stock/", ItemViewSet.as_view({"get": "current_stock"}), name="current-stock"),
+       path("inventory/current-stock/", ItemViewSet.as_view({"get": "current_stock"}), name="current-stock"),
+    path("products/rack-wise/", rack_wise_products, name="rack-wise-products"),
     path("inventory/shelf-stock/", ShelfStockViewSet.as_view({"get": "list"}), name="shelf-stock"),
     path("inventory/store-to-shelf/", store_to_shelf, name="store-to-shelf"),
     path("inventory/move-to-shelf/", store_to_shelf, name="move-to-shelf"),

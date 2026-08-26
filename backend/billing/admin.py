@@ -16,6 +16,7 @@ from .models import (
     PurchaseOrderItem,
     Quotation,
     QuotationItem,
+    Rack,
     Supplier,
     ReturnItem,
     ReturnRequest,
@@ -27,7 +28,6 @@ from .models import (
     User,
     WhatsAppMessage,
 )
-
 
 @admin.register(User)
 class BillingUserAdmin(UserAdmin):
@@ -62,10 +62,18 @@ class InvoiceAdmin(admin.ModelAdmin):
     inlines = [InvoiceItemInline]
 
 
+@admin.register(Rack)
+class RackAdmin(admin.ModelAdmin):
+    list_display = ("name", "branch", "display_order", "is_active")
+    list_filter = ("branch", "is_active")
+    search_fields = ("name",)
+    ordering = ("display_order", "name")
+
+
 @admin.register(Item)
 class ItemAdmin(admin.ModelAdmin):
-    list_display = ("name", "sku", "item_type", "category", "mrp", "selling_price", "stock_quantity", "is_active")
-    list_filter = ("item_type", "category", "is_active")
+    list_display = ("name", "sku", "item_type", "category", "rack", "mrp", "selling_price", "stock_quantity", "is_active")
+    list_filter = ("item_type", "category", "rack", "is_active")
     search_fields = ("name", "sku")
 
 

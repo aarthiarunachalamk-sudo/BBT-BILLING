@@ -38,6 +38,7 @@ from .models import (
     ProductPriceHistory,
     PurchaseOrder,
     Quotation,
+    Rack,
     Supplier,
     ReturnRequest,
     RolePermission,
@@ -659,9 +660,9 @@ class SupplierViewSet(SearchableModelViewSet):
 
 
 class ItemViewSet(SearchableModelViewSet):
-    queryset = Item.objects.select_related("category", "brand", "supplier").all()
+    queryset = Item.objects.select_related("category", "brand", "supplier", "rack").all()
     serializer_class = ItemSerializer
-    search_fields = ["name", "sku", "description", "store_section", "rack_location", "category__name", "brand__name"]
+    search_fields = ["name", "sku", "description", "rack__name", "category__name", "brand__name"]
     ordering_fields = ["name", "selling_price", "stock_quantity", "created_at"]
 
     def get_permissions(self):
@@ -846,7 +847,7 @@ class ItemViewSet(SearchableModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
-    def get_queryset(self):
+           def get_queryset(self):
         queryset = super().get_queryset()
         item_type = self.request.query_params.get("type")
         active = self.request.query_params.get("active")
@@ -942,7 +943,43 @@ class ItemViewSet(SearchableModelViewSet):
             {"quantity": quantity},
         )
         return Response(InventoryTransactionSerializer(movement).data)
+class RackViewSet(SearchableModelViewSet):
+    queryset = Rack.objects.all()
+    serializer_class = RackSerializer
+    search_fields = ["name"]
+    ordering_fields = ["display_order", "name", "created_at"]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        branch = self.request.query_params.get("branch")
+        active = self.request.query_params.get("active")
+        if branch:
+            queryset = queryset.filter(branch=branch)
+        if active in {"true", "false"}:
+            queryset = queryset.filter(is_active=active == "true")
+        return queryset
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def rack_wise_products(request):
+    """Rack -> Category -> Products, for the store-layout view."""
+    items = (
+        Item.objects.filter(is_active=True)
+        .select_related("rack", "category")
+        .order_by("rack__display_order", "rack__name", "category__name", "name")
+    )
+    grouped = {}
+    for item in items:
+        rack_name = item.rack.name if item.rack else "Unassigned"
+        category_name = item.category.name if item.category else "Uncategorized"
+        grouped.setdefault(rack_name, {}).setdefault(category_name, []).append({
+            "id": item.pk,
+            "name": item.name,
+            "sku": item.sku,
+            "stock_quantity": item.stock_quantity,
+        })
+    return Response(grouped)
 
 class ProductBatchViewSet(SearchableModelViewSet):
     queryset = ProductBatch.objects.select_related("item", "supplier").all()
