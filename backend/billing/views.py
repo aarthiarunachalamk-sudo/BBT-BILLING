@@ -1653,3 +1653,10 @@ def dashboard(request):
         "range_start": range_start,
         "range_end": today,
     })
+
+
+# views.py
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def health_check(request):
+    return Response({"status": "ok"})

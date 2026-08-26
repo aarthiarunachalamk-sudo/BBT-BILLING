@@ -31,6 +31,7 @@ from .views import (
     shelf_product_action,
     auto_refill_product,
     stock_summary,
+    health_check,
 )
 
 
@@ -60,6 +61,7 @@ router.register("store-settings", StoreSettingsViewSet)
 router.register("audit-logs", AuditLogViewSet)
 
 urlpatterns = [
+    path("health/", health_check, name="health-check"), 
     path("dashboard/", dashboard, name="dashboard"),
     path("admin/dashboard/", dashboard, name="admin-dashboard"),
     path("admin/users/", UserViewSet.as_view({"get": "list", "post": "create"}), name="admin-users"),
