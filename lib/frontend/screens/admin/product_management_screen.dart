@@ -1439,6 +1439,11 @@ class _ProductImage extends StatelessWidget {
   }
 }
 
+bool _sameCalendarDay(DateTime first, DateTime second) =>
+    first.year == second.year &&
+    first.month == second.month &&
+    first.day == second.day;
+
 Future<void> _showEditPriceSheet(
   BuildContext context,
   AdminState state,
@@ -1507,7 +1512,7 @@ Future<void> _showEditPriceSheet(
             ),
             const SizedBox(height: 4),
             Text(
-              'Choose when this purchase price, selling price and GST should start.',
+              'Choose Today or Tomorrow. Saving the same date again edits that schedule; old bills stay unchanged.',
               style: const TextStyle(fontSize: 11, color: muted),
             ),
             const SizedBox(height: 16),
@@ -1545,6 +1550,47 @@ Future<void> _showEditPriceSheet(
               ],
             ),
             const SizedBox(height: 12),
+            Row(
+              children: [
+                ChoiceChip(
+                  avatar: const Icon(Icons.today_outlined, size: 16),
+                  label: const Text('Today'),
+                  selected: _sameCalendarDay(effectiveDate, DateTime.now()),
+                  onSelected: saving
+                      ? null
+                      : (_) {
+                          final now = DateTime.now();
+                          setSheet(
+                            () => effectiveDate =
+                                DateTime(now.year, now.month, now.day),
+                          );
+                        },
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  avatar: const Icon(Icons.next_plan_outlined, size: 16),
+                  label: const Text('Tomorrow'),
+                  selected: _sameCalendarDay(
+                    effectiveDate,
+                    DateTime.now().add(const Duration(days: 1)),
+                  ),
+                  onSelected: saving
+                      ? null
+                      : (_) {
+                          final tomorrow =
+                              DateTime.now().add(const Duration(days: 1));
+                          setSheet(
+                            () => effectiveDate = DateTime(
+                              tomorrow.year,
+                              tomorrow.month,
+                              tomorrow.day,
+                            ),
+                          );
+                        },
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             InkWell(
               onTap: saving ? null : () async {
                 final picked = await showDatePicker(context: sheetCtx, initialDate: effectiveDate, firstDate: DateTime(2020), lastDate: DateTime(2100));

@@ -139,7 +139,9 @@ class CurrentStockScreen extends StatelessWidget {
     if (!context.mounted) return;
     final purchase = TextEditingController(text: '${product['purchase_price'] ?? 0}');
     final selling = TextEditingController(text: '${product['selling_price'] ?? 0}');
-    final gst = TextEditingController(text: '${product['tax_percent'] ?? 0}');
+    var gst = double.tryParse('${product['tax_percent'] ?? ''}')?.round() ?? 0;
+    const gstSlabs = [0, 5, 12, 18, 28];
+    if (!gstSlabs.contains(gst)) gst = 18;
     var effectiveDate = DateTime.now();
     final saved = await showDialog<bool>(
       context: context,
@@ -147,13 +149,46 @@ class CurrentStockScreen extends StatelessWidget {
         builder: (dialogContext, setDialog) => AlertDialog(
           title: Text('Schedule price — ${product['name'] ?? stock['product_name']}'),
           content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('This rate is used for bills from the selected date. Existing invoices are unchanged.', style: Theme.of(dialogContext).textTheme.bodySmall),
+            Text('Choose Today or Tomorrow. Saving the same date again edits that schedule; existing invoices stay unchanged.', style: Theme.of(dialogContext).textTheme.bodySmall),
             const SizedBox(height: 12),
             TextField(controller: purchase, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Buying price', prefixText: '₹ ')),
             const SizedBox(height: 10),
             TextField(controller: selling, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Selling price', prefixText: '₹ ')),
             const SizedBox(height: 10),
-            TextField(controller: gst, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'GST %')),
+            const Align(alignment: Alignment.centerLeft, child: Text('GST Slab *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800))),
+            const SizedBox(height: 7),
+            Row(children: gstSlabs.map((slab) => Expanded(child: Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: ChoiceChip(
+                label: Text('$slab%', style: const TextStyle(fontSize: 10)),
+                selected: gst == slab,
+                selectedColor: userBlue,
+                labelStyle: TextStyle(color: gst == slab ? Colors.white : userNavy),
+                onSelected: (_) => setDialog(() => gst = slab),
+              ),
+            ))).toList()),
+            const SizedBox(height: 10),
+            Row(children: [
+              ChoiceChip(
+                avatar: const Icon(Icons.today_outlined, size: 16),
+                label: const Text('Today'),
+                selected: _sameUserCalendarDay(effectiveDate, DateTime.now()),
+                onSelected: (_) {
+                  final now = DateTime.now();
+                  setDialog(() => effectiveDate = DateTime(now.year, now.month, now.day));
+                },
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                avatar: const Icon(Icons.next_plan_outlined, size: 16),
+                label: const Text('Tomorrow'),
+                selected: _sameUserCalendarDay(effectiveDate, DateTime.now().add(const Duration(days: 1))),
+                onSelected: (_) {
+                  final tomorrow = DateTime.now().add(const Duration(days: 1));
+                  setDialog(() => effectiveDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day));
+                },
+              ),
+            ]),
             const SizedBox(height: 10),
             InkWell(
               onTap: () async {
@@ -174,9 +209,14 @@ class CurrentStockScreen extends StatelessWidget {
     final success = await state.scheduleProductPrice(productId, {
       'purchase_price': purchase.text.trim(),
       'selling_price': selling.text.trim(),
-      'tax_percent': gst.text.trim(),
+      'tax_percent': gst.toString(),
       'effective_date': '${effectiveDate.year.toString().padLeft(4, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.day.toString().padLeft(2, '0')}',
     });
     if (context.mounted) _notice(context, success ? 'Price schedule saved.' : state.error ?? 'Could not save price schedule.');
   }
 }
+
+bool _sameUserCalendarDay(DateTime first, DateTime second) =>
+    first.year == second.year &&
+    first.month == second.month &&
+    first.day == second.day;

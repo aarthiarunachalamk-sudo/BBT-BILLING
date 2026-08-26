@@ -1,8 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../widgets/product_image_widget.dart';
 
