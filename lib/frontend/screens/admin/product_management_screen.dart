@@ -86,7 +86,10 @@ class _ProductsScreenState extends State<ProductsScreen>
       final searchable = [
         product['name'],
         product['sku'],
+        product['barcode'],
+        product['brand_name'],
         product['category_name'],
+        product['rack_name'],
         product['store_section'],
         product['rack_location'],
       ].map((v) => v?.toString().toLowerCase() ?? '').join(' ');
@@ -224,85 +227,696 @@ class _ProductsScreenState extends State<ProductsScreen>
   }
 }
 
-class _MobileProductList extends StatelessWidget {
+class _MobileProductList extends StatefulWidget {
   const _MobileProductList({required this.state, required this.products});
 
   final AdminState state;
   final List<Map<String, dynamic>> products;
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-        child: SearchBox(
-          'Search by name, SKU or barcode',
-          trailing: Icons.filter_alt_outlined,
-          onTrailingTap: () => _showProductFilters(context, state),
-          onChanged: state.setProductQuery,
+  State<_MobileProductList> createState() => _MobileProductListState();
+}
+
+class _MobileProductListState extends State<_MobileProductList> {
+  String? _selectedRack;
+
+  AdminState get state => widget.state;
+  List<Map<String, dynamic>> get products => widget.products;
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = _groupProductsByRack(products);
+    final searching = state.productQuery.trim().isNotEmpty;
+    final selectedRack = !searching &&
+            groups.any((group) => group.name == _selectedRack)
+        ? _selectedRack
+        : null;
+    final visibleGroups = selectedRack == null
+        ? groups
+        : groups.where((group) => group.name == selectedRack).toList();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+          child: SearchBox(
+            'Search product, rack or category',
+            trailing: Icons.filter_alt_outlined,
+            onTrailingTap: () => _showProductFilters(context, state),
+            onChanged: (value) {
+              if (value.trim().isNotEmpty && _selectedRack != null) {
+                setState(() => _selectedRack = null);
+              }
+              state.setProductQuery(value);
+            },
+          ),
         ),
-      ),
-      Expanded(
-        child: products.isEmpty
-            ? const _EmptyState(
-                'No products found.',
-                icon: Icons.inventory_2_outlined,
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
-                itemCount: products.length,
-                separatorBuilder: (_, _) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final product = products[index];
-                  final status = product['stock_status']?.toString() ?? '';
-                  return ListTile(
-                    minTileHeight: 72,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                    onTap: () => _showEditPriceSheet(context, state, product),
-                    leading: InkWell(
-                      onTap: () =>
-                          _replaceProductImage(context, state, product),
-                      child: SizedBox.square(
-                        dimension: 52,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: _ProductImage(
-                            url: _productImageUrl(state, product['image']),
-                          ),
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      product['name']?.toString() ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        '${product['brand_name']?.toString().isNotEmpty == true ? '${product['brand_name']} • ' : ''}SKU: ${product['sku'] ?? '—'}\nStore: ${product['store_stock'] ?? 0}  |  Shelf: ${product['shelf_stock'] ?? 0}  |  Total: ${product['total_stock'] ?? product['stock_quantity'] ?? 0}',
-                        style: const TextStyle(fontSize: 9, height: 1.45),
-                      ),
-                    ),
-                    trailing: _StockBadge(status: status),
-                  );
-                },
+        if (state.productStockFilter != 'All')
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: InputChip(
+                avatar: const Icon(Icons.filter_alt, size: 16),
+                label: Text(state.productStockFilter),
+                onDeleted: () => state.setProductStockFilter('All'),
               ),
+            ),
+          ),
+        if (groups.length > 1)
+          _RackQuickSelector(
+            groups: groups,
+            selectedRack: selectedRack,
+            onSelected: (rack) => setState(() => _selectedRack = rack),
+          ),
+        Expanded(
+          child: visibleGroups.isEmpty
+              ? const _EmptyState(
+                  'No products found.',
+                  icon: Icons.inventory_2_outlined,
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+                  itemCount: visibleGroups.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return _CatalogOverviewBar(
+                          racks: groups.length,
+                        categories: groups.fold(
+                          0,
+                          (total, group) => total + group.categories.length,
+                        ),
+                        products: products.length,
+                      );
+                    }
+                    return _RackProductSection(
+                      state: state,
+                      group: visibleGroups[index - 1],
+                      initiallyExpanded:
+                          searching || visibleGroups.length == 1,
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+          child: PrimaryAction(
+            'Add Product',
+            icon: Icons.add,
+            onPressed: () => state.go(5),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RackQuickSelector extends StatelessWidget {
+  const _RackQuickSelector({
+    required this.groups,
+    required this.selectedRack,
+    required this.onSelected,
+  });
+
+  final List<_RackProductGroup> groups;
+  final String? selectedRack;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(Icons.near_me_outlined, size: 15, color: blue),
+              SizedBox(width: 6),
+              Text(
+                'Jump to location',
+                style: TextStyle(
+                  color: ink,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 7),
+        SizedBox(
+          height: 38,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            children: [
+              _RackChoiceChip(
+                label: 'All',
+                count: groups.length,
+                selected: selectedRack == null,
+                icon: Icons.grid_view_rounded,
+                onTap: () => onSelected(null),
+              ),
+              for (final group in groups)
+                _RackChoiceChip(
+                  label: group.name,
+                  count: group.productCount,
+                  selected: selectedRack == group.name,
+                  icon: _rackIcon(group.name),
+                  onTap: () => onSelected(group.name),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _RackChoiceChip extends StatelessWidget {
+  const _RackChoiceChip({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(right: 7),
+    child: Material(
+      color: selected ? blue : Colors.white,
+      shape: StadiumBorder(
+        side: BorderSide(color: selected ? blue : line),
       ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
-        child: PrimaryAction(
-          'Add Product',
-          icon: Icons.add,
-          onPressed: () => state.go(5),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 11),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: selected ? Colors.white : muted,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : ink,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withValues(alpha: .18)
+                      : const Color(0xFFF0F4FA),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    color: selected ? Colors.white : muted,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ],
+    ),
   );
+}
+
+IconData _rackIcon(String name) {
+  final normalized = name.toLowerCase();
+  if (normalized.contains('fridge') ||
+      normalized.contains('freezer') ||
+      normalized.contains('cold')) {
+    return Icons.kitchen_outlined;
+  }
+  if (normalized == 'unassigned') return Icons.help_outline_rounded;
+  return Icons.shelves;
+}
+
+class _CatalogOverviewBar extends StatelessWidget {
+  const _CatalogOverviewBar({
+    required this.racks,
+    required this.categories,
+    required this.products,
+  });
+
+  final int racks;
+  final int categories;
+  final int products;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [navy, Color(0xFF0B5EC4)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: navy.withValues(alpha: .16),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        const Expanded(
+          flex: 4,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Store catalogue',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: 3),
+              Text(
+                'Browse by location and category',
+                style: TextStyle(color: Color(0xFFD9E9FF), fontSize: 9),
+              ),
+            ],
+          ),
+        ),
+        _OverviewMetric(value: '$racks', label: 'Locations'),
+        _OverviewMetric(value: '$categories', label: 'Categories'),
+        _OverviewMetric(value: '$products', label: 'Products'),
+      ],
+    ),
+  );
+}
+
+class _OverviewMetric extends StatelessWidget {
+  const _OverviewMetric({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              style: const TextStyle(color: Color(0xFFBCD7FA), fontSize: 7),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _RackProductSection extends StatelessWidget {
+  const _RackProductSection({
+    required this.state,
+    required this.group,
+    required this.initiallyExpanded,
+  });
+
+  final AdminState state;
+  final _RackProductGroup group;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final isColdStorage = group.name.toLowerCase().contains('fridge') ||
+        group.name.toLowerCase().contains('freezer') ||
+        group.name.toLowerCase().contains('cold');
+    final accent = isColdStorage ? const Color(0xFF00A6C8) : blue;
+
+    return Card(
+      key: PageStorageKey('rack-${group.name}-$initiallyExpanded'),
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      surfaceTintColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+      initiallyExpanded: initiallyExpanded,
+      maintainState: true,
+      backgroundColor: Colors.white,
+      collapsedBackgroundColor: Colors.white,
+      iconColor: accent,
+      collapsedIconColor: muted,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+      leading: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: .10),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          isColdStorage ? Icons.kitchen_outlined : Icons.shelves,
+          color: accent,
+          size: 22,
+        ),
+      ),
+      title: Text(
+        group.name,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+      ),
+      subtitle: Text(
+        '${group.categories.length} categories  •  ${group.productCount} products',
+        style: const TextStyle(fontSize: 10, color: muted),
+      ),
+      children: group.categories
+          .map(
+            (category) => _CategoryProductSection(
+              state: state,
+              rackName: group.name,
+              category: category,
+              initiallyExpanded:
+                  initiallyExpanded || group.categories.length == 1,
+            ),
+          )
+          .toList(),
+    ),
+    );
+  }
+}
+
+class _CategoryProductSection extends StatelessWidget {
+  const _CategoryProductSection({
+    required this.state,
+    required this.rackName,
+    required this.category,
+    required this.initiallyExpanded,
+  });
+
+  final AdminState state;
+  final String rackName;
+  final _CategoryProductGroup category;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 6),
+    child: Material(
+      color: const Color(0xFFF8FAFD),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: Color(0xFFE6EAF0)),
+      ),
+      child: ExpansionTile(
+        key: PageStorageKey(
+          'rack-$rackName-category-${category.name}-$initiallyExpanded',
+        ),
+        initiallyExpanded: initiallyExpanded,
+        maintainState: true,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 5),
+        leading: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: blue.withValues(alpha: .08),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.category_outlined, color: blue, size: 17),
+        ),
+        title: Text(
+          category.name,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text(
+          '${category.products.length} item${category.products.length == 1 ? '' : 's'}',
+          style: const TextStyle(fontSize: 9, color: muted),
+        ),
+        children: [
+          for (var index = 0; index < category.products.length; index++) ...[
+            if (index > 0) const Divider(height: 1),
+            _MobileProductRow(state: state, product: category.products[index]),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+class _MobileProductRow extends StatelessWidget {
+  const _MobileProductRow({required this.state, required this.product});
+
+  final AdminState state;
+  final Map<String, dynamic> product;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = product['stock_status']?.toString() ?? '';
+    final brand = product['brand_name']?.toString().trim() ?? '';
+    final store = product['store_stock'] ?? 0;
+    final shelf = product['shelf_stock'] ?? 0;
+    final total = product['total_stock'] ?? product['stock_quantity'] ?? 0;
+    final price = double.tryParse('${product['selling_price'] ?? ''}');
+    return ListTile(
+      minTileHeight: 92,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      onTap: () => _showEditPriceSheet(context, state, product),
+      leading: InkWell(
+        onTap: () => _replaceProductImage(context, state, product),
+        borderRadius: BorderRadius.circular(10),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: line),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: _ProductImage(
+                  url: _productImageUrl(state, product['image']),
+                ),
+              ),
+            ),
+            Positioned(
+              right: -3,
+              bottom: -3,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  color: blue,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.photo_camera_outlined,
+                  size: 9,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      title: Text(
+        product['name']?.toString() ?? '',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${brand.isEmpty ? '' : '$brand • '}SKU: ${product['sku'] ?? '—'}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 9, color: muted),
+            ),
+            const SizedBox(height: 5),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                _MiniStock(label: 'Store', value: '$store'),
+                _MiniStock(label: 'Shelf', value: '$shelf'),
+                _MiniStock(label: 'Total', value: '$total', emphasized: true),
+              ],
+            ),
+          ],
+        ),
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _StockBadge(status: status),
+          if (price != null) ...[
+            const SizedBox(height: 7),
+            Text(
+              '₹${price.toStringAsFixed(2)}',
+              style: const TextStyle(
+                color: ink,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStock extends StatelessWidget {
+  const _MiniStock({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+    decoration: BoxDecoration(
+      color: emphasized ? blue.withValues(alpha: .09) : Colors.white,
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(
+        color: emphasized ? blue.withValues(alpha: .22) : line,
+      ),
+    ),
+    child: Text(
+      '$label: $value',
+      style: TextStyle(
+        color: emphasized ? blue : muted,
+        fontSize: 7.5,
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+  );
+}
+
+class _RackProductGroup {
+  const _RackProductGroup({required this.name, required this.categories});
+
+  final String name;
+  final List<_CategoryProductGroup> categories;
+
+  int get productCount =>
+      categories.fold(0, (total, category) => total + category.products.length);
+}
+
+class _CategoryProductGroup {
+  const _CategoryProductGroup({required this.name, required this.products});
+
+  final String name;
+  final List<Map<String, dynamic>> products;
+}
+
+List<_RackProductGroup> _groupProductsByRack(
+  List<Map<String, dynamic>> products,
+) {
+  final grouped = <String, Map<String, List<Map<String, dynamic>>>>{};
+  for (final product in products) {
+    final rack = _firstProductLabel(product, const [
+      'rack_name',
+      'rack_location',
+      'store_section',
+    ], fallback: 'Unassigned');
+    final category = _firstProductLabel(product, const [
+      'category_name',
+    ], fallback: 'Uncategorized');
+    grouped
+        .putIfAbsent(rack, () => {})
+        .putIfAbsent(category, () => [])
+        .add(product);
+  }
+
+  final racks = grouped.entries.map((rack) {
+    final categories =
+        rack.value.entries.map((category) {
+          category.value.sort(
+            (a, b) => '${a['name'] ?? ''}'.toLowerCase().compareTo(
+              '${b['name'] ?? ''}'.toLowerCase(),
+            ),
+          );
+          return _CategoryProductGroup(
+            name: category.key,
+            products: category.value,
+          );
+        }).toList()..sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+    return _RackProductGroup(name: rack.key, categories: categories);
+  }).toList();
+  racks.sort((a, b) {
+    if (a.name == 'Unassigned') return 1;
+    if (b.name == 'Unassigned') return -1;
+    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  });
+  return racks;
+}
+
+String _firstProductLabel(
+  Map<String, dynamic> product,
+  List<String> keys, {
+  required String fallback,
+}) {
+  for (final key in keys) {
+    final value = product[key]?.toString().trim() ?? '';
+    if (value.isNotEmpty) return value;
+  }
+  return fallback;
 }
 
 /// A scrollable grid of product cards, with an empty state and an

@@ -71,7 +71,11 @@ class UserState extends ChangeNotifier {
         case UserPage.dashboard:
           dashboard = await api.getMap('dashboard');
           break;
-        case UserPage.inventory || UserPage.addProduct:
+        case UserPage.inventory:
+          categories = await api.getList('categories');
+          products = await api.getStoreStock();
+          break;
+        case UserPage.addProduct:
           categories = await api.getList('categories');
           break;
         case UserPage.currentStock:
