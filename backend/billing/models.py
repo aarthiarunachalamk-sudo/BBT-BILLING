@@ -153,31 +153,19 @@ class Item(TimeStampedModel):
     description = models.TextField(blank=True)
     manual_details = models.JSONField(default=dict, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="items")
-      brand = models.ForeignKey(
-        Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
-    )
-    supplier = models.ForeignKey(
-        Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
-    )
-    rack = models.ForeignKey(
-        Rack, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
-    )
+    brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name="items")
+    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name="items")
+    rack = models.ForeignKey(Rack, on_delete=models.SET_NULL, null=True, blank=True, related_name="items")
     unit = models.CharField(max_length=30, default="unit")
-    # Physical in-store location, independent of the sales category.  Examples:
-    # "Kids Section" + "Rack 2" or "Soap Section" + "Rack 1".
     store_section = models.CharField(max_length=100, default="General", db_index=True)
     rack_location = models.CharField(max_length=60, blank=True, db_index=True)
     selling_price = models.DecimalField(**MONEY)
     purchase_price = models.DecimalField(**MONEY)
-    mrp = models.DecimalField(
-        max_digits=14, decimal_places=2, null=True, blank=True
-    )
+    mrp = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     image = models.ImageField(upload_to="products/%Y/%m/", blank=True)
     price_source_url = models.URLField(blank=True)
     price_verified_at = models.DateField(null=True, blank=True)
-    tax_percent = models.DecimalField(
-        max_digits=5, decimal_places=2, default=Decimal("18.00")
-    )
+    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("18.00"))
     stock_quantity = models.IntegerField(default=0)
     store_stock = models.PositiveIntegerField(default=0)
     shelf_stock = models.PositiveIntegerField(default=0)
@@ -207,7 +195,6 @@ class Item(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} ({self.sku})"
-
 
 class ProductPriceHistory(TimeStampedModel):
     """A manual price schedule.  Future prices never rewrite old invoices."""
