@@ -32,6 +32,9 @@ class AdminState extends ChangeNotifier {
   bool logoutConfirmationVisible = false;
   bool loggingOut = false;
   bool loading = false;
+  bool wakingServer = false;
+  int wakeAttempt = 0;
+  int wakeMaxAttempts = 0;
   bool refreshing = false;
   bool decidingPurchaseOrder = false;
   bool decidingDiscount = false;
@@ -125,9 +128,28 @@ class AdminState extends ChangeNotifier {
 
   Future<bool> login(String email, String password) async {
     loading = true;
+    wakingServer = true;
+    wakeAttempt = 0;
+    wakeMaxAttempts = 8;
     error = null;
     notifyListeners();
     try {
+      final serverReady = await api.waitForServer(
+        maxAttempts: wakeMaxAttempts,
+        initialDelay: const Duration(seconds: 2),
+        onAttempt: (attempt, max) {
+          wakeAttempt = attempt;
+          wakeMaxAttempts = max;
+          notifyListeners();
+        },
+      );
+      if (!serverReady) {
+        error =
+            'Server is taking longer than expected to wake up. Please retry.';
+        return false;
+      }
+      wakingServer = false;
+      notifyListeners();
       final session = await api.login(email, password);
       final user = (session['user'] as Map?)?.cast<String, dynamic>() ?? {};
       final role = user['role']?.toString();
@@ -150,6 +172,7 @@ class AdminState extends ChangeNotifier {
       error = 'Cannot reach ${api.baseUrl}';
       return false;
     } finally {
+      wakingServer = false;
       loading = false;
       notifyListeners();
     }
@@ -222,12 +245,18 @@ class AdminState extends ChangeNotifier {
   }
 
   List<Map<String, dynamic>> get paymentNotifications => auditLogs
-      .where((entry) => entry['module']?.toString() == 'Payments' && entry['action']?.toString() == 'Payment Received')
+      .where(
+        (entry) =>
+            entry['module']?.toString() == 'Payments' &&
+            entry['action']?.toString() == 'Payment Received',
+      )
       .toList();
 
   void _startPaymentNotificationPolling() {
     _paymentNotificationPoller?.cancel();
-    _paymentNotificationPoller = Timer.periodic(const Duration(seconds: 30), (_) async {
+    _paymentNotificationPoller = Timer.periodic(const Duration(seconds: 30), (
+      _,
+    ) async {
       if (!loggedIn || _disposed) return;
       try {
         auditLogs = await api.getList('audit-logs');
@@ -305,7 +334,8 @@ class AdminState extends ChangeNotifier {
         return {
           ...product,
           'store_stock': stock['store_quantity'] ?? 0,
-          'minimum_quantity': stock['minimum_quantity'] ?? product['reorder_level'] ?? 0,
+          'minimum_quantity':
+              stock['minimum_quantity'] ?? product['reorder_level'] ?? 0,
           'store_stock_updated_at': stock['updated_at'],
         };
       }).toList();
@@ -661,7 +691,10 @@ class AdminState extends ChangeNotifier {
   /// Schedule purchase price, selling price and GST for a specific date.
   /// The backend keeps existing invoices unchanged and uses this rate on/after
   /// its effective date.
-  Future<void> scheduleProductPrice(int productId, Map<String, dynamic> fields) async {
+  Future<void> scheduleProductPrice(
+    int productId,
+    Map<String, dynamic> fields,
+  ) async {
     await api.action('items', productId, 'price-schedule', fields);
     products = await api.getList('items');
     notifyListeners();

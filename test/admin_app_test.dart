@@ -90,6 +90,9 @@ void main() {
     final api = AdminApi(
       baseUrl: 'https://example.com/api',
       client: MockClient((request) async {
+        if (request.url.path.endsWith('/health/')) {
+          return http.Response('{}', 200);
+        }
         if (request.url.path.endsWith('/auth/login/')) {
           return http.Response(
             jsonEncode({
@@ -131,6 +134,58 @@ void main() {
     }
     expect(hydrationRequests, 18);
     expect(state.refreshing, isFalse);
+  });
+
+  test(
+    'GET retries transient 5xx responses before decoding the list',
+    () async {
+      var requests = 0;
+      final api = AdminApi(
+        baseUrl: 'https://example.com/api',
+        readRetryBaseDelay: Duration.zero,
+        client: MockClient((request) async {
+          requests += 1;
+          if (requests < 3) {
+            return http.Response('{"detail":"starting"}', 503);
+          }
+          return http.Response(
+            jsonEncode({
+              'results': [
+                {'id': 1, 'name': 'Existing product'},
+              ],
+              'next': null,
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      addTearDown(api.dispose);
+
+      final products = await api.getList('items');
+
+      expect(requests, 3);
+      expect(products.single['name'], 'Existing product');
+    },
+  );
+
+  test('writes are not retried after a 503 response', () async {
+    var requests = 0;
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      readRetryBaseDelay: Duration.zero,
+      client: MockClient((request) async {
+        requests += 1;
+        return http.Response('{"detail":"starting"}', 503);
+      }),
+    );
+    addTearDown(api.dispose);
+
+    await expectLater(
+      api.create('items', {'name': 'Do not duplicate'}),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 503)),
+    );
+    expect(requests, 1);
   });
 
   testWidgets('Android back returns an admin sub-screen to dashboard', (

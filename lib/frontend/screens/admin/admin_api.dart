@@ -15,17 +15,21 @@ class ApiException implements Exception {
 }
 
 class AdminApi {
-  AdminApi({http.Client? client, String? baseUrl})
-    : _client = client ?? http.Client(),
-      baseUrl = _canonicalBaseUrl(
-        baseUrl ??
-            const String.fromEnvironment(
-              'API_BASE_URL',
-              defaultValue: 'https://bbt-billing-c16x.onrender.com/api',
-            ),
-      );
+  AdminApi({
+    http.Client? client,
+    String? baseUrl,
+    this.readRetryBaseDelay = const Duration(seconds: 2),
+  }) : _client = client ?? http.Client(),
+       baseUrl = _canonicalBaseUrl(
+         baseUrl ??
+             const String.fromEnvironment(
+               'API_BASE_URL',
+               defaultValue: 'https://bbt-billing-c16x.onrender.com/api',
+             ),
+       );
 
   final http.Client _client;
+  final Duration readRetryBaseDelay;
   String baseUrl;
   String? _accessToken;
 
@@ -70,9 +74,14 @@ class AdminApi {
     Object? lastError;
     for (var attempt = 1; attempt <= 3; attempt++) {
       try {
-        return await _client
+        final response = await _client
             .get(uri, headers: _headers)
             .timeout(const Duration(seconds: 30));
+        if (response.statusCode >= 500 && attempt < 3) {
+          await Future<void>.delayed(_readRetryDelay(attempt));
+          continue;
+        }
+        return response;
       } on TimeoutException catch (error) {
         lastError = error;
       } on SocketException catch (error) {
@@ -81,11 +90,14 @@ class AdminApi {
         lastError = error;
       }
       if (attempt < 3) {
-        await Future<void>.delayed(Duration(milliseconds: 500 * attempt));
+        await Future<void>.delayed(_readRetryDelay(attempt));
       }
     }
     throw lastError!;
   }
+
+  Duration _readRetryDelay(int attempt) =>
+      Duration(microseconds: readRetryBaseDelay.inMicroseconds * attempt);
 
   // ── Wake-up / health-check ────────────────────────────────────────────────
 
@@ -113,7 +125,9 @@ class AdminApi {
         }
       }
       if (attempt < maxAttempts) {
-        await Future<void>.delayed(initialDelay);
+        await Future<void>.delayed(
+          Duration(microseconds: initialDelay.inMicroseconds * attempt),
+        );
       }
     }
     return false;
@@ -295,9 +309,13 @@ class AdminApi {
   );
 
   Future<void> delete(String path, int id) async {
-    final response = await _client.delete(Uri.parse('$baseUrl/$path/$id/'), headers: _headers);
+    final response = await _client.delete(
+      Uri.parse('$baseUrl/$path/$id/'),
+      headers: _headers,
+    );
     _decode(response);
   }
+
   Future<Map<String, dynamic>> action(
     String path,
     int id,

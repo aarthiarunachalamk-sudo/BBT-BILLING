@@ -56,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  bool get _isWakingUp => false;
+  bool get _isWakingUp => widget.state.wakingServer;
 
   Future<void> _doLogin() async {
     // Detach EditableText/keyboard inherited dependencies before a successful
@@ -252,7 +252,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 14),
                 Text(
                   _isWakingUp
-                      ? (widget.state.error ?? 'Connecting to server…')
+                      ? 'Waking up server... Attempt '
+                            '${widget.state.wakeAttempt} of '
+                            '${widget.state.wakeMaxAttempts}'
                       : 'Logging in...',
                   textAlign: TextAlign.center,
                   style: TextStyle(
