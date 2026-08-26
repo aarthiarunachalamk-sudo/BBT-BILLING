@@ -101,7 +101,11 @@ class ProductCatalogSchemaRepairTests(APITransactionTestCase):
     def test_admin_repair_restores_missing_0013_dependency_before_migrate(self):
         recorder = MigrationRecorder(connection)
         recorder.migration_qs.filter(
-            app="billing", name="0013_item_store_section_item_rack_location"
+            app="billing",
+            name__in=(
+                "0013_item_store_section_item_rack_location",
+                "0014_secure_razorpay_payments",
+            ),
         ).delete()
         with connection.schema_editor() as editor:
             editor.remove_field(Item, Item._meta.get_field("rack_location"))
@@ -120,6 +124,7 @@ class ProductCatalogSchemaRepairTests(APITransactionTestCase):
             with_applied_migrations=True
         )
         self.assertIsNotNone(state.apps.get_model("billing", "Item"))
+        recorder.record_applied("billing", "0014_secure_razorpay_payments")
 
     def test_split_stock_repair_tolerates_missing_location_columns(self):
         recorder = MigrationRecorder(connection)

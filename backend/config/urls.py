@@ -11,7 +11,6 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from billing.schema_repair import (
     admin_visibility_schema_status,
-    product_catalog_migration_is_applied,
     product_catalog_schema_status,
     repair_admin_visibility_schema,
     repair_product_catalog_schema,
@@ -54,10 +53,9 @@ def health_check(request):
             # This legacy database has an inconsistent migration history, so
             # repair the known additive schema changes before serving traffic.
             repair_admin_visibility_schema()
-            # Only repair 0013 after Django considers it applied. Otherwise
-            # the normal migration must own creation of these columns.
-            if product_catalog_migration_is_applied():
-                repair_product_catalog_schema()
+            # This is additive and idempotent. Do not trust legacy migration
+            # records here: the missing columns are what breaks Item queries.
+            repair_product_catalog_schema()
             repair_split_stock_schema()
             connection.close()
             schema_ready = schema_is_ready()

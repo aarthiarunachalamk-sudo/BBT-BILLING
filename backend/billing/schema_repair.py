@@ -66,11 +66,13 @@ PRODUCT_CATALOG_FIELDS = {
     Item: ("store_section", "rack_location"),
 }
 PRODUCT_CATALOG_MIGRATIONS = (
+    # 0012 is the direct predecessor. If it is applied, this repair can safely
+    # perform 0013's additive DDL and record 0013 before Django runs migrate.
+    "0012_product_price_history",
     "0013_item_store_section_item_rack_location",
-    # Some legacy databases recorded the dependent migration without 0013.
-    # In that state the columns should already exist and are safe to repair.
     "0014_secure_razorpay_payments",
 )
+PRODUCT_CATALOG_MIGRATION = "0013_item_store_section_item_rack_location"
 
 
 def product_catalog_migration_is_applied():
@@ -155,24 +157,19 @@ def repair_admin_visibility_schema():
             recorder.record_applied("billing", migration)
             print(f"Repaired legacy billing migration record: {migration}")
 
-    # A few legacy databases contain 0014 without its declared dependency
-    # 0013. Django rejects that history before `migrate` can run, so restore
-    # both the additive columns and dependency record during this pre-migrate
-    # repair. Never fake 0013 on databases where no later migration proves it
-    # was intended to be applied.
-    catalog_migration = PRODUCT_CATALOG_MIGRATIONS[0]
-    later_catalog_migration = PRODUCT_CATALOG_MIGRATIONS[1]
-    if (
-        recorder.migration_qs.filter(
-            app="billing", name=later_catalog_migration
-        ).exists()
-        and not recorder.migration_qs.filter(
-            app="billing", name=catalog_migration
-        ).exists()
-    ):
+    # Once 0012 (or anything later) is recorded, 0013 is the next expected
+    # additive step. Restore its columns and record during this pre-migrate
+    # repair so Django never encounters missing or inconsistent state.
+    if product_catalog_migration_is_applied():
         repair_product_catalog_schema()
-        recorder.record_applied("billing", catalog_migration)
-        print(f"Repaired legacy billing migration record: {catalog_migration}")
+        if not recorder.migration_qs.filter(
+            app="billing", name=PRODUCT_CATALOG_MIGRATION
+        ).exists():
+            recorder.record_applied("billing", PRODUCT_CATALOG_MIGRATION)
+            print(
+                "Repaired legacy billing migration record: "
+                f"{PRODUCT_CATALOG_MIGRATION}"
+            )
 
 
 def split_stock_schema_status():
@@ -197,11 +194,10 @@ def repair_split_stock_schema():
     even though their DDL was never committed.  This is deliberately
     idempotent so it is safe to execute at every deployment.
     """
-    # Some Render services still use an older dashboard-level start command
-    # that invokes only this repair after migrate. If 0013 is already marked
-    # applied, restore its Item columns before any split-stock Item query.
-    if product_catalog_migration_is_applied():
-        repair_product_catalog_schema()
+    # This function is also called by older Render dashboard start commands.
+    # The repair itself checks for the Item table and missing columns, so it is
+    # safe and idempotent without relying on damaged migration records.
+    repair_product_catalog_schema()
 
     existing_tables = set(connection.introspection.table_names())
     with connection.schema_editor() as editor:
