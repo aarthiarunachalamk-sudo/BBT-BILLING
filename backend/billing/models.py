@@ -153,10 +153,10 @@ class Item(TimeStampedModel):
     description = models.TextField(blank=True)
     manual_details = models.JSONField(default=dict, blank=True)
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="items")
-    brand = models.ForeignKey(
+      brand = models.ForeignKey(
         Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
     )
-        supplier = models.ForeignKey(
+    supplier = models.ForeignKey(
         Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
     )
     rack = models.ForeignKey(
