@@ -9,6 +9,8 @@
 	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Select product images for the billing catalog.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan product barcodes and capture product images.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

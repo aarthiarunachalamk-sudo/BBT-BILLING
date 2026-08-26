@@ -208,9 +208,14 @@ class AdminApi {
   Future<Map<String, dynamic>> getMap(String path) async =>
       _decodeMap(await _get(Uri.parse('$baseUrl/$path/')));
 
-  Future<List<Map<String, dynamic>>> getList(String path) async {
+  Future<List<Map<String, dynamic>>> getList(
+    String path, {
+    Map<String, String>? query,
+  }) async {
     final results = <Map<String, dynamic>>[];
-    String? url = '$baseUrl/$path/?page_size=200';
+    String? url = Uri.parse('$baseUrl/$path/').replace(
+      queryParameters: {...?query, 'page_size': '200'},
+    ).toString();
     while (url != null) {
       final response = await _get(Uri.parse(url));
       final decoded = _decode(response);

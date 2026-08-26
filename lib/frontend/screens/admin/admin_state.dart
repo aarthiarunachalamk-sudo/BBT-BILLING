@@ -44,6 +44,7 @@ class AdminState extends ChangeNotifier {
   List<Map<String, dynamic>> users = [];
   List<Map<String, dynamic>> products = [];
   List<Map<String, dynamic>> categories = [];
+  List<Map<String, dynamic>> racks = [];
   List<Map<String, dynamic>> brands = [];
   List<Map<String, dynamic>> suppliers = [];
   List<Map<String, dynamic>> purchaseOrders = [];
@@ -271,6 +272,19 @@ class AdminState extends ChangeNotifier {
     try {
       categories = await api.getList('categories');
       _hydrateControls();
+      error = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      error = 'Cannot reach ${api.baseUrl}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> refreshRacks() async {
+    try {
+      racks = await api.getList('racks', query: const {'active': 'true'});
       error = null;
       notifyListeners();
       return true;
@@ -959,6 +973,7 @@ class AdminState extends ChangeNotifier {
       users.clear();
       products.clear();
       categories.clear();
+      racks.clear();
       suppliers.clear();
       purchaseOrders.clear();
       discountApprovals.clear();

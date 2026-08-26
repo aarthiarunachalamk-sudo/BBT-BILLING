@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../widgets/barcode_scanner_screen.dart';
 import 'admin_state.dart';
 import 'admin_widgets.dart';
 part 'login_screen.dart';

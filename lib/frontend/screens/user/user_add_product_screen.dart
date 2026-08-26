@@ -15,10 +15,13 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
   final purchasePrice = TextEditingController();
   final sellingPrice = TextEditingController();
   final openingStock = TextEditingController(text: '0');
-  final rackLocation = TextEditingController();
+  String? rackLocation;
+  XFile? productImage;
+  Uint8List? productImageBytes;
   int? categoryId;
   int? gst;
   int currentStep = 0;
+  bool imageError = false;
 
   @override
   void initState() {
@@ -35,8 +38,29 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
     purchasePrice.dispose();
     sellingPrice.dispose();
     openingStock.dispose();
-    rackLocation.dispose();
     super.dispose();
+  }
+
+  List<String> get _locationOptions {
+    final names = <String>{
+      for (final rack in widget.state.racks)
+        if (rack['is_active'] != false && '${rack['name'] ?? ''}'.trim().isNotEmpty)
+          '${rack['name']}'.trim(),
+      for (final product in widget.state.products)
+        if ('${product['rack_name'] ?? product['rack_location'] ?? ''}'.trim().isNotEmpty)
+          '${product['rack_name'] ?? product['rack_location']}'.trim(),
+    };
+    if (names.isEmpty) names.addAll(const ['Rack 1', 'Rack 2', 'Rack 3', 'Fridge']);
+    return names.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  }
+
+  int? get _selectedRackId {
+    for (final rack in widget.state.racks) {
+      if ('${rack['name']}'.toLowerCase() == rackLocation?.toLowerCase()) {
+        return int.tryParse('${rack['id']}');
+      }
+    }
+    return null;
   }
 
   @override
@@ -102,14 +126,25 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
           const SizedBox(height: 14),
           TextFormField(
             controller: sku,
-            textCapitalization: TextCapitalization.characters,
-            decoration: const InputDecoration(
+            readOnly: true,
+            onTap: _scanBarcode,
+            decoration: InputDecoration(
               labelText: 'Barcode / SKU *',
-              hintText: 'Scan or enter a unique code',
-              prefixIcon: Icon(Icons.qr_code_scanner_rounded),
+              hintText: 'Tap scanner to capture code',
+              prefixIcon: const Icon(Icons.qr_code_2_rounded),
+              suffixIcon: IconButton(
+                tooltip: 'Scan barcode',
+                onPressed: _scanBarcode,
+                icon: const Icon(
+                  Icons.qr_code_scanner_rounded,
+                  color: userBlue,
+                ),
+              ),
             ),
             validator: _required,
           ),
+          const SizedBox(height: 16),
+          _productImagePicker(),
         ],
       ),
     ),
@@ -166,15 +201,25 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
             validator: _stock,
           ),
           const SizedBox(height: 14),
-          TextFormField(
-            controller: rackLocation,
-            textCapitalization: TextCapitalization.words,
+          DropdownButtonFormField<String>(
+            initialValue: rackLocation,
+            isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Rack / Fridge Location *',
-              hintText: 'Example: Rack 1 or Fridge',
               prefixIcon: Icon(Icons.location_on_outlined),
             ),
-            validator: _required,
+            hint: const Text('Select location'),
+            items: _locationOptions
+                .map(
+                  (location) => DropdownMenuItem<String>(
+                    value: location,
+                    child: Text(location),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) => setState(() => rackLocation = value),
+            validator: (value) =>
+                value == null ? 'Select a location.' : null,
           ),
           const SizedBox(height: 18),
           Container(
@@ -274,8 +319,102 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
     return null;
   }
 
+  Future<void> _scanBarcode() async {
+    final code = await showBarcodeScanner(context);
+    if (!mounted || code == null || code.trim().isEmpty) return;
+    setState(() => sku.text = code.trim());
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final image = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1600,
+      imageQuality: 85,
+      requestFullMetadata: false,
+    );
+    if (image == null) return;
+    final bytes = await image.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      productImage = image;
+      productImageBytes = bytes;
+      imageError = false;
+    });
+  }
+
+  Widget _productImagePicker() => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF7F9FC),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: imageError ? userRed : const Color(0xFFDCE3EC),
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Product Image *',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox.square(
+                dimension: 72,
+                child: productImageBytes == null
+                    ? const ColoredBox(
+                        color: Colors.white,
+                        child: Icon(
+                          Icons.add_photo_alternate_outlined,
+                          color: userBlue,
+                          size: 28,
+                        ),
+                      )
+                    : Image.memory(productImageBytes!, fit: BoxFit.cover),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    label: const Text('Camera'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Gallery'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (imageError) ...[
+          const SizedBox(height: 7),
+          const Text(
+            'Add a product image to continue.',
+            style: TextStyle(color: userRed, fontSize: 11),
+          ),
+        ],
+      ],
+    ),
+  );
+
   void _continue() {
     if (!(stepKeys[currentStep].currentState?.validate() ?? false)) return;
+    if (currentStep == 0 && productImageBytes == null) {
+      setState(() => imageError = true);
+      return;
+    }
     if (currentStep < 2) {
       setState(() => currentStep++);
       return;
@@ -289,17 +428,19 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
       'item_type': 'material',
       'name': name.text.trim(),
       'sku': sku.text.trim(),
+      'barcode': sku.text.trim(),
       'category': categoryId,
       'purchase_price': purchasePrice.text.trim(),
       'selling_price': sellingPrice.text.trim(),
       'tax_percent': gst,
-      'rack_location': rackLocation.text.trim(),
+      if (_selectedRackId != null) 'rack': _selectedRackId,
+      'rack_location': rackLocation,
       'store_stock': stock,
       'shelf_stock': 0,
       'stock_quantity': stock,
       'is_active': true,
     };
-    final success = await widget.state.createProduct(body);
+    final success = await widget.state.createProduct(body, image: productImage);
     if (!mounted) return;
     if (success) {
       _notice(context, '${name.text.trim()} added successfully.');

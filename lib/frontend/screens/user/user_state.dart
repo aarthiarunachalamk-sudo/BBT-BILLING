@@ -23,7 +23,7 @@ class UserState extends ChangeNotifier {
   bool loading = true;
   String? error;
   Map<String, dynamic> user = {}, dashboard = {}, lastInvoice = {}, paymentSummary = {};
-  List<Map<String, dynamic>> categories = [], products = [], batches = [], reviews = [], invoices = [], stockMovements = [];
+  List<Map<String, dynamic>> categories = [], racks = [], products = [], batches = [], reviews = [], invoices = [], stockMovements = [];
   final List<CartLine> cart = [];
   int navIndex = 0;
   String search = '', stockFilter = 'All', reviewFilter = 'All', expiryFilter = '30 Days';
@@ -77,6 +77,7 @@ class UserState extends ChangeNotifier {
           break;
         case UserPage.addProduct:
           categories = await api.getList('categories');
+          racks = await api.getList('racks', query: const {'active': 'true'});
           break;
         case UserPage.currentStock:
           products = await api.getStoreStock(
