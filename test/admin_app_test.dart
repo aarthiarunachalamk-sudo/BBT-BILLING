@@ -188,6 +188,55 @@ void main() {
     expect(requests, 1);
   });
 
+  test('wake-up accepts a structured Django health 503 immediately', () async {
+    var requests = 0;
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        requests += 1;
+        return http.Response(
+          jsonEncode({
+            'status': 'error',
+            'service': 'bbt-billing-api',
+            'database': 'migration_required',
+          }),
+          503,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    addTearDown(api.dispose);
+
+    final awake = await api.waitForServer(
+      maxAttempts: 8,
+      initialDelay: Duration.zero,
+    );
+
+    expect(awake, isTrue);
+    expect(requests, 1);
+  });
+
+  test('wake-up retries a generic Render gateway 503', () async {
+    var requests = 0;
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        requests += 1;
+        if (requests == 1) return http.Response('Service Unavailable', 503);
+        return http.Response('{}', 200);
+      }),
+    );
+    addTearDown(api.dispose);
+
+    final awake = await api.waitForServer(
+      maxAttempts: 2,
+      initialDelay: Duration.zero,
+    );
+
+    expect(awake, isTrue);
+    expect(requests, 2);
+  });
+
   testWidgets('Android back returns an admin sub-screen to dashboard', (
     tester,
   ) async {

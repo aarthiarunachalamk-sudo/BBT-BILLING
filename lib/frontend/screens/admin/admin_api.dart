@@ -101,8 +101,9 @@ class AdminApi {
 
   // ── Wake-up / health-check ────────────────────────────────────────────────
 
-  /// Pings the health endpoint repeatedly until the server responds or
-  /// [maxAttempts] is exhausted.  Returns true when reachable.
+  /// Pings the health endpoint repeatedly until Django responds or
+  /// [maxAttempts] is exhausted. A structured API health error still proves
+  /// that Render is awake; generic Render/Cloudflare 5xx pages are retried.
   Future<bool> waitForServer({
     int maxAttempts = 3,
     Duration initialDelay = const Duration(seconds: 1),
@@ -116,7 +117,7 @@ class AdminApi {
           final response = await _client
               .get(Uri.parse('$origin/health/'))
               .timeout(const Duration(seconds: 6));
-          if (response.statusCode >= 200 && response.statusCode < 400) {
+          if (_djangoIsResponding(response)) {
             baseUrl = candidate;
             return true;
           }
@@ -131,6 +132,17 @@ class AdminApi {
       }
     }
     return false;
+  }
+
+  bool _djangoIsResponding(http.Response response) {
+    if (response.statusCode >= 200 && response.statusCode < 400) return true;
+    if (response.statusCode < 500 || response.bodyBytes.isEmpty) return false;
+    try {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return decoded is Map && decoded['service'] == 'bbt-billing-api';
+    } on FormatException {
+      return false;
+    }
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
