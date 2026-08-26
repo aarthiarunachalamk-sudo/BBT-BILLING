@@ -65,6 +65,19 @@ PRODUCT_CATALOG_FIELDS = {
     # column makes the whole product screen fail with a 500 response.
     Item: ("store_section", "rack_location"),
 }
+PRODUCT_CATALOG_MIGRATIONS = (
+    "0013_item_store_section_item_rack_location",
+    # Some legacy databases recorded the dependent migration without 0013.
+    # In that state the columns should already exist and are safe to repair.
+    "0014_secure_razorpay_payments",
+)
+
+
+def product_catalog_migration_is_applied():
+    """Return whether migration history says the catalogue fields should exist."""
+    return MigrationRecorder(connection).migration_qs.filter(
+        app="billing", name__in=PRODUCT_CATALOG_MIGRATIONS
+    ).exists()
 
 
 def admin_visibility_schema_status():
@@ -168,10 +181,7 @@ def repair_split_stock_schema():
     # Some Render services still use an older dashboard-level start command
     # that invokes only this repair after migrate. If 0013 is already marked
     # applied, restore its Item columns before any split-stock Item query.
-    recorder = MigrationRecorder(connection)
-    if recorder.migration_qs.filter(
-        app="billing", name="0013_item_store_section_item_rack_location"
-    ).exists():
+    if product_catalog_migration_is_applied():
         repair_product_catalog_schema()
 
     existing_tables = set(connection.introspection.table_names())

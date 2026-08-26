@@ -11,6 +11,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from billing.schema_repair import (
     admin_visibility_schema_status,
+    product_catalog_migration_is_applied,
     product_catalog_schema_status,
     repair_admin_visibility_schema,
     repair_product_catalog_schema,
@@ -55,10 +56,7 @@ def health_check(request):
             repair_admin_visibility_schema()
             # Only repair 0013 after Django considers it applied. Otherwise
             # the normal migration must own creation of these columns.
-            if MigrationRecorder(connection).migration_qs.filter(
-                app="billing",
-                name="0013_item_store_section_item_rack_location",
-            ).exists():
+            if product_catalog_migration_is_applied():
                 repair_product_catalog_schema()
             repair_split_stock_schema()
             connection.close()

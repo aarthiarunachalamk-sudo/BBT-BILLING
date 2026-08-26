@@ -99,11 +99,22 @@ class ProductCatalogSchemaRepairTests(APITransactionTestCase):
         self.assertNotIn("billing_item.expiry_date", admin_visibility_schema_status())
 
     def test_split_stock_repair_tolerates_missing_location_columns(self):
+        recorder = MigrationRecorder(connection)
+        recorder.migration_qs.filter(
+            app="billing", name="0013_item_store_section_item_rack_location"
+        ).delete()
         with connection.schema_editor() as editor:
             editor.remove_field(Item, Item._meta.get_field("rack_location"))
             editor.remove_field(Item, Item._meta.get_field("store_section"))
 
-        repair_split_stock_schema()
+        try:
+            # A later applied migration still proves that these fields should
+            # exist, even when the legacy database lost its 0013 record.
+            repair_split_stock_schema()
+        finally:
+            recorder.record_applied(
+                "billing", "0013_item_store_section_item_rack_location"
+            )
 
         self.assertEqual(product_catalog_schema_status(), [])
 
