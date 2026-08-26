@@ -41,6 +41,7 @@ MIGRATIONS = (
 FIELD_NAMES = {
     Item: (
         "manual_details",
+        "expiry_date",
         "barcode",
         "image",
         "mrp",
@@ -164,6 +165,15 @@ def repair_split_stock_schema():
     even though their DDL was never committed.  This is deliberately
     idempotent so it is safe to execute at every deployment.
     """
+    # Some Render services still use an older dashboard-level start command
+    # that invokes only this repair after migrate. If 0013 is already marked
+    # applied, restore its Item columns before any split-stock Item query.
+    recorder = MigrationRecorder(connection)
+    if recorder.migration_qs.filter(
+        app="billing", name="0013_item_store_section_item_rack_location"
+    ).exists():
+        repair_product_catalog_schema()
+
     existing_tables = set(connection.introspection.table_names())
     with connection.schema_editor() as editor:
         for model in SPLIT_STOCK_MODELS:
@@ -183,7 +193,11 @@ def repair_split_stock_schema():
     # applied.  Create only missing per-product records; existing production
     # quantities and movement history are never overwritten or duplicated.
     with transaction.atomic():
-        for product in Item.objects.filter(item_type=Item.ItemType.MATERIAL).iterator():
+        # Location columns belong to migration 0013 and may still be absent
+        # when this function is invoked by an older Render start command.
+        for product in Item.objects.filter(
+            item_type=Item.ItemType.MATERIAL
+        ).defer("store_section", "rack_location").iterator():
             store_quantity = product.store_stock
             shelf_quantity = product.shelf_stock
             if store_quantity == 0 and shelf_quantity == 0 and product.stock_quantity:

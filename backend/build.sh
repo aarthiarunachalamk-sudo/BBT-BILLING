@@ -37,7 +37,7 @@ if ! python manage.py migrate --noinput; then
 fi
 echo "Billing migration status after build:"
 python manage.py showmigrations billing
-python manage.py shell -c "from billing.schema_repair import repair_split_stock_schema; repair_split_stock_schema()"
 python manage.py shell -c "from billing.schema_repair import repair_product_catalog_schema; repair_product_catalog_schema()"
+python manage.py shell -c "from billing.schema_repair import repair_split_stock_schema; repair_split_stock_schema()"
 python manage.py seed_weight_products
 python manage.py seed_brand_catalog

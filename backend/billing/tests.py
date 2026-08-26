@@ -50,8 +50,11 @@ from .inventory.services.stock_service import (
     transfer_store_to_shelf,
 )
 from .schema_repair import (
+    admin_visibility_schema_status,
     product_catalog_schema_status,
+    repair_admin_visibility_schema,
     repair_product_catalog_schema,
+    repair_split_stock_schema,
 )
 
 
@@ -73,8 +76,6 @@ class ProductCatalogSchemaRepairTests(APITransactionTestCase):
                 with_applied_migrations=True
             )
 
-        from .schema_repair import repair_admin_visibility_schema
-
         repair_admin_visibility_schema()
         state = MigrationExecutor(connection)._create_project_state(
             with_applied_migrations=True
@@ -86,6 +87,25 @@ class ProductCatalogSchemaRepairTests(APITransactionTestCase):
                 app="billing", name="0002_admin_flow_models"
             ).exists()
         )
+
+    def test_admin_repair_restores_expiry_column_before_recording_0003(self):
+        field = Item._meta.get_field("expiry_date")
+        with connection.schema_editor() as editor:
+            editor.remove_field(Item, field)
+
+        self.assertIn("billing_item.expiry_date", admin_visibility_schema_status())
+        repair_admin_visibility_schema()
+
+        self.assertNotIn("billing_item.expiry_date", admin_visibility_schema_status())
+
+    def test_split_stock_repair_tolerates_missing_location_columns(self):
+        with connection.schema_editor() as editor:
+            editor.remove_field(Item, Item._meta.get_field("rack_location"))
+            editor.remove_field(Item, Item._meta.get_field("store_section"))
+
+        repair_split_stock_schema()
+
+        self.assertEqual(product_catalog_schema_status(), [])
 
     def test_catalog_schema_repair_is_idempotent(self):
         self.assertEqual(product_catalog_schema_status(), [])

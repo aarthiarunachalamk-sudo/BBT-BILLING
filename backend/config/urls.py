@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -16,6 +18,9 @@ from billing.schema_repair import (
     split_stock_schema_status,
 )
 from billing.views import AdminTokenObtainPairView, change_password, checkout, current_user, dashboard, logout_view, razorpay_order
+
+
+logger = logging.getLogger(__name__)
 
 
 def api_root(request):
@@ -48,7 +53,6 @@ def health_check(request):
             # This legacy database has an inconsistent migration history, so
             # repair the known additive schema changes before serving traffic.
             repair_admin_visibility_schema()
-            repair_split_stock_schema()
             # Only repair 0013 after Django considers it applied. Otherwise
             # the normal migration must own creation of these columns.
             if MigrationRecorder(connection).migration_qs.filter(
@@ -56,9 +60,11 @@ def health_check(request):
                 name="0013_item_store_section_item_rack_location",
             ).exists():
                 repair_product_catalog_schema()
+            repair_split_stock_schema()
             connection.close()
             schema_ready = schema_is_ready()
     except Exception as exception:
+        logger.exception("Automatic database schema repair failed")
         return JsonResponse(
             {"status": "error", "service": "bbt-billing-api", "database": exception.__class__.__name__},
             status=503,
