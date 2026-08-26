@@ -155,6 +155,25 @@ def repair_admin_visibility_schema():
             recorder.record_applied("billing", migration)
             print(f"Repaired legacy billing migration record: {migration}")
 
+    # A few legacy databases contain 0014 without its declared dependency
+    # 0013. Django rejects that history before `migrate` can run, so restore
+    # both the additive columns and dependency record during this pre-migrate
+    # repair. Never fake 0013 on databases where no later migration proves it
+    # was intended to be applied.
+    catalog_migration = PRODUCT_CATALOG_MIGRATIONS[0]
+    later_catalog_migration = PRODUCT_CATALOG_MIGRATIONS[1]
+    if (
+        recorder.migration_qs.filter(
+            app="billing", name=later_catalog_migration
+        ).exists()
+        and not recorder.migration_qs.filter(
+            app="billing", name=catalog_migration
+        ).exists()
+    ):
+        repair_product_catalog_schema()
+        recorder.record_applied("billing", catalog_migration)
+        print(f"Repaired legacy billing migration record: {catalog_migration}")
+
 
 def split_stock_schema_status():
     """Return missing split-stock tables/fields for legacy databases."""

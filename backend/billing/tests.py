@@ -98,6 +98,29 @@ class ProductCatalogSchemaRepairTests(APITransactionTestCase):
 
         self.assertNotIn("billing_item.expiry_date", admin_visibility_schema_status())
 
+    def test_admin_repair_restores_missing_0013_dependency_before_migrate(self):
+        recorder = MigrationRecorder(connection)
+        recorder.migration_qs.filter(
+            app="billing", name="0013_item_store_section_item_rack_location"
+        ).delete()
+        with connection.schema_editor() as editor:
+            editor.remove_field(Item, Item._meta.get_field("rack_location"))
+            editor.remove_field(Item, Item._meta.get_field("store_section"))
+
+        repair_admin_visibility_schema()
+
+        self.assertEqual(product_catalog_schema_status(), [])
+        self.assertTrue(
+            recorder.migration_qs.filter(
+                app="billing",
+                name="0013_item_store_section_item_rack_location",
+            ).exists()
+        )
+        state = MigrationExecutor(connection)._create_project_state(
+            with_applied_migrations=True
+        )
+        self.assertIsNotNone(state.apps.get_model("billing", "Item"))
+
     def test_split_stock_repair_tolerates_missing_location_columns(self):
         recorder = MigrationRecorder(connection)
         recorder.migration_qs.filter(
