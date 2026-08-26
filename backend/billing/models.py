@@ -125,6 +125,22 @@ class Brand(TimeStampedModel):
         return self.name
 
 
+class Rack(TimeStampedModel):
+    name = models.CharField(max_length=100)
+    branch = models.CharField(max_length=120, default="Main Branch")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["display_order", "name"]
+        constraints = [
+            models.UniqueConstraint(fields=["name", "branch"], name="unique_rack_name_branch")
+        ]
+
+    def __str__(self):
+        return self.name
+
+
 class Item(TimeStampedModel):
     class ItemType(models.TextChoices):
         SERVICE = "service", "Service"
@@ -140,8 +156,11 @@ class Item(TimeStampedModel):
     brand = models.ForeignKey(
         Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
     )
-    supplier = models.ForeignKey(
+        supplier = models.ForeignKey(
         Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
+    )
+    rack = models.ForeignKey(
+        Rack, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
     )
     unit = models.CharField(max_length=30, default="unit")
     # Physical in-store location, independent of the sales category.  Examples:
