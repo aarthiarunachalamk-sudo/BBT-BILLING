@@ -23,7 +23,11 @@ void main() {
     app.main();
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome Admin'), findsOneWidget);
+    expect(find.text('Choose your workspace'), findsOneWidget);
+    await tester.tap(find.text('Admin'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('BBT Billing'), findsOneWidget);
     expect(find.text('Username or Email'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.text('Login'), findsOneWidget);
@@ -75,9 +79,9 @@ void main() {
     expect(find.text('256'), findsOneWidget);
     expect(find.text('₹ 12850.00'), findsOneWidget);
     expect(find.text('23'), findsWidgets);
-    expect(find.text('12'), findsOneWidget);
-    expect(find.text('7'), findsOneWidget);
-    expect(find.text('↑ 8.5% vs yesterday'), findsOneWidget);
+    expect(find.text("Today's Payments"), findsOneWidget);
+    expect(find.text('Total Collection'), findsOneWidget);
+    expect(find.text('8.5% vs yesterday'), findsOneWidget);
   });
 
   test('login opens dashboard before workspace hydration completes', () async {
@@ -117,10 +121,15 @@ void main() {
     expect(state.screen, 1);
     expect(state.refreshing, isTrue);
     await Future<void>.delayed(const Duration(milliseconds: 10));
-    expect(hydrationRequests, 16);
+    // Hydration is sequential so a free-tier server is not flooded with
+    // simultaneous requests. Login itself does not wait for this work.
+    expect(hydrationRequests, 1);
 
     hydrationGate.complete();
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    while (state.refreshing) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(hydrationRequests, 18);
     expect(state.refreshing, isFalse);
   });
 
@@ -318,11 +327,14 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
 
-    expect(find.text('Product catalog'), findsOneWidget);
-    expect(find.text('Inventory cost'), findsOneWidget);
-    expect(find.text('23% OFF'), findsOneWidget);
-    expect(find.text('24 in stock'), findsOneWidget);
-    expect(find.byTooltip('Add or replace product image'), findsOneWidget);
+    expect(find.text('Product Management'), findsOneWidget);
+    expect(
+      find.text('Fortune Sunlite Refined Sunflower Oil 840 g'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('SKU: FORTUNE-SUNLITE-840G'), findsOneWidget);
+    expect(find.textContaining('Total: 24'), findsOneWidget);
+    expect(find.text('Add Product'), findsOneWidget);
   });
 
   testWidgets('GST report button opens a calculated report', (tester) async {
@@ -342,12 +354,12 @@ void main() {
     addTearDown(state.dispose);
 
     await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
-    await tester.tap(find.text('GST Report'));
+    await tester.tap(find.text('GST\nReport'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Taxable Amount:'), findsOneWidget);
-    expect(find.textContaining('CGST Collected:'), findsOneWidget);
-    expect(find.text('Copy'), findsOneWidget);
+    expect(find.text('Taxable Amount'), findsOneWidget);
+    expect(find.text('CGST Collected'), findsOneWidget);
+    expect(find.byTooltip('Copy as CSV'), findsOneWidget);
   });
 
   test('staff toggle immediately updates the rendered user data', () async {

@@ -508,6 +508,7 @@ class Payment(TimeStampedModel):
 
     class Method(models.TextChoices):
         UPI = "upi", "UPI"
+        RAZORPAY = "razorpay", "Razorpay"
         BANK = "bank", "Bank Transfer"
         CARD = "card", "Card"
         CASH = "cash", "Cash"
@@ -537,6 +538,13 @@ class Payment(TimeStampedModel):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["transaction_reference"],
+                condition=models.Q(method="razorpay"),
+                name="unique_razorpay_payment_reference",
+            )
+        ]
 
     def __str__(self):
         return self.receipt_number

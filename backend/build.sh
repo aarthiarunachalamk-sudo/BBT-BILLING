@@ -32,9 +32,12 @@ echo "Running Django database migrations..."
 if ! python manage.py migrate --noinput; then
   echo "Normal migration history is inconsistent; applying targeted additive repair."
   python manage.py shell -c "from billing.schema_repair import repair_admin_visibility_schema; repair_admin_visibility_schema()"
+  echo "Retrying Django migrations after repairing their legacy dependencies."
+  python manage.py migrate --noinput
 fi
 echo "Billing migration status after build:"
 python manage.py showmigrations billing
 python manage.py shell -c "from billing.schema_repair import repair_split_stock_schema; repair_split_stock_schema()"
+python manage.py shell -c "from billing.schema_repair import repair_product_catalog_schema; repair_product_catalog_schema()"
 python manage.py seed_weight_products
 python manage.py seed_brand_catalog

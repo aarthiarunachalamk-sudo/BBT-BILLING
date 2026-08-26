@@ -1,5 +1,7 @@
 from datetime import date, timedelta
 import base64
+import hashlib
+import hmac
 import json
 import os
 from urllib import error as urlerror
@@ -10,6 +12,8 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.core import signing
+from django.core.signing import BadSignature, SignatureExpired
 from django.db import DatabaseError, models, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
@@ -47,6 +51,8 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+RAZORPAY_ORDER_TOKEN_SALT = "billing.razorpay.order"
+RAZORPAY_ORDER_TOKEN_MAX_AGE = 30 * 60
 from .serializers import (
     AuditLogSerializer,
     BrandSerializer,
@@ -167,7 +173,63 @@ def razorpay_order(request):
     except (urlerror.URLError, urlerror.HTTPError, TimeoutError, ValueError) as exception:
         logger.exception("Razorpay order creation failed")
         return Response({"detail": "Could not start Razorpay payment. Please retry."}, status=status.HTTP_502_BAD_GATEWAY)
-    return Response({"key_id": key_id, "order_id": order["id"], "amount": order["amount"], "currency": "INR"}, status=status.HTTP_201_CREATED)
+    order_id = str(order.get("id", ""))
+    order_amount = order.get("amount")
+    if not order_id or order_amount != int((amount * 100).quantize(Decimal("1"))):
+        logger.error("Razorpay returned an invalid order response")
+        return Response({"detail": "Razorpay returned an invalid order. Please retry."}, status=status.HTTP_502_BAD_GATEWAY)
+    order_token = signing.dumps(
+        {"order_id": order_id, "amount": str(amount), "user_id": request.user.pk},
+        salt=RAZORPAY_ORDER_TOKEN_SALT,
+        compress=True,
+    )
+    return Response(
+        {
+            "key_id": key_id,
+            "order_id": order_id,
+            "order_token": order_token,
+            "amount": order_amount,
+            "currency": "INR",
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
+def _razorpay_payment_error(entry, user, amount):
+    """Validate Checkout's callback against the server-created order."""
+    credentials = _razorpay_credentials()
+    if credentials is None:
+        return "Razorpay is not configured on the server."
+    order_id = str(entry.get("razorpay_order_id", "")).strip()
+    payment_id = str(entry.get("razorpay_payment_id", "")).strip()
+    signature = str(entry.get("razorpay_signature", "")).strip()
+    order_token = str(entry.get("razorpay_order_token", "")).strip()
+    if not all((order_id, payment_id, signature, order_token)):
+        return "Razorpay payment confirmation is incomplete."
+    try:
+        order = signing.loads(
+            order_token,
+            salt=RAZORPAY_ORDER_TOKEN_SALT,
+            max_age=RAZORPAY_ORDER_TOKEN_MAX_AGE,
+        )
+    except SignatureExpired:
+        return "The Razorpay order expired. Start the payment again."
+    except BadSignature:
+        return "The Razorpay order could not be authenticated."
+    if (
+        order.get("order_id") != order_id
+        or str(order.get("user_id")) != str(user.pk)
+        or str(order.get("amount")) != str(amount)
+    ):
+        return "The Razorpay order does not match this checkout."
+    expected = hmac.new(
+        credentials[1].encode(),
+        f"{order_id}|{payment_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return "Razorpay payment signature verification failed."
+    return None
 
 
 @api_view(["POST"])
@@ -337,6 +399,8 @@ def checkout(request):
     parsed_payments = []
     payment_total = Decimal("0.00")
     for index, entry in enumerate(payments_data):
+        if not isinstance(entry, dict):
+            return Response({"payments": f"Payment {index + 1} is invalid."}, status=status.HTTP_400_BAD_REQUEST)
         method = str(entry.get("method", "")).lower()
         if method not in allowed_methods:
             return Response({"payments": f"Payment {index + 1} has an invalid method."}, status=status.HTTP_400_BAD_REQUEST)
@@ -353,6 +417,20 @@ def checkout(request):
             {"payments": f"Payment total {payment_total} must equal invoice total {grand_total}."},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    razorpay_references = []
+    for method, amount, entry in parsed_payments:
+        if method != Payment.Method.RAZORPAY:
+            continue
+        verification_error = _razorpay_payment_error(entry, request.user, amount)
+        if verification_error:
+            return Response({"payments": verification_error}, status=status.HTTP_400_BAD_REQUEST)
+        payment_id = str(entry["razorpay_payment_id"]).strip()
+        razorpay_references.append(payment_id)
+    if len(razorpay_references) != len(set(razorpay_references)) or Payment.objects.filter(
+        method=Payment.Method.RAZORPAY,
+        transaction_reference__in=razorpay_references,
+    ).exists():
+        return Response({"payments": "This Razorpay payment has already been processed."}, status=status.HTTP_409_CONFLICT)
 
     client_id = request.data.get("client")
     if client_id:
@@ -422,7 +500,9 @@ def checkout(request):
             payment_type=Payment.PaymentType.FULL if len(parsed_payments) == 1 else Payment.PaymentType.PARTIAL,
             method=method,
             amount=amount,
-            transaction_reference=str(entry.get("reference", "")),
+            transaction_reference=str(
+                entry.get("razorpay_payment_id", entry.get("reference", ""))
+            ),
             cash_received=_money(entry.get("cash_received", amount if method == Payment.Method.CASH else 0)),
             balance_returned=Decimal("0.00"),
             status=Payment.Status.VERIFIED,
@@ -531,6 +611,7 @@ class UserViewSet(SearchableModelViewSet):
             "cash_collection": by_method.get(Payment.Method.CASH, Decimal("0.00")),
             "upi_collection": by_method.get(Payment.Method.UPI, Decimal("0.00")),
             "card_collection": by_method.get(Payment.Method.CARD, Decimal("0.00")),
+            "razorpay_collection": by_method.get(Payment.Method.RAZORPAY, Decimal("0.00")),
             "stock_updated_count": InventoryTransaction.objects.filter(performed_by=user, created_at__date=today).count(),
             "last_activity": AuditLogSerializer(user.audit_logs.first()).data if user.audit_logs.exists() else None,
             "recent_bills": InvoiceSerializer(
@@ -1555,6 +1636,7 @@ def dashboard(request):
         "upi_collection": payment_totals.get(Payment.Method.UPI, Decimal("0.00")),
         "cash_collection": payment_totals.get(Payment.Method.CASH, Decimal("0.00")),
         "card_collection": payment_totals.get(Payment.Method.CARD, Decimal("0.00")),
+        "razorpay_collection": payment_totals.get(Payment.Method.RAZORPAY, Decimal("0.00")),
         "total_collection": paid_today,
         "quantity_review_due_count": review_due,
         "shelf_stock_3_month_count": old_shelf_stock,

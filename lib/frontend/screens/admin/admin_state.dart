@@ -73,7 +73,7 @@ class AdminState extends ChangeNotifier {
   final Map<String, bool> categoryActive = {};
 
   void go(int value) {
-    var destination = value.clamp(0, 19);
+    var destination = value.clamp(0, 20);
     if (!loggedIn && destination != 0 && destination != 16) {
       destination = 0;
     }
@@ -267,6 +267,26 @@ class AdminState extends ChangeNotifier {
       error = 'Cannot reach ${api.baseUrl}';
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<bool> refreshAuditLogs() async {
+    if (refreshing) return false;
+    refreshing = true;
+    error = null;
+    notifyListeners();
+    try {
+      auditLogs = await api.getList('audit-logs');
+      return true;
+    } on ApiException catch (exception) {
+      error = exception.message;
+      return false;
+    } catch (_) {
+      error = 'Cannot reach ${api.baseUrl}';
+      return false;
+    } finally {
+      refreshing = false;
+      notifyListeners();
     }
   }
 

@@ -227,6 +227,7 @@ class _ReferencePaymentSummary extends StatelessWidget {
     final upi = amount('upi');
     final cash = amount('cash');
     final card = amount('card');
+    final razorpay = amount('razorpay');
     return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,6 +255,12 @@ class _ReferencePaymentSummary extends StatelessWidget {
             card,
             const Color(0xFF7C3AED),
           ),
+          _paymentRow(
+            Icons.account_balance_wallet_rounded,
+            'Razorpay',
+            razorpay,
+            blue,
+          ),
           const Divider(height: 22),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -263,7 +270,7 @@ class _ReferencePaymentSummary extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
               Text(
-                _money(upi + cash + card),
+                _money(upi + cash + card + razorpay),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,

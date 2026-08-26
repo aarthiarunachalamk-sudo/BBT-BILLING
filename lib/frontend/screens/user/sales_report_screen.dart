@@ -14,7 +14,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
   Future<void> load(String value) async {
     setState(() => range = value);
     widget.state.loading = true;
-    widget.state.notifyListeners();
+    widget.state.notify();
     try {
       widget.state.paymentSummary = await widget.state.api.getMap('payments/summary', query: {'range': value});
       widget.state.invoices = await widget.state.api.getList('invoices');
@@ -22,7 +22,7 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
       widget.state.error = error.message;
     } finally {
       widget.state.loading = false;
-      widget.state.notifyListeners();
+      widget.state.notify();
     }
   }
 
@@ -108,3 +108,4 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
     );
   }
 }
+

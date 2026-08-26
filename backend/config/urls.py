@@ -9,7 +9,9 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from billing.schema_repair import (
     admin_visibility_schema_status,
+    product_catalog_schema_status,
     repair_admin_visibility_schema,
+    repair_product_catalog_schema,
     repair_split_stock_schema,
     split_stock_schema_status,
 )
@@ -31,9 +33,14 @@ def health_check(request):
     def schema_is_ready():
         applied = MigrationRecorder(connection).migration_qs.filter(
             app="billing",
-            name="0011_migrate_split_stock_data",
+            name="0014_secure_razorpay_payments",
         ).exists()
-        return applied and not admin_visibility_schema_status() and not split_stock_schema_status()
+        return (
+            applied
+            and not admin_visibility_schema_status()
+            and not split_stock_schema_status()
+            and not product_catalog_schema_status()
+        )
 
     try:
         schema_ready = schema_is_ready()
@@ -42,6 +49,13 @@ def health_check(request):
             # repair the known additive schema changes before serving traffic.
             repair_admin_visibility_schema()
             repair_split_stock_schema()
+            # Only repair 0013 after Django considers it applied. Otherwise
+            # the normal migration must own creation of these columns.
+            if MigrationRecorder(connection).migration_qs.filter(
+                app="billing",
+                name="0013_item_store_section_item_rack_location",
+            ).exists():
+                repair_product_catalog_schema()
             connection.close()
             schema_ready = schema_is_ready()
     except Exception as exception:
@@ -54,8 +68,12 @@ def health_check(request):
             "status": "ok" if schema_ready else "error",
             "service": "bbt-billing-api",
             "database": "ready" if schema_ready else "migration_required",
-            "schema": "0011",
-            "missing": (admin_visibility_schema_status() + split_stock_schema_status()) if not schema_ready else [],
+            "schema": "0014",
+            "missing": (
+                admin_visibility_schema_status()
+                + split_stock_schema_status()
+                + product_catalog_schema_status()
+            ) if not schema_ready else [],
         },
         status=200 if schema_ready else 503,
     )

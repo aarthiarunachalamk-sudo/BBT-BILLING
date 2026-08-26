@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../widgets/product_image_widget.dart';
 
 import 'user_api.dart';
@@ -29,14 +30,20 @@ part 'invoice_screen.dart';
 part 'user_profile_screen.dart';
 
 Widget buildUserScreen(UserState state) => switch (state.page) {
-  UserPage.login => StaffLoginScreen(state), UserPage.verification => UserVerificationScreen(state),
-  UserPage.dashboard => UserDashboardScreen(state), UserPage.inventory => InventoryCategoriesScreen(state),
+  UserPage.login => StaffLoginScreen(state),
+  UserPage.verification => UserVerificationScreen(state),
+  UserPage.dashboard => UserDashboardScreen(state),
+  UserPage.inventory => InventoryCategoriesScreen(state),
   UserPage.addProduct => UserAddProductScreen(state),
-  UserPage.currentStock => CurrentStockScreen(state), UserPage.shelfAging => ShelfAgingScreen(state),
+  UserPage.currentStock => CurrentStockScreen(state),
+  UserPage.shelfAging => ShelfAgingScreen(state),
   UserPage.stockMovement => StockMovementScreen(state),
-  UserPage.quantityReview => QuantityReviewScreen(state), UserPage.expiry => ExpiryProductsScreen(state),
-  UserPage.billing => UserBillingScreen(state), UserPage.payment => PaymentMethodScreen(state),
-  UserPage.reports => SalesReportScreen(state), UserPage.invoice => InvoiceScreen(state),
+  UserPage.quantityReview => QuantityReviewScreen(state),
+  UserPage.expiry => ExpiryProductsScreen(state),
+  UserPage.billing => UserBillingScreen(state),
+  UserPage.payment => PaymentMethodScreen(state),
+  UserPage.reports => SalesReportScreen(state),
+  UserPage.invoice => InvoiceScreen(state),
   UserPage.profile => UserProfileScreen(state),
 };
 

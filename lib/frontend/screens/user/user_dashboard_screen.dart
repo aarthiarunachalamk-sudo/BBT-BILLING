@@ -227,6 +227,7 @@ class _PaymentsCard extends StatelessWidget {
         _PaymentRow(icon: Icons.check_circle, label: 'GPay / UPI', value: data['upi_collection'], color: userGreen),
         _PaymentRow(icon: Icons.account_balance_wallet_rounded, label: 'Cash', value: data['cash_collection'], color: const Color(0xFFFF6B00)),
         _PaymentRow(icon: Icons.credit_card_rounded, label: 'Card', value: data['card_collection'], color: const Color(0xFF6D28D9)),
+        _PaymentRow(icon: Icons.account_balance_wallet_rounded, label: 'Razorpay', value: data['razorpay_collection'], color: userBlue),
         const Divider(height: 10),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),

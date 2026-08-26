@@ -14,6 +14,10 @@ class BulkShelfActionResult {
 class UserState extends ChangeNotifier {
   UserState({UserApi? api}) : api = api ?? UserApi();
   final UserApi api;
+
+  // Public wrapper so widgets can trigger a rebuild without accessing
+  // the protected notifyListeners() directly.
+  void notify() => notifyListeners();
   UserPage page = UserPage.login;
   UserPage? previousPage;
   bool loading = true;

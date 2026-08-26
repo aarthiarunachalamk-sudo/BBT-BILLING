@@ -1,7 +1,11 @@
 from datetime import timedelta
 from decimal import Decimal
+import hashlib
+import hmac
 from io import StringIO
+import json
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.core.management import call_command
 from django.core.exceptions import ValidationError
@@ -9,7 +13,7 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APITransactionTestCase
 from rest_framework.test import APIClient
 
 from .models import (
@@ -42,6 +46,26 @@ from .inventory.services.stock_service import (
     transfer_shelf_to_store,
     transfer_store_to_shelf,
 )
+from .schema_repair import (
+    product_catalog_schema_status,
+    repair_product_catalog_schema,
+)
+
+
+class ProductCatalogSchemaRepairTests(APITransactionTestCase):
+    def test_catalog_schema_repair_is_idempotent(self):
+        self.assertEqual(product_catalog_schema_status(), [])
+
+        repair_product_catalog_schema()
+
+        self.assertEqual(product_catalog_schema_status(), [])
+
+    def test_health_check_requires_latest_product_schema(self):
+        response = self.client.get("/health/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
+        self.assertEqual(response.json()["schema"], "0014")
+        self.assertEqual(response.json()["missing"], [])
 
 
 class SplitStockServiceTests(APITestCase):
@@ -698,4 +722,98 @@ class StaffAdminIntegrationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         product.refresh_from_db()
         self.assertEqual(product.stock_quantity, before)
+        self.assertEqual(Invoice.objects.count(), 0)
+
+    @patch.dict(
+        "os.environ",
+        {"RAZORPAY_KEY_ID": "rzp_test_bbt", "RAZORPAY_KEY_SECRET": "test-secret"},
+    )
+    @patch("billing.views.urlrequest.urlopen")
+    def test_razorpay_order_and_verified_checkout(self, mocked_urlopen):
+        gateway_response = mocked_urlopen.return_value.__enter__.return_value
+        gateway_response.read.return_value = json.dumps(
+            {"id": "order_test_001", "amount": 1770}
+        ).encode()
+        order = self.client.post(
+            "/api/billing/razorpay/order/",
+            {"amount": "17.70"},
+            format="json",
+        )
+        self.assertEqual(order.status_code, status.HTTP_201_CREATED, order.data)
+        self.assertNotIn("test-secret", str(order.data))
+
+        signature = hmac.new(
+            b"test-secret",
+            b"order_test_001|pay_test_001",
+            hashlib.sha256,
+        ).hexdigest()
+        product = Item.objects.get(sku="TEST-ITEM")
+        checkout_response = self.client.post(
+            "/api/billing/checkout/",
+            {
+                "items": [{"product": product.pk, "quantity": 1}],
+                "payments": [
+                    {
+                        "method": "razorpay",
+                        "amount": "17.70",
+                        "razorpay_payment_id": "pay_test_001",
+                        "razorpay_order_id": "order_test_001",
+                        "razorpay_signature": signature,
+                        "razorpay_order_token": order.data["order_token"],
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(checkout_response.status_code, status.HTTP_201_CREATED, checkout_response.data)
+        self.assertTrue(
+            Payment.objects.filter(
+                method=Payment.Method.RAZORPAY,
+                transaction_reference="pay_test_001",
+                status=Payment.Status.VERIFIED,
+            ).exists()
+        )
+        dashboard_response = self.client.get("/api/dashboard/")
+        self.assertEqual(
+            Decimal(dashboard_response.data["razorpay_collection"]),
+            Decimal("17.70"),
+        )
+
+    @patch.dict(
+        "os.environ",
+        {"RAZORPAY_KEY_ID": "rzp_test_bbt", "RAZORPAY_KEY_SECRET": "test-secret"},
+    )
+    @patch("billing.views.urlrequest.urlopen")
+    def test_razorpay_checkout_rejects_invalid_signature_without_writes(self, mocked_urlopen):
+        gateway_response = mocked_urlopen.return_value.__enter__.return_value
+        gateway_response.read.return_value = json.dumps(
+            {"id": "order_test_bad", "amount": 1770}
+        ).encode()
+        order = self.client.post(
+            "/api/billing/razorpay/order/",
+            {"amount": "17.70"},
+            format="json",
+        )
+        product = Item.objects.get(sku="TEST-ITEM")
+        response = self.client.post(
+            "/api/billing/checkout/",
+            {
+                "items": [{"product": product.pk, "quantity": 1}],
+                "payments": [
+                    {
+                        "method": "razorpay",
+                        "amount": "17.70",
+                        "razorpay_payment_id": "pay_forged",
+                        "razorpay_order_id": "order_test_bad",
+                        "razorpay_signature": "forged",
+                        "razorpay_order_token": order.data["order_token"],
+                    }
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("signature", response.data["payments"].lower())
         self.assertEqual(Invoice.objects.count(), 0)

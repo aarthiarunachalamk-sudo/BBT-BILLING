@@ -43,7 +43,7 @@ class UserShell extends StatelessWidget {
       if (state.error != null) Container(
         margin: const EdgeInsets.fromLTRB(12, 10, 12, 0), padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: const Color(0xFFFFF1F0), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFECACA))),
-        child: Row(children: [const Icon(Icons.error_outline_rounded, color: userRed), const SizedBox(width: 10), Expanded(child: Text(state.error!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))), TextButton(onPressed: state.refresh, child: const Text('Retry')), IconButton(tooltip: 'Dismiss error', visualDensity: VisualDensity.compact, icon: const Icon(Icons.close), onPressed: () { state.error = null; state.notifyListeners(); })]),
+        child: Row(children: [const Icon(Icons.error_outline_rounded, color: userRed), const SizedBox(width: 10), Expanded(child: Text(state.error!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))), TextButton(onPressed: state.refresh, child: const Text('Retry')), IconButton(tooltip: 'Dismiss error', visualDensity: VisualDensity.compact, icon: const Icon(Icons.close), onPressed: () { state.error = null; state.notify(); })]),
       ),
       Expanded(child: state.loading ? const _UserLoadingSurface() : child),
     ])),
@@ -258,3 +258,4 @@ class _UserLoadingSurface extends StatelessWidget {
 
 String money(dynamic value) => '₹${(double.tryParse('$value') ?? 0).toStringAsFixed(2)}';
 int number(dynamic value) => int.tryParse('$value') ?? 0;
+

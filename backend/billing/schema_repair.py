@@ -50,6 +50,12 @@ FIELD_NAMES = {
 }
 NEW_MODELS = (StockAdjustment, StockReview, ProductBatch, Brand)
 SPLIT_STOCK_MODELS = (StoreStock, ShelfStock, StockMovement)
+PRODUCT_CATALOG_FIELDS = {
+    # Migration 0013 was recorded without its DDL on some legacy Render
+    # databases.  Item list queries select these columns, so either missing
+    # column makes the whole product screen fail with a 500 response.
+    Item: ("store_section", "rack_location"),
+}
 
 
 def admin_visibility_schema_status():
@@ -205,3 +211,45 @@ def repair_split_stock_schema():
                     reference_type="MIGRATION_REPAIR", reference_id=str(product.pk),
                     notes="Recovered from legacy Item shelf stock.",
                 )
+
+
+def product_catalog_schema_status():
+    """Return fields that can prevent the product catalogue from loading."""
+    missing = []
+    tables = set(connection.introspection.table_names())
+    for model, names in PRODUCT_CATALOG_FIELDS.items():
+        table = model._meta.db_table
+        if table not in tables:
+            missing.append(table)
+            continue
+        with connection.cursor() as cursor:
+            columns = {
+                column.name
+                for column in connection.introspection.get_table_description(cursor, table)
+            }
+        missing.extend(
+            f"{table}.{model._meta.get_field(name).column}"
+            for name in names
+            if model._meta.get_field(name).column not in columns
+        )
+    return missing
+
+
+def repair_product_catalog_schema():
+    """Idempotently restore product fields from an incorrectly faked 0013."""
+    existing_tables = set(connection.introspection.table_names())
+    with connection.schema_editor() as editor:
+        for model, names in PRODUCT_CATALOG_FIELDS.items():
+            table = model._meta.db_table
+            if table not in existing_tables:
+                continue
+            with connection.cursor() as cursor:
+                columns = {
+                    column.name
+                    for column in connection.introspection.get_table_description(cursor, table)
+                }
+            for name in names:
+                field = model._meta.get_field(name)
+                if field.column not in columns:
+                    editor.add_field(model, field)
+                    columns.add(field.column)

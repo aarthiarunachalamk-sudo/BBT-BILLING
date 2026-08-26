@@ -26,6 +26,7 @@ part 'returns_refunds_screen.dart';
 part 'whatsapp_invoice_screen.dart';
 part 'reports_store_settings_screen.dart';
 part 'audit_log_logout_screen.dart';
+part 'history_screen.dart';
 
 const adminScreenNames = [
   'Admin Login',
@@ -290,6 +291,7 @@ Widget buildAdminScreen(AdminState state) => switch (state.screen) {
   17 => SalesDashboardScreen(state),
   18 => UserDetailsScreen(state),
   19 => BrandsScreen(state),
+  20 => HistoryScreen(state),
   _ => AuditScreen(state),
 };
 
@@ -344,6 +346,7 @@ class _AdminPage extends StatelessWidget {
                     )
                   : const Icon(Icons.refresh_rounded),
             ),
+          if (state.loggedIn) _AdminAccountMenu(state: state),
           const SizedBox(width: 8),
         ],
       ),
