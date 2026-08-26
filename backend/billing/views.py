@@ -847,7 +847,7 @@ class ItemViewSet(SearchableModelViewSet):
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
-           def get_queryset(self):
+             def get_queryset(self):
         queryset = super().get_queryset()
         item_type = self.request.query_params.get("type")
         active = self.request.query_params.get("active")
