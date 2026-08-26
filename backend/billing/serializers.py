@@ -183,7 +183,7 @@ class ItemSerializer(serializers.ModelSerializer):
     manufactured_date = serializers.DateField(write_only=True, required=False, allow_null=True)
     target_shelf_quantity = serializers.IntegerField(write_only=True, required=False, min_value=0)
 
-     class Meta:
+    class Meta:
         model = Item
         fields = "__all__"
         extra_kwargs = {"sku": {"validators": []}}

@@ -68,6 +68,7 @@ from .serializers import (
     ProductBatchSerializer,
     PurchaseOrderSerializer,
     QuotationSerializer,
+    RackSerializer,
     SupplierSerializer,
     ReturnRequestSerializer,
     RolePermissionSerializer,
