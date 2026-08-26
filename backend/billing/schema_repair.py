@@ -23,7 +23,15 @@ from .models import (
 
 MIGRATIONS = (
     # Legacy Render databases may have later migrations recorded while these
-    # additive dependencies are absent from django_migrations.
+    # dependencies are absent from django_migrations.  The first three are
+    # essential migration *state*: without 0002 Django does not know Item
+    # exists and crashes with KeyError before it can execute any migration.
+    "0001_initial",
+    # 0002_admin_flow replaces this filename. Django's migration loader checks
+    # the replaced name when deciding whether the replacement is applied.
+    "0002_admin_flow_models",
+    "0002_admin_flow",
+    "0003_item_expiry_date",
     "0004_item_catalog_details_and_sunflower_oil",
     "0005_item_manual_details",
     "0006_admin_visibility_inventory",

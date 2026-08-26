@@ -9,6 +9,9 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.recorder import MigrationRecorder
 from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -53,6 +56,37 @@ from .schema_repair import (
 
 
 class ProductCatalogSchemaRepairTests(APITransactionTestCase):
+    def test_repair_restores_foundational_migration_state(self):
+        recorder = MigrationRecorder(connection)
+        recorder.migration_qs.filter(
+            app="billing",
+            name__in=(
+                "0001_initial",
+                "0002_admin_flow",
+                "0002_admin_flow_models",
+                "0003_item_expiry_date",
+            ),
+        ).delete()
+
+        with self.assertRaises(KeyError):
+            MigrationExecutor(connection)._create_project_state(
+                with_applied_migrations=True
+            )
+
+        from .schema_repair import repair_admin_visibility_schema
+
+        repair_admin_visibility_schema()
+        state = MigrationExecutor(connection)._create_project_state(
+            with_applied_migrations=True
+        )
+
+        self.assertIsNotNone(state.apps.get_model("billing", "Item"))
+        self.assertTrue(
+            recorder.migration_qs.filter(
+                app="billing", name="0002_admin_flow_models"
+            ).exists()
+        )
+
     def test_catalog_schema_repair_is_idempotent(self):
         self.assertEqual(product_catalog_schema_status(), [])
 
