@@ -1532,57 +1532,108 @@ Future<void> _showEditPriceSheet(
   AdminState state,
   Map<String, dynamic> product,
 ) async {
-  final productId = product['id'] as int;
-  final sellingCtrl = TextEditingController(
-    text: product['selling_price']?.toString() ?? '',
-  );
-  final purchaseCtrl = TextEditingController(
-    text: product['purchase_price']?.toString() ?? '',
-  );
-  final mrpCtrl = TextEditingController(text: product['mrp']?.toString() ?? '');
-  var effectiveDate = DateTime.now();
-  var gst =
-      int.tryParse(
-        double.tryParse(
-              product['tax_percent']?.toString() ?? '',
-            )?.toStringAsFixed(0) ??
-            '0',
-      ) ??
-      0;
-  // Snap to a valid slab
-  const slabs = [0, 5, 12, 18, 28];
-  if (!slabs.contains(gst)) gst = 18;
-
-  var saving = false;
-  String? errorText;
-
-  await showModalBottomSheet<void>(
+  final result = await showModalBottomSheet<_PriceSheetResult>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (sheetCtx) => StatefulBuilder(
-      builder: (sheetCtx, setSheet) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 4,
-          bottom: MediaQuery.viewInsetsOf(sheetCtx).bottom + 24,
-        ),
+    builder: (sheetContext) =>
+        _EditProductPriceSheet(state: state, product: product),
+  );
+  if (!context.mounted) return;
+  switch (result) {
+    case _PriceSheetResult.updated:
+      showNotice(context, 'Prices updated — open quotations recalculated.');
+    case _PriceSheetResult.deleted:
+      showNotice(context, 'Product deleted.');
+    case null:
+      return;
+  }
+}
+
+enum _PriceSheetResult { updated, deleted }
+
+class _EditProductPriceSheet extends StatefulWidget {
+  const _EditProductPriceSheet({required this.state, required this.product});
+
+  final AdminState state;
+  final Map<String, dynamic> product;
+
+  @override
+  State<_EditProductPriceSheet> createState() => _EditProductPriceSheetState();
+}
+
+class _EditProductPriceSheetState extends State<_EditProductPriceSheet> {
+  static const slabs = [0, 5, 12, 18, 28];
+
+  late final TextEditingController sellingCtrl;
+  late final TextEditingController purchaseCtrl;
+  late final TextEditingController mrpCtrl;
+  late DateTime effectiveDate;
+  late int gst;
+  bool saving = false;
+  String? errorText;
+
+  int get productId => widget.product['id'] as int;
+
+  @override
+  void initState() {
+    super.initState();
+    sellingCtrl = TextEditingController(
+      text: widget.product['selling_price']?.toString() ?? '',
+    );
+    purchaseCtrl = TextEditingController(
+      text: widget.product['purchase_price']?.toString() ?? '',
+    );
+    mrpCtrl = TextEditingController(
+      text: widget.product['mrp']?.toString() ?? '',
+    );
+    effectiveDate = DateTime.now();
+    gst =
+        int.tryParse(
+          double.tryParse(
+                widget.product['tax_percent']?.toString() ?? '',
+              )?.toStringAsFixed(0) ??
+              '0',
+        ) ??
+        0;
+    if (!slabs.contains(gst)) gst = 18;
+  }
+
+  @override
+  void dispose() {
+    sellingCtrl.dispose();
+    purchaseCtrl.dispose();
+    mrpCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(
+      left: 20,
+      right: 20,
+      top: 4,
+      bottom: MediaQuery.viewInsetsOf(context).bottom + 24,
+    ),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .82,
+      ),
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Header ──────────────────────────────────────────────────
             Row(
               children: [
                 const Icon(Icons.edit_outlined, color: blue, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    product['name']?.toString() ?? 'Edit Prices',
+                    widget.product['name']?.toString() ?? 'Edit Prices',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1591,16 +1642,19 @@ Future<void> _showEditPriceSheet(
                     ),
                   ),
                 ),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: saving ? null : () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                ),
               ],
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               'Choose Today or Tomorrow. Saving the same date again edits that schedule; old bills stay unchanged.',
-              style: const TextStyle(fontSize: 11, color: muted),
+              style: TextStyle(fontSize: 11, color: muted),
             ),
             const SizedBox(height: 16),
-
-            // ── Price fields ─────────────────────────────────────────────
             Row(
               children: [
                 Expanded(
@@ -1639,18 +1693,7 @@ Future<void> _showEditPriceSheet(
                   avatar: const Icon(Icons.today_outlined, size: 16),
                   label: const Text('Today'),
                   selected: _sameCalendarDay(effectiveDate, DateTime.now()),
-                  onSelected: saving
-                      ? null
-                      : (_) {
-                          final now = DateTime.now();
-                          setSheet(
-                            () => effectiveDate = DateTime(
-                              now.year,
-                              now.month,
-                              now.day,
-                            ),
-                          );
-                        },
+                  onSelected: saving ? null : (_) => _selectToday(),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
@@ -1660,38 +1703,13 @@ Future<void> _showEditPriceSheet(
                     effectiveDate,
                     DateTime.now().add(const Duration(days: 1)),
                   ),
-                  onSelected: saving
-                      ? null
-                      : (_) {
-                          final tomorrow = DateTime.now().add(
-                            const Duration(days: 1),
-                          );
-                          setSheet(
-                            () => effectiveDate = DateTime(
-                              tomorrow.year,
-                              tomorrow.month,
-                              tomorrow.day,
-                            ),
-                          );
-                        },
+                  onSelected: saving ? null : (_) => _selectTomorrow(),
                 ),
               ],
             ),
             const SizedBox(height: 10),
             InkWell(
-              onTap: saving
-                  ? null
-                  : () async {
-                      final picked = await showDatePicker(
-                        context: sheetCtx,
-                        initialDate: effectiveDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setSheet(() => effectiveDate = picked);
-                      }
-                    },
+              onTap: saving ? null : _pickDate,
               child: InputDecorator(
                 decoration: const InputDecoration(
                   labelText: 'Price effective from',
@@ -1716,8 +1734,6 @@ Future<void> _showEditPriceSheet(
               ),
             ),
             const SizedBox(height: 16),
-
-            // ── GST slab ─────────────────────────────────────────────────
             const Text(
               'GST Slab',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
@@ -1737,8 +1753,8 @@ Future<void> _showEditPriceSheet(
                           selected: gst == slab,
                           onSelected: saving
                               ? null
-                              : (_) => setSheet(() => gst = slab),
-                          selectedColor: blue,
+                              : (_) => setState(() => gst = slab),
+                          selectedColor: violet,
                           labelStyle: TextStyle(
                             color: gst == slab ? Colors.white : ink,
                           ),
@@ -1748,8 +1764,6 @@ Future<void> _showEditPriceSheet(
                   )
                   .toList(),
             ),
-
-            // ── Error ────────────────────────────────────────────────────
             if (errorText != null) ...[
               const SizedBox(height: 12),
               Text(
@@ -1757,99 +1771,15 @@ Future<void> _showEditPriceSheet(
                 style: const TextStyle(color: red, fontSize: 12),
               ),
             ],
-
             const SizedBox(height: 20),
-
-            // ── Save button ──────────────────────────────────────────────
             PrimaryAction(
               saving ? 'Updating prices…' : 'Update Prices',
               icon: saving ? null : Icons.check_rounded,
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final sp = double.tryParse(sellingCtrl.text.trim());
-                      if (sp == null || sp <= 0) {
-                        setSheet(
-                          () => errorText = 'Enter a valid selling price.',
-                        );
-                        return;
-                      }
-                      setSheet(() {
-                        saving = true;
-                        errorText = null;
-                      });
-                      try {
-                        final body = <String, dynamic>{
-                          'selling_price': sellingCtrl.text.trim(),
-                          'purchase_price': purchaseCtrl.text.trim().isEmpty
-                              ? '0'
-                              : purchaseCtrl.text.trim(),
-                          'tax_percent': gst.toString(),
-                          'effective_date':
-                              '${effectiveDate.year.toString().padLeft(4, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.day.toString().padLeft(2, '0')}',
-                        };
-                        final mrp = mrpCtrl.text.trim();
-                        await state.scheduleProductPrice(productId, body);
-                        await state.updateProduct(productId, {
-                          'mrp': mrp.isEmpty ? null : mrp,
-                        });
-                        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
-                        if (context.mounted) {
-                          showNotice(
-                            context,
-                            'Prices updated — open quotations recalculated.',
-                          );
-                        }
-                      } catch (e) {
-                        setSheet(() {
-                          saving = false;
-                          errorText = e.toString();
-                        });
-                      }
-                    },
+              onPressed: saving ? null : _save,
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final confirmed =
-                          await showDialog<bool>(
-                            context: sheetCtx,
-                            builder: (dialogContext) => AlertDialog(
-                              title: const Text('Delete product?'),
-                              content: Text(
-                                'Delete ${product['name']} permanently? This cannot be undone.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(dialogContext, false),
-                                  child: const Text('Cancel'),
-                                ),
-                                FilledButton(
-                                  onPressed: () =>
-                                      Navigator.pop(dialogContext, true),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: red,
-                                  ),
-                                  child: const Text('Delete'),
-                                ),
-                              ],
-                            ),
-                          ) ??
-                          false;
-                      if (!confirmed) return;
-                      try {
-                        await state.deleteProduct(productId);
-                        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
-                        if (context.mounted) {
-                          showNotice(context, 'Product deleted.');
-                        }
-                      } catch (error) {
-                        setSheet(() => errorText = error.toString());
-                      }
-                    },
+              onPressed: saving ? null : _delete,
               icon: const Icon(Icons.delete_outline),
               label: const Text('Delete Product'),
               style: OutlinedButton.styleFrom(foregroundColor: red),
@@ -1860,9 +1790,102 @@ Future<void> _showEditPriceSheet(
     ),
   );
 
-  sellingCtrl.dispose();
-  purchaseCtrl.dispose();
-  mrpCtrl.dispose();
+  void _selectToday() {
+    final now = DateTime.now();
+    setState(() => effectiveDate = DateTime(now.year, now.month, now.day));
+  }
+
+  void _selectTomorrow() {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    setState(
+      () =>
+          effectiveDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day),
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: effectiveDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null && mounted) setState(() => effectiveDate = picked);
+  }
+
+  Future<void> _save() async {
+    final sellingPrice = double.tryParse(sellingCtrl.text.trim());
+    if (sellingPrice == null || sellingPrice <= 0) {
+      setState(() => errorText = 'Enter a valid selling price.');
+      return;
+    }
+    setState(() {
+      saving = true;
+      errorText = null;
+    });
+    try {
+      await widget.state.scheduleProductPrice(productId, {
+        'selling_price': sellingCtrl.text.trim(),
+        'purchase_price': purchaseCtrl.text.trim().isEmpty
+            ? '0'
+            : purchaseCtrl.text.trim(),
+        'tax_percent': gst.toString(),
+        'effective_date':
+            '${effectiveDate.year.toString().padLeft(4, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.day.toString().padLeft(2, '0')}',
+      });
+      final mrp = mrpCtrl.text.trim();
+      await widget.state.updateProduct(productId, {
+        'mrp': mrp.isEmpty ? null : mrp,
+      });
+      if (mounted) Navigator.pop(context, _PriceSheetResult.updated);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        saving = false;
+        errorText = error.toString();
+      });
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Delete product?'),
+            content: Text(
+              'Delete ${widget.product['name']} permanently? This cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: FilledButton.styleFrom(backgroundColor: red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    setState(() {
+      saving = true;
+      errorText = null;
+    });
+    try {
+      await widget.state.deleteProduct(productId);
+      if (mounted) Navigator.pop(context, _PriceSheetResult.deleted);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        saving = false;
+        errorText = error.toString();
+      });
+    }
+  }
 }
 
 Future<void> _showProductFilters(BuildContext context, AdminState state) async {

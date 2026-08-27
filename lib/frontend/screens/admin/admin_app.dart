@@ -74,14 +74,16 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
         labelStyle: const TextStyle(fontSize: 12, color: ink),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: navy,
-        indicatorColor: const Color(0xFF174E8F),
+        backgroundColor: const Color(0xFF052E66),
+        indicatorColor: violet,
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             fontSize: 9,
-            fontWeight: FontWeight.w700,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w900
+                : FontWeight.w600,
             color: states.contains(WidgetState.selected)
-                ? Colors.white
+                ? softCyan
                 : const Color(0xFFB9CBE3),
           ),
         ),
@@ -96,25 +98,52 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: blue,
+          backgroundColor: violet,
           foregroundColor: Colors.white,
-          elevation: 0,
+          elevation: 2,
+          shadowColor: violet.withValues(alpha: .28),
           minimumSize: const Size(0, 46),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: blue,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(0, 44),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(13),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: blue,
+          foregroundColor: violet,
+          backgroundColor: violet.withValues(alpha: .035),
           minimumSize: const Size(0, 44),
-          side: const BorderSide(color: Color(0xFFB7CAE8)),
+          side: BorderSide(color: violet.withValues(alpha: .45)),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(13),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+      tabBarTheme: const TabBarThemeData(
+        labelColor: violet,
+        unselectedLabelColor: muted,
+        indicatorColor: violet,
+        dividerColor: Color(0xFFE5EAF2),
+        labelStyle: TextStyle(fontWeight: FontWeight.w900),
+        unselectedLabelStyle: TextStyle(fontWeight: FontWeight.w600),
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: UnderlineTabIndicator(
+          borderSide: BorderSide(color: violet, width: 3),
+          insets: EdgeInsets.symmetric(horizontal: 18),
         ),
       ),
       cardTheme: CardThemeData(

@@ -1,9 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../widgets/barcode_scanner_screen.dart';
 import 'admin_state.dart';
 import 'admin_widgets.dart';
@@ -26,6 +33,8 @@ part 'discount_approval_screen.dart';
 part 'returns_refunds_screen.dart';
 part 'whatsapp_invoice_screen.dart';
 part 'reports_store_settings_screen.dart';
+part 'report_export_service.dart';
+part 'barcode_label_service.dart';
 part 'audit_log_logout_screen.dart';
 part 'history_screen.dart';
 
@@ -399,43 +408,117 @@ Future<void> _showAdminLogoutDialog(
   AdminState state,
 ) async {
   if (state.loggingOut) return;
-  final confirmed =
-      await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          icon: Container(
-            padding: const EdgeInsets.all(11),
-            decoration: BoxDecoration(
-              color: red.withValues(alpha: .09),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.logout_rounded, color: red, size: 28),
-          ),
-          title: const Text('Logout?'),
-          content: const Text(
-            'Are you sure you want to logout?',
-            textAlign: TextAlign.center,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: red),
-              onPressed: () => Navigator.pop(dialogContext, true),
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('Logout'),
-            ),
-          ],
-        ),
-      ) ??
-      false;
-  if (!confirmed) return;
+  final decision = await showDialog<_LogoutDecision>(
+    context: context,
+    builder: (_) => const _AdminLogoutDialog(),
+  );
+  if (decision == null) return;
   // Let the dialog route finish deactivating before logout removes the whole
   // admin workspace. This avoids inherited-widget teardown assertions.
   await Future<void>.delayed(const Duration(milliseconds: 300));
-  if (context.mounted) await state.logout();
+  if (context.mounted) {
+    await state.logout(
+      reason: decision.reason,
+      suggestion: decision.suggestion,
+    );
+  }
+}
+
+class _LogoutDecision {
+  const _LogoutDecision(this.reason, this.suggestion);
+  final String reason;
+  final String suggestion;
+}
+
+class _AdminLogoutDialog extends StatefulWidget {
+  const _AdminLogoutDialog();
+
+  @override
+  State<_AdminLogoutDialog> createState() => _AdminLogoutDialogState();
+}
+
+class _AdminLogoutDialogState extends State<_AdminLogoutDialog> {
+  String reason = 'End of shift';
+  final suggestion = TextEditingController();
+
+  @override
+  void dispose() {
+    suggestion.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    icon: Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: red.withValues(alpha: .09),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(Icons.logout_rounded, color: red, size: 28),
+    ),
+    title: const Text('Logout?'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: reason,
+            decoration: const InputDecoration(labelText: 'Reason for logout'),
+            items:
+                const [
+                      'End of shift',
+                      'Taking a break',
+                      'Switching account',
+                      'App issue',
+                      'Other',
+                    ]
+                    .map(
+                      (value) =>
+                          DropdownMenuItem(value: value, child: Text(value)),
+                    )
+                    .toList(),
+            onChanged: (value) => setState(() => reason = value ?? reason),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: suggestion,
+            maxLines: 3,
+            maxLength: 500,
+            decoration: const InputDecoration(
+              labelText: 'Suggestion or issue (optional)',
+              hintText: 'Tell us what we can improve',
+            ),
+          ),
+          const Text(
+            'Your feedback is stored in the audit log when the server is available.',
+            style: TextStyle(fontSize: 9.5, color: muted),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton.icon(
+        style: FilledButton.styleFrom(backgroundColor: red),
+        onPressed: () => Navigator.pop(
+          context,
+          _LogoutDecision(reason, suggestion.text.trim()),
+        ),
+        icon: const Icon(Icons.logout_rounded),
+        label: const Text('Logout'),
+      ),
+    ],
+  );
 }
 
 class _AdminAccountMenu extends StatelessWidget {
@@ -496,6 +579,10 @@ class _AdminErrorBanner extends StatelessWidget {
   final VoidCallback onDismiss;
   final VoidCallback? onRetry;
 
+  String get _displayMessage => message.startsWith('Cannot reach ')
+      ? 'Connection interrupted. Showing your previously loaded data.'
+      : message;
+
   @override
   Widget build(BuildContext context) => Material(
     color: const Color(0xFFFFECEE),
@@ -506,13 +593,26 @@ class _AdminErrorBanner extends StatelessWidget {
           const Icon(Icons.error_outline_rounded, size: 19, color: red),
           const SizedBox(width: 9),
           Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: Color(0xFF8A1720),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sync paused',
+                  style: TextStyle(
+                    color: Color(0xFF8A1720),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  _displayMessage,
+                  style: const TextStyle(
+                    color: Color(0xFF8A1720),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
           TextButton.icon(

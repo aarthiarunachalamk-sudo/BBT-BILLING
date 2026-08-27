@@ -285,7 +285,14 @@ def change_password(request):
 def logout_view(request):
     request.user.last_logout = timezone.now()
     request.user.save(update_fields=["last_logout"])
-    record_audit(request, "Logout", "Auth")
+    reason = str(request.data.get("reason", "")).strip()[:80]
+    suggestion = str(request.data.get("suggestion", "")).strip()[:500]
+    record_audit(
+        request,
+        "Logout",
+        "Auth",
+        metadata={"reason": reason, "suggestion": suggestion},
+    )
     return Response({"detail": "Logged out successfully."})
 
 

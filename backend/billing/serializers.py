@@ -225,6 +225,19 @@ class ItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A product with this SKU already exists.")
         return sku
 
+    def validate_barcode(self, value):
+        barcode = (value or "").strip()
+        if not barcode:
+            return None
+        queryset = Item.objects.filter(barcode__iexact=barcode)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "A product with this barcode already exists."
+            )
+        return barcode
+
     def validate(self, attrs):
         purchase_price = attrs.get(
             "purchase_price", getattr(self.instance, "purchase_price", 0)

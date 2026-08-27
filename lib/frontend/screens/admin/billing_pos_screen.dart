@@ -1,7 +1,5 @@
 part of 'admin_screens.dart';
 
-enum _BillingProductAction { editPrice, delete }
-
 class _EditBillingPriceDialog extends StatefulWidget {
   const _EditBillingPriceDialog({
     required this.state,
@@ -347,34 +345,29 @@ class _BillingPosScreenState extends State<BillingPosScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              PopupMenuButton<_BillingProductAction>(
-                key: ValueKey('billing-product-menu-${product['id']}'),
-                tooltip: 'Manage product',
-                padding: EdgeInsets.zero,
-                onSelected: (action) => _handleProductAction(action, product),
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: _BillingProductAction.editPrice,
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.edit_outlined, color: blue),
-                      title: Text('Edit price'),
-                    ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _productActionButton(
+                    key: ValueKey('billing-edit-product-${product['id']}'),
+                    tooltip: 'Edit price',
+                    icon: Icons.edit_rounded,
+                    foreground: violet,
+                    background: violet.withValues(alpha: .10),
+                    onPressed: () => _editProductPrice(product),
                   ),
-                  PopupMenuItem(
-                    value: _BillingProductAction.delete,
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.delete_outline, color: red),
-                      title: Text('Delete product'),
-                    ),
+                  const SizedBox(width: 6),
+                  _productActionButton(
+                    key: ValueKey('billing-delete-product-${product['id']}'),
+                    tooltip: 'Delete product',
+                    icon: Icons.delete_outline_rounded,
+                    foreground: red,
+                    background: red.withValues(alpha: .09),
+                    onPressed: () => _deleteProduct(product),
                   ),
                 ],
-                icon: const Icon(Icons.more_horiz_rounded, color: muted),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 7),
               FilledButton.icon(
                 key: ValueKey('billing-add-product-${product['id']}'),
                 onPressed: stock <= 0
@@ -403,24 +396,34 @@ class _BillingPosScreenState extends State<BillingPosScreen> {
     );
   }
 
+  Widget _productActionButton({
+    required Key key,
+    required String tooltip,
+    required IconData icon,
+    required Color foreground,
+    required Color background,
+    required VoidCallback onPressed,
+  }) => IconButton(
+    key: key,
+    tooltip: tooltip,
+    onPressed: onPressed,
+    visualDensity: VisualDensity.compact,
+    constraints: const BoxConstraints.tightFor(width: 34, height: 32),
+    padding: EdgeInsets.zero,
+    style: IconButton.styleFrom(
+      foregroundColor: foreground,
+      backgroundColor: background,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+    ),
+    icon: Icon(icon, size: 17),
+  );
+
   Future<void> _scanBarcode() async {
     final code = await showBarcodeScanner(context);
     if (!mounted || code == null || code.trim().isEmpty) return;
     search.text = code.trim();
     search.selection = TextSelection.collapsed(offset: search.text.length);
     setState(() {});
-  }
-
-  Future<void> _handleProductAction(
-    _BillingProductAction action,
-    Map<String, dynamic> product,
-  ) async {
-    switch (action) {
-      case _BillingProductAction.editPrice:
-        await _editProductPrice(product);
-      case _BillingProductAction.delete:
-        await _deleteProduct(product);
-    }
   }
 
   Future<void> _editProductPrice(Map<String, dynamic> product) async {

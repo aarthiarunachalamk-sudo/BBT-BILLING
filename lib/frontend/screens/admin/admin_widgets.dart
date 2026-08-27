@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 const navy = Color(0xFF06356F);
 const blue = Color(0xFF0868F7);
+const violet = Color(0xFF6657E8);
+const softCyan = Color(0xFFBDF5FF);
 const ink = Color(0xFF10264D);
 const muted = Color(0xFF6F7F99);
 const line = Color(0xFFDDE5F0);
@@ -34,7 +36,9 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
       automaticallyImplyLeading: false,
       backgroundColor: desktop ? Colors.white : navy,
       foregroundColor: foreground,
-      systemOverlayStyle: desktop ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+      systemOverlayStyle: desktop
+          ? SystemUiOverlayStyle.dark
+          : SystemUiOverlayStyle.light,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: desktop ? const Border(bottom: BorderSide(color: line)) : null,
@@ -92,10 +96,13 @@ class AdminBottomBar extends StatelessWidget {
   final ValueChanged<int> onTap;
   @override
   Widget build(BuildContext context) => NavigationBar(
-    height: 58,
-    elevation: 4,
-    backgroundColor: navy,
-    indicatorColor: const Color(0xFF174E8F),
+    height: 62,
+    elevation: 8,
+    backgroundColor: const Color(0xFF052E66),
+    indicatorColor: violet,
+    indicatorShape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(18),
+    ),
     labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
     selectedIndex: selected,
     onDestinationSelected: onTap,
@@ -161,30 +168,70 @@ class PrimaryAction extends StatelessWidget {
       ],
     );
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(13),
     );
-    return outlined
-        ? OutlinedButton(
-            onPressed: onPressed,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: color,
-              side: BorderSide(color: color),
-              minimumSize: const Size.fromHeight(44),
-              shape: shape,
-            ),
-            child: child,
-          )
-        : ElevatedButton(
-            onPressed: onPressed,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: color,
-              foregroundColor: Colors.white,
-              elevation: 0,
-            minimumSize: const Size.fromHeight(44),
-              shape: shape,
-            ),
-            child: child,
-          );
+    if (outlined) {
+      return OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color == blue ? violet : color,
+          backgroundColor: color == blue
+              ? violet.withValues(alpha: .04)
+              : color.withValues(alpha: .035),
+          side: BorderSide(
+            color: color == blue ? violet.withValues(alpha: .55) : color,
+          ),
+          minimumSize: const Size.fromHeight(46),
+          shape: shape,
+        ),
+        child: child,
+      );
+    }
+    final usesPrimaryGradient = color == blue;
+    final enabled = onPressed != null;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: enabled && !usesPrimaryGradient
+            ? color
+            : enabled
+            ? null
+            : const Color(0xFFD9E1EC),
+        gradient: enabled && usesPrimaryGradient
+            ? const LinearGradient(
+                colors: [violet, blue],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              )
+            : null,
+        borderRadius: BorderRadius.circular(13),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: (usesPrimaryGradient ? violet : color).withValues(
+                    alpha: .22,
+                  ),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
+                ),
+              ]
+            : null,
+      ),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          disabledForegroundColor: const Color(0xFF8794A8),
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          minimumSize: const Size.fromHeight(46),
+          shape: shape,
+        ),
+        child: child,
+      ),
+    );
   }
 }
 

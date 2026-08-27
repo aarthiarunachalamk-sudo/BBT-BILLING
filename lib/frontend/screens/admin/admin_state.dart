@@ -39,6 +39,8 @@ class AdminState extends ChangeNotifier {
   bool refreshing = false;
   bool decidingPurchaseOrder = false;
   bool decidingDiscount = false;
+  bool savingPermissions = false;
+  bool permissionsDirty = false;
   String? error;
   String passwordChangeIdentifier = '';
   Map<String, dynamic> dashboard = {};
@@ -391,13 +393,30 @@ class AdminState extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
+      // Do one lightweight connectivity gate before the many workspace reads.
+      // Without this, an unavailable Render instance makes every sequential
+      // endpoint exhaust its own retries and the UI can appear stuck for
+      // several minutes. Existing cached data remains usable while offline.
+      final serverReady = await api.waitForServer(
+        maxAttempts: 2,
+        initialDelay: const Duration(seconds: 1),
+      );
+      if (!serverReady) {
+        error =
+            'Server is waking up or temporarily unavailable. '
+            'Showing your previously loaded data.';
+        return false;
+      }
       await refreshAll();
+      error = null;
       return true;
     } on ApiException catch (exception) {
       error = exception.message;
       return false;
     } catch (_) {
-      error = 'Cannot reach ${api.baseUrl}';
+      error =
+          'Connection interrupted while syncing. '
+          'Showing your previously loaded data.';
       return false;
     } finally {
       refreshing = false;
@@ -435,8 +454,18 @@ class AdminState extends ChangeNotifier {
       categoryActive[category['name'].toString()] =
           category['is_active'] == true;
     }
+    _hydrateSelectedRolePermissions();
+  }
+
+  String get _selectedRoleKey => switch (selectedRole) {
+    'Store Manager' => 'manager',
+    _ => selectedRole.toLowerCase().replaceAll(' ', '_'),
+  };
+
+  void _hydrateSelectedRolePermissions() {
+    permissions.updateAll((key, value) => false);
     final selected = rolePermissions.where(
-      (row) => row['role'] == selectedRole.toLowerCase().replaceAll(' ', '_'),
+      (row) => row['role'] == _selectedRoleKey,
     );
     if (selected.isNotEmpty) {
       for (final key in permissions.keys) {
@@ -445,17 +474,32 @@ class AdminState extends ChangeNotifier {
     }
   }
 
-  List<String> get availableRoles =>
-      rolePermissions.map((row) => _roleLabel(row['role'].toString())).toList();
+  List<String> get availableRoles {
+    const supported = [
+      'Admin',
+      'Store Manager',
+      'Cashier',
+      'Sales',
+      'Accountant',
+      'Inventory',
+    ];
+    final loaded = rolePermissions
+        .map((row) => _roleLabel(row['role'].toString()))
+        .where((role) => role.isNotEmpty);
+    return {...supported, ...loaded}.toList();
+  }
 
-  String _roleLabel(String value) => value
-      .split('_')
-      .map(
-        (word) => word.isEmpty
-            ? word
-            : '${word[0].toUpperCase()}${word.substring(1)}',
-      )
-      .join(' ');
+  String _roleLabel(String value) {
+    if (value == 'manager') return 'Store Manager';
+    return value
+        .split('_')
+        .map(
+          (word) => word.isEmpty
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1)}',
+        )
+        .join(' ');
+  }
 
   void setNav(int index) {
     final destination = switch (index) {
@@ -516,29 +560,62 @@ class AdminState extends ChangeNotifier {
 
   void togglePermission(String name, bool value) {
     permissions[name] = value;
+    permissionsDirty = true;
+    notifyListeners();
+  }
+
+  void setAllPermissions(bool value) {
+    permissions.updateAll((key, previous) => value);
+    permissionsDirty = true;
+    notifyListeners();
+  }
+
+  void applyPermissionPreset() {
+    final enabled = switch (_selectedRoleKey) {
+      'admin' || 'manager' => permissions.keys.toSet(),
+      'cashier' => {'Dashboard', 'Billing', 'Returns'},
+      'inventory' => {'Dashboard', 'Products', 'Inventory', 'Reports'},
+      'accountant' => {'Dashboard', 'Billing', 'Reports', 'Returns'},
+      _ => {'Dashboard', 'Products', 'Billing'},
+    };
+    for (final key in permissions.keys) {
+      permissions[key] = enabled.contains(key);
+    }
+    permissionsDirty = true;
     notifyListeners();
   }
 
   void setRole(String value) {
     selectedRole = value;
-    _hydrateControls();
+    _hydrateSelectedRolePermissions();
+    permissionsDirty = false;
     notifyListeners();
   }
 
   Future<void> savePermissions() async {
-    final role = selectedRole.toLowerCase().replaceAll(' ', '_');
-    final matching = rolePermissions.where((row) => row['role'] == role);
-    final body = {
-      for (final entry in permissions.entries)
-        entry.key.toLowerCase(): entry.value,
-    };
-    if (matching.isEmpty) {
-      await api.create('role-permissions', {'role': role, ...body});
-    } else {
-      await api.update('role-permissions', matching.first['id'] as int, body);
-    }
-    rolePermissions = await api.getList('role-permissions');
+    if (savingPermissions) return;
+    savingPermissions = true;
+    error = null;
     notifyListeners();
+    try {
+      final role = _selectedRoleKey;
+      final matching = rolePermissions.where((row) => row['role'] == role);
+      final body = {
+        for (final entry in permissions.entries)
+          entry.key.toLowerCase(): entry.value,
+      };
+      if (matching.isEmpty) {
+        await api.create('role-permissions', {'role': role, ...body});
+      } else {
+        await api.update('role-permissions', matching.first['id'] as int, body);
+      }
+      rolePermissions = await api.getList('role-permissions');
+      permissionsDirty = false;
+      _hydrateSelectedRolePermissions();
+    } finally {
+      savingPermissions = false;
+      notifyListeners();
+    }
   }
 
   Future<void> decidePurchaseOrder(bool approved) async {
@@ -897,12 +974,21 @@ class AdminState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> resendInvoice([Map<String, dynamic>? selectedInvoice]) async {
+  Future<void> resendInvoice(
+    Map<String, dynamic>? selectedInvoice, {
+    String? recipientOverride,
+    String? message,
+  }) async {
     if (invoices.isEmpty) {
       throw const ApiException('No invoice is available to send.');
     }
     final invoice = selectedInvoice ?? invoices.first;
-    final recipient = invoice['client_mobile']?.toString() ?? '';
+    final recipient =
+        (recipientOverride?.trim().isNotEmpty == true
+                ? recipientOverride
+                : invoice['client_mobile']?.toString())
+            ?.trim() ??
+        '';
     if (recipient.isEmpty) {
       throw const ApiException(
         'The selected invoice has no customer mobile number.',
@@ -911,7 +997,9 @@ class AdminState extends ChangeNotifier {
     await api.create('whatsapp-messages', {
       'invoice': invoice['id'],
       'recipient': recipient,
-      'message': 'Your invoice ${invoice['number']} is ready.',
+      'message': message?.trim().isNotEmpty == true
+          ? message!.trim()
+          : 'Your invoice ${invoice['number']} is ready.',
       'message_type': 'invoice',
     });
     whatsappMessages = await api.getList('whatsapp-messages');
@@ -964,13 +1052,13 @@ class AdminState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> logout() async {
+  Future<void> logout({String? reason, String? suggestion}) async {
     if (loggingOut) return;
     loggingOut = true;
     error = null;
     notifyListeners();
     try {
-      await api.logout();
+      await api.logout(reason: reason, suggestion: suggestion);
     } catch (_) {
       // Local logout must still complete if the server is temporarily offline.
     } finally {
@@ -986,6 +1074,8 @@ class AdminState extends ChangeNotifier {
       refreshing = false;
       decidingPurchaseOrder = false;
       decidingDiscount = false;
+      savingPermissions = false;
+      permissionsDirty = false;
       staffFilter = 'All';
       inventoryFilter = 'Low Stock';
       productQuery = '';

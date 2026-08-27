@@ -587,7 +587,100 @@ void main() {
     );
   });
 
-  testWidgets('billing product menu updates price and deletes product', (
+  testWidgets('updated product price sheet closes without controller errors', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var scheduleRequests = 0;
+    var updateRequests = 0;
+    final updatedProduct = <String, dynamic>{
+      'id': 1,
+      'name': 'Sunflower Oil 1 L',
+      'sku': 'OIL-1L',
+      'category_name': 'Edible Oils',
+      'rack_name': 'General',
+      'purchase_price': '110.00',
+      'selling_price': '155.00',
+      'mrp': '170.00',
+      'tax_percent': '5.00',
+      'stock_quantity': 12,
+      'stock_status': 'in_stock',
+      'is_active': true,
+    };
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        if (request.method == 'POST' &&
+            request.url.path.endsWith('/items/1/price-schedule/')) {
+          scheduleRequests += 1;
+          return http.Response(
+            jsonEncode({'id': 1, 'selling_price': '155.00'}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'PATCH' &&
+            request.url.path.endsWith('/items/1/')) {
+          updateRequests += 1;
+          return http.Response(
+            jsonEncode(updatedProduct),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.url.path.endsWith('/items/')) {
+          return http.Response(
+            jsonEncode([updatedProduct]),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.url.path.endsWith('/purchase-orders/')) {
+          return http.Response(
+            '[]',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          '{}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    final state = AdminState(api: api)
+      ..loggedIn = true
+      ..screen = 4
+      ..products = [
+        {...updatedProduct, 'selling_price': '145.00'},
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.tap(find.text('Sunflower Oil 1 L'));
+    await tester.pumpAndSettle();
+    expect(find.text('Update Prices'), findsOneWidget);
+
+    final sellingPriceField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.labelText == 'Selling Price (₹) *',
+    );
+    await tester.enterText(sellingPriceField, '155.00');
+    await tester.tap(find.text('Update Prices'));
+    await tester.pumpAndSettle();
+
+    expect(scheduleRequests, 1);
+    expect(updateRequests, 1);
+    expect(find.text('Update Prices'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('billing product actions update price and delete product', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(430, 1000);
@@ -655,9 +748,7 @@ void main() {
     expect(find.text('1 products available'), findsOneWidget);
     expect(find.byTooltip('Scan barcode'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('billing-product-menu-1')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit price'));
+    await tester.tap(find.byKey(const ValueKey('billing-edit-product-1')));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('billing-price-field')),
@@ -669,9 +760,7 @@ void main() {
     expect(patchRequests, 1);
     expect(state.products.single['selling_price'], '725.50');
 
-    await tester.tap(find.byKey(const ValueKey('billing-product-menu-1')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete product'));
+    await tester.tap(find.byKey(const ValueKey('billing-delete-product-1')));
     await tester.pumpAndSettle();
     expect(find.text('Delete product?'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
@@ -702,6 +791,7 @@ void main() {
         {
           'id': 1,
           'number': 'INV-001',
+          'invoice_date': DateTime.now().toIso8601String(),
           'taxable_amount': '100.00',
           'cgst_amount': '9.00',
           'sgst_amount': '9.00',
@@ -716,7 +806,307 @@ void main() {
 
     expect(find.text('Taxable Amount'), findsOneWidget);
     expect(find.text('CGST Collected'), findsOneWidget);
-    expect(find.byTooltip('Copy as CSV'), findsOneWidget);
+    expect(find.byTooltip('Download report'), findsOneWidget);
+    expect(find.byKey(const Key('report-calendar-button')), findsOneWidget);
+    expect(find.byKey(const Key('report-history-button')), findsOneWidget);
+    expect(find.text('GST Collected by Effective Rate'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('report-download-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Download GST Report'), findsOneWidget);
+    expect(find.text('PDF document'), findsOneWidget);
+    expect(find.text('CSV spreadsheet'), findsOneWidget);
+    expect(find.text('Save report image to Gallery'), findsOneWidget);
+  });
+
+  testWidgets('Sales report clearly shows date and download controls', (
+    tester,
+  ) async {
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 14
+      ..invoices = [
+        {
+          'id': 1,
+          'number': 'INV-SALES-001',
+          'invoice_date': DateTime.now().toIso8601String(),
+          'client_name': 'Walk-in Customer',
+          'status': 'paid',
+          'taxable_amount': '100.00',
+          'cgst_amount': '9.00',
+          'sgst_amount': '9.00',
+          'discount_amount': '0.00',
+          'total': '118.00',
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.tap(find.text('Sales\nReport'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sales Report'), findsWidgets);
+    expect(
+      find.text('Invoice totals, tax, discounts and payment status'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('report-calendar-button')), findsOneWidget);
+    expect(find.byKey(const Key('report-download-button')), findsOneWidget);
+    expect(find.text('INV-SALES-001'), findsOneWidget);
+  });
+
+  testWidgets('Inventory report has as-of date, downloads and history', (
+    tester,
+  ) async {
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient(
+        (_) async => http.Response(
+          '[]',
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      ),
+    );
+    final state = AdminState(api: api)
+      ..loggedIn = true
+      ..screen = 14
+      ..products = [
+        {
+          'id': 1,
+          'name': 'Basmati Rice',
+          'sku': 'RICE-1',
+          'category_name': 'Groceries',
+          'purchase_price': '100.00',
+          'stock_quantity': 18,
+          'reorder_level': 5,
+          'stock_status': 'in_stock',
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.tap(find.text('Inventory\nReport'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Inventory Report'), findsWidgets);
+    expect(
+      find.text('Stock availability, reorder status and cost value'),
+      findsOneWidget,
+    );
+    expect(find.text('Stock as of date'), findsOneWidget);
+    expect(find.byKey(const Key('report-download-button')), findsOneWidget);
+    expect(find.byKey(const Key('report-history-button')), findsOneWidget);
+    expect(find.text('Basmati Rice'), findsOneWidget);
+  });
+
+  testWidgets('Purchase report filters and exposes export formats', (
+    tester,
+  ) async {
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 14
+      ..purchaseOrders = [
+        {
+          'id': 1,
+          'number': 'PO-001',
+          'order_date': DateTime.now().toIso8601String(),
+          'supplier_name': 'BBT Supplier',
+          'status': 'received',
+          'subtotal': '100.00',
+          'tax_amount': '18.00',
+          'total': '118.00',
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.tap(find.text('Purchase\nReport'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Purchase Report'), findsWidgets);
+    expect(
+      find.text('Supplier orders, status and purchase value'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('report-calendar-button')), findsOneWidget);
+    expect(find.text('PO-001'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('report-download-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Download Purchase Report'), findsOneWidget);
+    expect(find.text('PDF document'), findsOneWidget);
+    expect(find.text('Save report image to Gallery'), findsOneWidget);
+  });
+
+  testWidgets('Profit and loss report uses period sales and sold item cost', (
+    tester,
+  ) async {
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 14
+      ..products = [
+        {
+          'id': 1,
+          'name': 'Basmati Rice',
+          'sku': 'RICE-1',
+          'purchase_price': '60.00',
+          'selling_price': '100.00',
+          'stock_quantity': 10,
+        },
+      ]
+      ..invoices = [
+        {
+          'id': 1,
+          'number': 'INV-PL-001',
+          'invoice_date': DateTime.now().toIso8601String(),
+          'status': 'paid',
+          'taxable_amount': '200.00',
+          'cgst_amount': '18.00',
+          'sgst_amount': '18.00',
+          'discount_amount': '5.00',
+          'total': '236.00',
+          'items': [
+            {'item': 1, 'quantity': 2},
+          ],
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.tap(find.text('Profit\n& Loss'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Profit & Loss'), findsWidgets);
+    expect(find.text('Net Sales'), findsOneWidget);
+    expect(find.text('Estimated COGS'), findsOneWidget);
+    expect(find.text('Gross Margin'), findsOneWidget);
+    expect(
+      find.text('Current Catalog Product Margins (Top 20)'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('report-calendar-button')), findsOneWidget);
+    expect(find.byKey(const Key('report-download-button')), findsOneWidget);
+  });
+
+  testWidgets('Stock valuation report supports as-of date and downloads', (
+    tester,
+  ) async {
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient(
+        (_) async => http.Response(
+          '[]',
+          200,
+          headers: {'content-type': 'application/json'},
+        ),
+      ),
+    );
+    final state = AdminState(api: api)
+      ..loggedIn = true
+      ..screen = 14
+      ..products = [
+        {
+          'id': 1,
+          'name': 'Premium Tea',
+          'sku': 'TEA-1',
+          'category_name': 'Beverages',
+          'purchase_price': '60.00',
+          'selling_price': '100.00',
+          'stock_quantity': 10,
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.tap(find.text('Stock\nValuation'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Stock Valuation'), findsWidgets);
+    expect(
+      find.text('Cost, retail value and potential stock profit'),
+      findsOneWidget,
+    );
+    expect(find.text('Valuation as of date'), findsOneWidget);
+    expect(find.text('Premium Tea'), findsOneWidget);
+    expect(find.byKey(const Key('report-history-button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('report-download-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Download Stock Valuation'), findsOneWidget);
+    expect(find.text('PDF document'), findsOneWidget);
+    expect(find.text('Save report image to Gallery'), findsOneWidget);
+  });
+
+  testWidgets('Admin summary exposes decisions, exports and workflow actions', (
+    tester,
+  ) async {
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 14
+      ..dashboard = {
+        'outstanding_total': '250.00',
+        'overdue_invoice_count': 1,
+        'returns_total': '0.00',
+      }
+      ..products = [
+        {
+          'id': 1,
+          'name': 'Low Stock Product',
+          'stock_status': 'low_stock',
+          'stock_quantity': 2,
+        },
+      ]
+      ..invoices = [
+        {
+          'id': 1,
+          'number': 'INV-SUM-001',
+          'invoice_date': DateTime.now().toIso8601String(),
+          'status': 'paid',
+          'taxable_amount': '100.00',
+          'cgst_amount': '9.00',
+          'sgst_amount': '9.00',
+          'discount_amount': '0.00',
+          'total': '118.00',
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.scrollUntilVisible(
+      find.text('Full Summary'),
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView).first,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(find.text('Full Summary'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Admin Summary'), findsWidgets);
+    expect(find.text('Business Health'), findsOneWidget);
+    expect(find.text('Period Performance'), findsOneWidget);
+    expect(find.byKey(const Key('report-calendar-button')), findsOneWidget);
+    expect(find.byKey(const Key('report-download-button')), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Stock attention'),
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView).last,
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(find.text('Stock attention'));
+    await tester.pumpAndSettle();
+
+    expect(state.screen, 9);
+    expect(find.text('Inventory Alerts'), findsWidgets);
   });
 
   test('staff toggle immediately updates the rendered user data', () async {

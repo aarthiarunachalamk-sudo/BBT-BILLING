@@ -191,13 +191,16 @@ class AdminApi {
     ),
   );
 
-  Future<void> logout() async {
+  Future<void> logout({String? reason, String? suggestion}) async {
     try {
       _decodeMap(
         await _client.post(
           Uri.parse('$baseUrl/auth/logout/'),
           headers: _headers,
-          body: jsonEncode({}),
+          body: jsonEncode({
+            'reason': reason?.trim() ?? '',
+            'suggestion': suggestion?.trim() ?? '',
+          }),
         ),
       );
     } finally {
