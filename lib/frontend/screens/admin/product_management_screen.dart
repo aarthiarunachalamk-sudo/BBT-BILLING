@@ -31,9 +31,9 @@ class _ProductsScreenState extends State<ProductsScreen>
     setState(() => _loadingProducts = true);
     // Do not hold the product page until every unrelated admin endpoint has
     // refreshed. Once the catalogue arrives, the user can start working.
-    while (
-      mounted && widget.state.refreshing && widget.state.products.isEmpty
-    ) {
+    while (mounted &&
+        widget.state.refreshing &&
+        widget.state.products.isEmpty) {
       await Future<void>.delayed(const Duration(milliseconds: 250));
     }
     if (!mounted) return;
@@ -247,8 +247,8 @@ class _MobileProductListState extends State<_MobileProductList> {
   Widget build(BuildContext context) {
     final groups = _groupProductsByRack(products);
     final searching = state.productQuery.trim().isNotEmpty;
-    final selectedRack = !searching &&
-            groups.any((group) => group.name == _selectedRack)
+    final selectedRack =
+        !searching && groups.any((group) => group.name == _selectedRack)
         ? _selectedRack
         : null;
     final visibleGroups = selectedRack == null
@@ -301,7 +301,7 @@ class _MobileProductListState extends State<_MobileProductList> {
                   itemBuilder: (context, index) {
                     if (index == 0) {
                       return _CatalogOverviewBar(
-                          racks: groups.length,
+                        racks: groups.length,
                         categories: groups.fold(
                           0,
                           (total, group) => total + group.categories.length,
@@ -312,8 +312,7 @@ class _MobileProductListState extends State<_MobileProductList> {
                     return _RackProductSection(
                       state: state,
                       group: visibleGroups[index - 1],
-                      initiallyExpanded:
-                          searching || visibleGroups.length == 1,
+                      initiallyExpanded: searching || visibleGroups.length == 1,
                     );
                   },
                 ),
@@ -367,7 +366,7 @@ class _RackQuickSelector extends StatelessWidget {
         ),
         const SizedBox(height: 7),
         SizedBox(
-          height: 38,
+          height: 52,
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -376,7 +375,7 @@ class _RackQuickSelector extends StatelessWidget {
                 label: 'All',
                 count: groups.length,
                 selected: selectedRack == null,
-                icon: Icons.grid_view_rounded,
+                imageAsset: 'assets/location_icons/general.png',
                 onTap: () => onSelected(null),
               ),
               for (final group in groups)
@@ -384,7 +383,7 @@ class _RackQuickSelector extends StatelessWidget {
                   label: group.name,
                   count: group.productCount,
                   selected: selectedRack == group.name,
-                  icon: _rackIcon(group.name),
+                  imageAsset: _locationImageAsset(group.name),
                   onTap: () => onSelected(group.name),
                 ),
             ],
@@ -400,14 +399,14 @@ class _RackChoiceChip extends StatelessWidget {
     required this.label,
     required this.count,
     required this.selected,
-    required this.icon,
+    required this.imageAsset,
     required this.onTap,
   });
 
   final String label;
   final int count;
   final bool selected;
-  final IconData icon;
+  final String imageAsset;
   final VoidCallback onTap;
 
   @override
@@ -415,22 +414,27 @@ class _RackChoiceChip extends StatelessWidget {
     padding: const EdgeInsets.only(right: 7),
     child: Material(
       color: selected ? blue : Colors.white,
-      shape: StadiumBorder(
-        side: BorderSide(color: selected ? blue : line),
-      ),
+      shape: StadiumBorder(side: BorderSide(color: selected ? blue : line)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 11),
+          padding: const EdgeInsets.fromLTRB(6, 4, 11, 4),
           child: Row(
             children: [
-              Icon(
-                icon,
-                size: 14,
-                color: selected ? Colors.white : muted,
+              Container(
+                width: 34,
+                height: 34,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withValues(alpha: .94)
+                      : const Color(0xFFF0F6FF),
+                  shape: BoxShape.circle,
+                ),
+                child: Image.asset(imageAsset, fit: BoxFit.contain),
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 7),
               Text(
                 label,
                 style: TextStyle(
@@ -465,15 +469,17 @@ class _RackChoiceChip extends StatelessWidget {
   );
 }
 
-IconData _rackIcon(String name) {
+String _locationImageAsset(String name) {
   final normalized = name.toLowerCase();
   if (normalized.contains('fridge') ||
       normalized.contains('freezer') ||
       normalized.contains('cold')) {
-    return Icons.kitchen_outlined;
+    return 'assets/location_icons/fridge.png';
   }
-  if (normalized == 'unassigned') return Icons.help_outline_rounded;
-  return Icons.shelves;
+  if (normalized.contains('general') || normalized == 'unassigned') {
+    return 'assets/location_icons/general.png';
+  }
+  return 'assets/location_icons/rack.png';
 }
 
 class _CatalogOverviewBar extends StatelessWidget {
@@ -583,10 +589,18 @@ class _RackProductSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isColdStorage = group.name.toLowerCase().contains('fridge') ||
+    final isColdStorage =
+        group.name.toLowerCase().contains('fridge') ||
         group.name.toLowerCase().contains('freezer') ||
         group.name.toLowerCase().contains('cold');
-    final accent = isColdStorage ? const Color(0xFF00A6C8) : blue;
+    final isGeneral =
+        group.name.toLowerCase().contains('general') ||
+        group.name.toLowerCase() == 'unassigned';
+    final accent = isColdStorage
+        ? const Color(0xFF00A6C8)
+        : isGeneral
+        ? const Color(0xFF6D4FD3)
+        : blue;
 
     return Card(
       key: PageStorageKey('rack-${group.name}-$initiallyExpanded'),
@@ -599,47 +613,52 @@ class _RackProductSection extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-      initiallyExpanded: initiallyExpanded,
-      maintainState: true,
-      backgroundColor: Colors.white,
-      collapsedBackgroundColor: Colors.white,
-      iconColor: accent,
-      collapsedIconColor: muted,
-      tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-      childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-      leading: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: accent.withValues(alpha: .10),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          isColdStorage ? Icons.kitchen_outlined : Icons.shelves,
-          color: accent,
-          size: 22,
-        ),
-      ),
-      title: Text(
-        group.name,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
-      ),
-      subtitle: Text(
-        '${group.categories.length} categories  •  ${group.productCount} products',
-        style: const TextStyle(fontSize: 10, color: muted),
-      ),
-      children: group.categories
-          .map(
-            (category) => _CategoryProductSection(
-              state: state,
-              rackName: group.name,
-              category: category,
-              initiallyExpanded:
-                  initiallyExpanded || group.categories.length == 1,
+        initiallyExpanded: initiallyExpanded,
+        maintainState: true,
+        backgroundColor: Colors.white,
+        collapsedBackgroundColor: Colors.white,
+        iconColor: accent,
+        collapsedIconColor: muted,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+        childrenPadding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+        leading: Container(
+          width: 52,
+          height: 52,
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.white, accent.withValues(alpha: .10)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          )
-          .toList(),
-    ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: accent.withValues(alpha: .18)),
+          ),
+          child: Image.asset(
+            _locationImageAsset(group.name),
+            fit: BoxFit.contain,
+          ),
+        ),
+        title: Text(
+          group.name,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+        ),
+        subtitle: Text(
+          '${group.categories.length} categories  •  ${group.productCount} products',
+          style: const TextStyle(fontSize: 10, color: muted),
+        ),
+        children: group.categories
+            .map(
+              (category) => _CategoryProductSection(
+                state: state,
+                rackName: group.name,
+                category: category,
+                initiallyExpanded:
+                    initiallyExpanded || group.categories.length == 1,
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 }
@@ -661,11 +680,11 @@ class _CategoryProductSection extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: 6),
     child: Material(
-      color: const Color(0xFFF8FAFD),
+      color: Colors.white,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFFE6EAF0)),
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFE2E8F2)),
       ),
       child: ExpansionTile(
         key: PageStorageKey(
@@ -673,16 +692,23 @@ class _CategoryProductSection extends StatelessWidget {
         ),
         initiallyExpanded: initiallyExpanded,
         maintainState: true,
-        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 5),
         leading: Container(
-          width: 32,
-          height: 32,
+          width: 44,
+          height: 44,
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: blue.withValues(alpha: .08),
-            shape: BoxShape.circle,
+            color: const Color(0xFFF0F6FF),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFDDEBFF)),
           ),
-          child: const Icon(Icons.category_outlined, color: blue, size: 17),
+          child: Image.asset(
+            _categoryImageAsset(category.name),
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) =>
+                const Icon(Icons.inventory_2_outlined, color: blue, size: 20),
+          ),
         ),
         title: Text(
           category.name,
@@ -701,6 +727,41 @@ class _CategoryProductSection extends StatelessWidget {
       ),
     ),
   );
+}
+
+String _categoryImageAsset(String categoryName) {
+  final normalized = categoryName.toLowerCase().replaceAll(
+    RegExp(r'[^a-z]'),
+    '',
+  );
+  if (normalized.contains('beverage') ||
+      normalized.contains('drink') ||
+      normalized.contains('juice')) {
+    return 'assets/category_icons/beverages.png';
+  }
+  if (normalized.contains('dairy') || normalized.contains('milk')) {
+    return 'assets/category_icons/dairy.png';
+  }
+  if (normalized.contains('bakery') || normalized.contains('bread')) {
+    return 'assets/category_icons/bakery.png';
+  }
+  if (normalized.contains('frozen') || normalized.contains('icecream')) {
+    return 'assets/category_icons/frozen_foods.png';
+  }
+  if (normalized.contains('household') || normalized.contains('cleaning')) {
+    return 'assets/category_icons/household.png';
+  }
+  if (normalized.contains('personalcare') ||
+      normalized.contains('cosmetic') ||
+      normalized.contains('hygiene')) {
+    return 'assets/category_icons/personal_care.png';
+  }
+  if (normalized.contains('snack') ||
+      normalized.contains('biscuit') ||
+      normalized.contains('confection')) {
+    return 'assets/category_icons/snacks.png';
+  }
+  return 'assets/category_icons/grocery.png';
 }
 
 class _MobileProductRow extends StatelessWidget {
@@ -1242,20 +1303,42 @@ class _ProductCatalogCard extends StatelessWidget {
                             fontFamily: 'monospace',
                           ),
                         ),
-                        if ('${product['store_section'] ?? ''}${product['rack_location'] ?? ''}'.trim().isNotEmpty) ...[
+                        if ('${product['store_section'] ?? ''}${product['rack_location'] ?? ''}'
+                            .trim()
+                            .isNotEmpty) ...[
                           const SizedBox(height: 5),
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            const Icon(Icons.location_on_outlined, size: 12, color: blue),
-                            const SizedBox(width: 3),
-                            Flexible(child: Text(
-                              [product['store_section'], product['rack_location']]
-                                  .where((value) => value != null && value.toString().trim().isNotEmpty)
-                                  .join(' • '),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: blue, fontSize: 9, fontWeight: FontWeight.w700),
-                            )),
-                          ]),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 12,
+                                color: blue,
+                              ),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  [
+                                        product['store_section'],
+                                        product['rack_location'],
+                                      ]
+                                      .where(
+                                        (value) =>
+                                            value != null &&
+                                            value.toString().trim().isNotEmpty,
+                                      )
+                                      .join(' • '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: blue,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ],
                     ),
@@ -1561,8 +1644,11 @@ Future<void> _showEditPriceSheet(
                       : (_) {
                           final now = DateTime.now();
                           setSheet(
-                            () => effectiveDate =
-                                DateTime(now.year, now.month, now.day),
+                            () => effectiveDate = DateTime(
+                              now.year,
+                              now.month,
+                              now.day,
+                            ),
                           );
                         },
                 ),
@@ -1577,8 +1663,9 @@ Future<void> _showEditPriceSheet(
                   onSelected: saving
                       ? null
                       : (_) {
-                          final tomorrow =
-                              DateTime.now().add(const Duration(days: 1));
+                          final tomorrow = DateTime.now().add(
+                            const Duration(days: 1),
+                          );
                           setSheet(
                             () => effectiveDate = DateTime(
                               tomorrow.year,
@@ -1592,13 +1679,27 @@ Future<void> _showEditPriceSheet(
             ),
             const SizedBox(height: 10),
             InkWell(
-              onTap: saving ? null : () async {
-                final picked = await showDatePicker(context: sheetCtx, initialDate: effectiveDate, firstDate: DateTime(2020), lastDate: DateTime(2100));
-                if (picked != null) setSheet(() => effectiveDate = picked);
-              },
+              onTap: saving
+                  ? null
+                  : () async {
+                      final picked = await showDatePicker(
+                        context: sheetCtx,
+                        initialDate: effectiveDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setSheet(() => effectiveDate = picked);
+                      }
+                    },
               child: InputDecorator(
-                decoration: const InputDecoration(labelText: 'Price effective from', prefixIcon: Icon(Icons.calendar_month_outlined)),
-                child: Text('${effectiveDate.day.toString().padLeft(2, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.year}'),
+                decoration: const InputDecoration(
+                  labelText: 'Price effective from',
+                  prefixIcon: Icon(Icons.calendar_month_outlined),
+                ),
+                child: Text(
+                  '${effectiveDate.day.toString().padLeft(2, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.year}',
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -1680,13 +1781,18 @@ Future<void> _showEditPriceSheet(
                       try {
                         final body = <String, dynamic>{
                           'selling_price': sellingCtrl.text.trim(),
-                          'purchase_price': purchaseCtrl.text.trim().isEmpty ? '0' : purchaseCtrl.text.trim(),
+                          'purchase_price': purchaseCtrl.text.trim().isEmpty
+                              ? '0'
+                              : purchaseCtrl.text.trim(),
                           'tax_percent': gst.toString(),
-                          'effective_date': '${effectiveDate.year.toString().padLeft(4, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.day.toString().padLeft(2, '0')}',
+                          'effective_date':
+                              '${effectiveDate.year.toString().padLeft(4, '0')}-${effectiveDate.month.toString().padLeft(2, '0')}-${effectiveDate.day.toString().padLeft(2, '0')}',
                         };
                         final mrp = mrpCtrl.text.trim();
                         await state.scheduleProductPrice(productId, body);
-                        await state.updateProduct(productId, {'mrp': mrp.isEmpty ? null : mrp});
+                        await state.updateProduct(productId, {
+                          'mrp': mrp.isEmpty ? null : mrp,
+                        });
                         if (sheetCtx.mounted) Navigator.pop(sheetCtx);
                         if (context.mounted) {
                           showNotice(
@@ -1704,17 +1810,46 @@ Future<void> _showEditPriceSheet(
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: saving ? null : () async {
-                final confirmed = await showDialog<bool>(context: sheetCtx, builder: (dialogContext) => AlertDialog(title: const Text('Delete product?'), content: Text('Delete ${product['name']} permanently? This cannot be undone.'), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialogContext, true), style: FilledButton.styleFrom(backgroundColor: red), child: const Text('Delete'))])) ?? false;
-                if (!confirmed) return;
-                try {
-                  await state.deleteProduct(productId);
-                  if (sheetCtx.mounted) Navigator.pop(sheetCtx);
-                  if (context.mounted) showNotice(context, 'Product deleted.');
-                } catch (error) {
-                  setSheet(() => errorText = error.toString());
-                }
-              },
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final confirmed =
+                          await showDialog<bool>(
+                            context: sheetCtx,
+                            builder: (dialogContext) => AlertDialog(
+                              title: const Text('Delete product?'),
+                              content: Text(
+                                'Delete ${product['name']} permanently? This cannot be undone.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                FilledButton(
+                                  onPressed: () =>
+                                      Navigator.pop(dialogContext, true),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: red,
+                                  ),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            ),
+                          ) ??
+                          false;
+                      if (!confirmed) return;
+                      try {
+                        await state.deleteProduct(productId);
+                        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                        if (context.mounted) {
+                          showNotice(context, 'Product deleted.');
+                        }
+                      } catch (error) {
+                        setSheet(() => errorText = error.toString());
+                      }
+                    },
               icon: const Icon(Icons.delete_outline),
               label: const Text('Delete Product'),
               style: OutlinedButton.styleFrom(foregroundColor: red),

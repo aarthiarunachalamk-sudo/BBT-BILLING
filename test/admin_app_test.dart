@@ -456,6 +456,26 @@ void main() {
     expect(find.textContaining('SKU: FORTUNE-SUNLITE-840G'), findsOneWidget);
     expect(find.textContaining('Total: 24'), findsOneWidget);
     expect(find.text('Add Product'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName ==
+                'assets/location_icons/general.png',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName ==
+                'assets/category_icons/grocery.png',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('GST report button opens a calculated report', (tester) async {
