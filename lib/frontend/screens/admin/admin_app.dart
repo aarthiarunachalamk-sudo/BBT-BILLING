@@ -30,10 +30,8 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'Supermarket Billing Admin',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
+  Widget build(BuildContext context) => Theme(
+    data: ThemeData(
       useMaterial3: true,
       scaffoldBackgroundColor: page,
       visualDensity: VisualDensity.standard,
@@ -57,7 +55,10 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
         filled: true,
         fillColor: Colors.white,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: line),
@@ -75,19 +76,56 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: navy,
         indicatorColor: const Color(0xFF174E8F),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: states.contains(WidgetState.selected) ? Colors.white : const Color(0xFFB9CBE3))),
-        iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(size: 20, color: states.contains(WidgetState.selected) ? Colors.white : const Color(0xFFB9CBE3))),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: states.contains(WidgetState.selected)
+                ? Colors.white
+                : const Color(0xFFB9CBE3),
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 20,
+            color: states.contains(WidgetState.selected)
+                ? Colors.white
+                : const Color(0xFFB9CBE3),
+          ),
+        ),
       ),
-      elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(
-        backgroundColor: blue, foregroundColor: Colors.white, elevation: 0,
-        minimumSize: const Size(0, 46), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w800),
-      )),
-      outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(
-        foregroundColor: blue, minimumSize: const Size(0, 44), side: const BorderSide(color: Color(0xFFB7CAE8)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), textStyle: const TextStyle(fontWeight: FontWeight.w700),
-      )),
-      cardTheme: CardThemeData(elevation: 0, margin: EdgeInsets.zero, surfaceTintColor: Colors.transparent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: const BorderSide(color: line))),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: blue,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          minimumSize: const Size(0, 46),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: blue,
+          minimumSize: const Size(0, 44),
+          side: const BorderSide(color: Color(0xFFB7CAE8)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: line),
+        ),
+      ),
       snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: ink,
@@ -98,7 +136,7 @@ class _SupermarketAdminAppState extends State<SupermarketAdminApp> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
     ),
-    home: AdminViewport(state: state),
+    child: AdminViewport(state: state),
   );
 }
 

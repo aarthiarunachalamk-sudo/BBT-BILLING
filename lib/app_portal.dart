@@ -65,7 +65,12 @@ class _AccessPortal extends StatelessWidget {
                     context,
                     SupermarketAdminApp(
                       onLogout: () {
-                        if (context.mounted) Navigator.of(context).pop();
+                        // Logout is initiated inside the workspace's inherited
+                        // widget tree. Remove the route on the next frame so
+                        // Flutter can finish rebuilding that tree first.
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (context.mounted) Navigator.of(context).pop();
+                        });
                       },
                     ),
                   ),
@@ -86,9 +91,9 @@ class _AccessPortal extends StatelessWidget {
   );
 
   void _open(BuildContext context, Widget application) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => application),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => application));
   }
 }
 

@@ -46,6 +46,23 @@ void main() {
     expect(find.text('Confirm New Password'), findsOneWidget);
   });
 
+  testWidgets('admin workspace can be removed without inherited dependents', (
+    tester,
+  ) async {
+    app.main();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Admin'));
+    await tester.pumpAndSettle();
+    expect(find.text('Username or Email'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose your workspace'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('dashboard renders dynamic API state values', (tester) async {
     tester.view.physicalSize = const Size(430, 1000);
     tester.view.devicePixelRatio = 1;
