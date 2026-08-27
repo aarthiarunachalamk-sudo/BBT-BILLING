@@ -112,11 +112,13 @@ class AdminApi {
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       onAttempt?.call(attempt, maxAttempts);
       for (final candidate in _candidateBaseUrls) {
-        final origin = candidate.replaceFirst(RegExp(r'/api$'), '');
         try {
           final response = await _client
-              .get(Uri.parse('$origin/health/'))
-              .timeout(const Duration(seconds: 6));
+              // Use the lightweight API probe. The root /health/ endpoint also
+              // audits/repairs the database schema and can exceed the old
+              // six-second mobile timeout even when Render is already awake.
+              .get(Uri.parse('$candidate/health/'))
+              .timeout(const Duration(seconds: 15));
           if (_djangoIsResponding(response)) {
             baseUrl = candidate;
             return true;
@@ -213,9 +215,9 @@ class AdminApi {
     Map<String, String>? query,
   }) async {
     final results = <Map<String, dynamic>>[];
-    String? url = Uri.parse('$baseUrl/$path/').replace(
-      queryParameters: {...?query, 'page_size': '200'},
-    ).toString();
+    String? url = Uri.parse(
+      '$baseUrl/$path/',
+    ).replace(queryParameters: {...?query, 'page_size': '200'}).toString();
     while (url != null) {
       final response = await _get(Uri.parse(url));
       final decoded = _decode(response);

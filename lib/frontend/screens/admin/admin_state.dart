@@ -134,13 +134,13 @@ class AdminState extends ChangeNotifier {
     loading = true;
     wakingServer = true;
     wakeAttempt = 0;
-    wakeMaxAttempts = 8;
+    wakeMaxAttempts = 4;
     error = null;
     notifyListeners();
     try {
       final serverReady = await api.waitForServer(
         maxAttempts: wakeMaxAttempts,
-        initialDelay: const Duration(seconds: 2),
+        initialDelay: const Duration(seconds: 1),
         onAttempt: (attempt, max) {
           wakeAttempt = attempt;
           wakeMaxAttempts = max;

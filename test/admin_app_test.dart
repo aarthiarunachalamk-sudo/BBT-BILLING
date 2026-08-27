@@ -269,6 +269,26 @@ void main() {
     expect(requests, 2);
   });
 
+  test('wake-up uses the lightweight API health endpoint', () async {
+    late Uri requestedUri;
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        requestedUri = request.url;
+        return http.Response('{"status":"ok"}', 200);
+      }),
+    );
+    addTearDown(api.dispose);
+
+    final awake = await api.waitForServer(
+      maxAttempts: 1,
+      initialDelay: Duration.zero,
+    );
+
+    expect(awake, isTrue);
+    expect(requestedUri.path, '/api/health/');
+  });
+
   testWidgets('Android back returns an admin sub-screen to dashboard', (
     tester,
   ) async {

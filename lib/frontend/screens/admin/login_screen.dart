@@ -13,15 +13,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool obscure = true;
   bool remember = false;
-  bool showServerUrl = false;
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  final serverUrlController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    serverUrlController.text = widget.state.api.baseUrl;
     _loadRememberedLogin();
   }
 
@@ -52,7 +49,6 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
-    serverUrlController.dispose();
     super.dispose();
   }
 
@@ -161,59 +157,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
 
-          // ── Server URL (collapsible) ──────────────────────────────────────
-          if (false)
-            GestureDetector(
-              onTap: () => setState(() => showServerUrl = !showServerUrl),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    const Icon(Icons.dns_outlined, size: 15, color: muted),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        widget.state.api.baseUrl,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, color: muted),
-                      ),
-                    ),
-                    Icon(
-                      showServerUrl
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
-                      size: 18,
-                      color: muted,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          if (showServerUrl) ...[
-            TextFormField(
-              controller: serverUrlController,
-              autocorrect: false,
-              keyboardType: TextInputType.url,
-              style: const TextStyle(fontSize: 12),
-              decoration: InputDecoration(
-                labelText: 'Server URL',
-                hintText: 'https://bbt-billing-c16x.onrender.com',
-                prefixIcon: const Icon(Icons.link, size: 18),
-                suffixIcon: IconButton(
-                  tooltip: 'Reset to default',
-                  icon: const Icon(Icons.refresh, size: 18),
-                  onPressed: () => setState(() {
-                    serverUrlController.text =
-                        'https://bbt-billing-c16x.onrender.com/api';
-                  }),
-                ),
-                helperText: 'Must start with https://',
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-
           const SizedBox(height: 12),
 
           // ── Error / wakeup status ────────────────────────────────────────
@@ -266,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 if (_isWakingUp) ...[
                   const SizedBox(height: 6),
                   const Text(
-                    'Render free tier wakes up in ~30 seconds on first use.',
+                    'First connection can take up to a minute. Keep this screen open.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 10, color: muted),
                   ),
