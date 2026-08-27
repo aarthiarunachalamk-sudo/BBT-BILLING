@@ -149,16 +149,13 @@ class AdminViewport extends StatelessWidget {
     listenable: state,
     builder: (context, _) {
       final screen = buildAdminScreen(state);
-      final canExitApp = state.screen == 0 || state.screen == 1;
+      final canExitApp =
+          (state.screen == 0 || state.screen == 1) && !state.canGoBack;
       return PopScope(
         canPop: canExitApp,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
-          if (state.loggedIn) {
-            state.setNav(0);
-          } else {
-            state.go(0);
-          }
+          state.goBack(fallback: state.loggedIn ? 1 : 0);
         },
         child: LayoutBuilder(
           builder: (context, constraints) {

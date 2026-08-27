@@ -68,7 +68,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (!mounted) return;
     if (success) {
       showNotice(context, 'Password changed successfully.');
-      widget.state.go(widget.state.loggedIn ? 15 : 0);
+      widget.state.goBack(fallback: widget.state.loggedIn ? 15 : 0);
     } else {
       showNotice(context, widget.state.error ?? 'Unable to change password.');
     }

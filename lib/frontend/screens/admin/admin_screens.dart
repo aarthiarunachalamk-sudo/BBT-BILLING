@@ -107,9 +107,22 @@ class AdminNavigationPanel extends StatelessWidget {
   final bool inDrawer;
 
   void _openScreen(BuildContext context, int screen, {bool logout = false}) {
+    if (logout) {
+      if (!inDrawer) {
+        unawaited(_showAdminLogoutDialog(context, state));
+        return;
+      }
+      final navigator = Navigator.of(context);
+      navigator.pop();
+      Future<void>.delayed(const Duration(milliseconds: 350), () {
+        if (navigator.mounted) {
+          unawaited(_showAdminLogoutDialog(navigator.context, state));
+        }
+      });
+      return;
+    }
     if (!inDrawer) {
       state.go(screen);
-      if (logout) state.showLogoutConfirmation();
       return;
     }
 
@@ -119,7 +132,6 @@ class AdminNavigationPanel extends StatelessWidget {
     Navigator.of(context).pop();
     Future<void>.delayed(const Duration(milliseconds: 350), () {
       state.go(screen);
-      if (logout) state.showLogoutConfirmation();
     });
   }
 
@@ -321,7 +333,7 @@ class _AdminPage extends StatelessWidget {
           : null,
       appBar: AdminTopBar(
         title: title,
-        back: back == null ? null : () => state.go(back!),
+        back: back == null ? null : () => state.goBack(fallback: back),
         showLeading: compact,
         actions: [
           ...?actions,
@@ -382,6 +394,50 @@ class _AdminPage extends StatelessWidget {
   }
 }
 
+Future<void> _showAdminLogoutDialog(
+  BuildContext context,
+  AdminState state,
+) async {
+  if (state.loggingOut) return;
+  final confirmed =
+      await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: red.withValues(alpha: .09),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.logout_rounded, color: red, size: 28),
+          ),
+          title: const Text('Logout?'),
+          content: const Text(
+            'Are you sure you want to logout?',
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: red),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Logout'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+  if (!confirmed) return;
+  // Let the dialog route finish deactivating before logout removes the whole
+  // admin workspace. This avoids inherited-widget teardown assertions.
+  await Future<void>.delayed(const Duration(milliseconds: 300));
+  if (context.mounted) await state.logout();
+}
+
 class _AdminAccountMenu extends StatelessWidget {
   const _AdminAccountMenu({required this.state});
 
@@ -401,8 +457,7 @@ class _AdminAccountMenu extends StatelessWidget {
           state.openChangePassword(state.passwordChangeIdentifier);
           return;
         case 'logout':
-          state.go(15);
-          state.showLogoutConfirmation();
+          unawaited(_showAdminLogoutDialog(context, state));
           return;
       }
     },

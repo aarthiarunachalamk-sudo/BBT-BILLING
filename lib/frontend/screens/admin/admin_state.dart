@@ -11,6 +11,7 @@ class AdminState extends ChangeNotifier {
 
   bool _disposed = false;
   Timer? _paymentNotificationPoller;
+  final List<int> _navigationHistory = [];
 
   @override
   void notifyListeners() {
@@ -76,11 +77,32 @@ class AdminState extends ChangeNotifier {
   final Map<String, bool> staffActive = {};
   final Map<String, bool> categoryActive = {};
 
+  bool get canGoBack => _navigationHistory.isNotEmpty;
+
   void go(int value) {
     var destination = value.clamp(0, 20);
     if (!loggedIn && destination != 0 && destination != 16) {
       destination = 0;
     }
+    if (loggedIn && destination != screen) {
+      _navigationHistory.add(screen);
+    }
+    _applyDestination(destination);
+    notifyListeners();
+  }
+
+  void goBack({int? fallback}) {
+    int? destination;
+    while (_navigationHistory.isNotEmpty && destination == null) {
+      final candidate = _navigationHistory.removeLast();
+      if (candidate != screen) destination = candidate;
+    }
+    destination ??= fallback ?? (loggedIn ? 1 : 0);
+    _applyDestination(destination);
+    notifyListeners();
+  }
+
+  void _applyDestination(int destination) {
     screen = destination;
     // Page-level request errors should not follow the user into an unrelated
     // workspace. A fresh request on the destination can report its own error.
@@ -93,7 +115,6 @@ class AdminState extends ChangeNotifier {
       14 || 15 || 16 => 4,
       _ => navIndex,
     };
-    notifyListeners();
   }
 
   void openChangePassword(String identifier) {
@@ -163,6 +184,7 @@ class AdminState extends ChangeNotifier {
         return false;
       }
       loggedIn = true;
+      _navigationHistory.clear();
       passwordChangeIdentifier = email;
       screen = 1;
       _startPaymentNotificationPolling();
@@ -436,16 +458,14 @@ class AdminState extends ChangeNotifier {
       .join(' ');
 
   void setNav(int index) {
-    error = null;
-    navIndex = index;
-    screen = switch (index) {
+    final destination = switch (index) {
       0 => 1,
       1 => 2,
       2 => 10,
       3 => 17,
       _ => 14,
     };
-    notifyListeners();
+    go(destination);
   }
 
   void setStaffFilter(String value) {
@@ -958,6 +978,7 @@ class AdminState extends ChangeNotifier {
       _paymentNotificationPoller?.cancel();
       _paymentNotificationPoller = null;
       loggedIn = false;
+      _navigationHistory.clear();
       screen = 0;
       navIndex = 0;
       logoutConfirmationVisible = false;

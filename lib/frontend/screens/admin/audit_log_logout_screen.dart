@@ -62,68 +62,9 @@ class AuditScreen extends StatelessWidget {
           child: PrimaryAction(
             'Logout',
             color: red,
-            onPressed: state.showLogoutConfirmation,
+            onPressed: () => _showAdminLogoutDialog(context, state),
           ),
         ),
-        if (state.logoutConfirmationVisible)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Confirm Logout',
-                        style: TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      IconButton(
-                        onPressed: state.loggingOut
-                            ? null
-                            : state.hideLogoutConfirmation,
-                        tooltip: 'Close',
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.close, size: 17),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Are you sure you want to logout?',
-                    style: TextStyle(fontSize: 11, color: muted),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: PrimaryAction(
-                          'Cancel',
-                          outlined: true,
-                          onPressed: state.loggingOut
-                              ? null
-                              : state.hideLogoutConfirmation,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: PrimaryAction(
-                          state.loggingOut ? 'Logging out...' : 'Logout',
-                          color: red,
-                          onPressed: state.loggingOut
-                              ? null
-                              : () async {
-                                  await state.logout();
-                                },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
       ],
     ),
   );

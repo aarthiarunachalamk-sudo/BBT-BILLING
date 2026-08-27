@@ -314,6 +314,80 @@ void main() {
     expect(find.text('Admin Dashboard'), findsOneWidget);
   });
 
+  testWidgets('mobile back returns through the actual screen history', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 1;
+    state.go(4);
+    state.go(5);
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    expect(state.screen, 5);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(state.screen, 4);
+    expect(find.text('Product Management'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(state.screen, 1);
+    expect(find.text('Admin Dashboard'), findsOneWidget);
+  });
+
+  testWidgets('logout asks for confirmation before ending the session', (
+    tester,
+  ) async {
+    var logoutRequests = 0;
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        if (request.method == 'POST' &&
+            request.url.path.endsWith('/auth/logout/')) {
+          logoutRequests += 1;
+          return http.Response(
+            jsonEncode({'detail': 'Logged out successfully.'}),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{}', 404);
+      }),
+    );
+    final state = AdminState(api: api)
+      ..loggedIn = true
+      ..screen = 15;
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.tap(find.text('Logout'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Logout?'), findsOneWidget);
+    expect(find.text('Are you sure you want to logout?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(state.loggedIn, isTrue);
+    expect(logoutRequests, 0);
+
+    await tester.tap(find.text('Logout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Logout'));
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    expect(logoutRequests, 1);
+    expect(state.loggedIn, isFalse);
+    expect(find.text('Admin Login'), findsOneWidget);
+  });
+
   test('logged-out users cannot open protected admin screens', () {
     final state = AdminState();
     addTearDown(state.dispose);
