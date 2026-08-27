@@ -49,17 +49,32 @@ void main() {
   testWidgets('admin workspace can be removed without inherited dependents', (
     tester,
   ) async {
-    app.main();
-    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SupermarketAdminApp(),
+                ),
+              ),
+              child: const Text('Open admin'),
+            ),
+          ),
+        ),
+      ),
+    );
 
-    await tester.tap(find.text('Admin'));
+    await tester.tap(find.text('Open admin'));
     await tester.pumpAndSettle();
     expect(find.text('Username or Email'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(find.text('Choose your workspace'), findsOneWidget);
+    expect(find.text('Open admin'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -476,6 +491,113 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('billing product menu updates price and deletes product', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var patchRequests = 0;
+    var deleteRequests = 0;
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        if (request.method == 'PATCH' &&
+            request.url.path.endsWith('/items/1/')) {
+          patchRequests += 1;
+          return http.Response(
+            jsonEncode({
+              'id': 1,
+              'name': 'Basmati Rice 5 kg',
+              'sku': 'RICE-5KG',
+              'selling_price': '725.50',
+              'tax_percent': '5.00',
+              'stock_quantity': 18,
+              'is_active': true,
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'DELETE' &&
+            request.url.path.endsWith('/items/1/')) {
+          deleteRequests += 1;
+          return http.Response('', 204);
+        }
+        if (request.url.path.endsWith('/purchase-orders/')) {
+          return http.Response(
+            '[]',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          '{}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    final state = AdminState(api: api)
+      ..loggedIn = true
+      ..screen = 10
+      ..products = [
+        {
+          'id': 1,
+          'name': 'Basmati Rice 5 kg',
+          'sku': 'RICE-5KG',
+          'selling_price': '760.00',
+          'tax_percent': '5.00',
+          'stock_quantity': 18,
+          'is_active': true,
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    expect(find.text('1 products available'), findsOneWidget);
+    expect(find.byTooltip('Scan barcode'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('billing-product-menu-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit price'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('billing-price-field')),
+      '725.50',
+    );
+    await tester.tap(find.text('Save price'));
+    await tester.pumpAndSettle();
+
+    expect(patchRequests, 1);
+    expect(state.products.single['selling_price'], '725.50');
+
+    await tester.tap(find.byKey(const ValueKey('billing-product-menu-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete product'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete product?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(deleteRequests, 1);
+    expect(state.products, isEmpty);
+    expect(find.text('No products found.'), findsOneWidget);
+  });
+
+  test('navigation clears stale page errors', () {
+    final state = AdminState()
+      ..loggedIn = true
+      ..error = 'Cannot reach backend';
+    addTearDown(state.dispose);
+
+    state.setNav(2);
+
+    expect(state.screen, 10);
+    expect(state.error, isNull);
   });
 
   testWidgets('GST report button opens a calculated report', (tester) async {

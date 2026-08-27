@@ -359,6 +359,9 @@ class _AdminPage extends StatelessWidget {
               _AdminErrorBanner(
                 message: state.error!,
                 onDismiss: state.clearError,
+                onRetry: state.refreshing
+                    ? null
+                    : () => unawaited(state.reloadAll()),
               ),
             Expanded(
               child: Align(
@@ -428,10 +431,15 @@ class _AdminAccountMenu extends StatelessWidget {
 }
 
 class _AdminErrorBanner extends StatelessWidget {
-  const _AdminErrorBanner({required this.message, required this.onDismiss});
+  const _AdminErrorBanner({
+    required this.message,
+    required this.onDismiss,
+    required this.onRetry,
+  });
 
   final String message;
   final VoidCallback onDismiss;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -450,6 +458,15 @@ class _AdminErrorBanner extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: const Text('Retry'),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF8A1720),
+              visualDensity: VisualDensity.compact,
             ),
           ),
           IconButton(

@@ -1,5 +1,137 @@
 part of 'admin_screens.dart';
 
+enum _BillingProductAction { editPrice, delete }
+
+class _EditBillingPriceDialog extends StatefulWidget {
+  const _EditBillingPriceDialog({
+    required this.state,
+    required this.product,
+    required this.initialPrice,
+  });
+
+  final AdminState state;
+  final Map<String, dynamic> product;
+  final double initialPrice;
+
+  @override
+  State<_EditBillingPriceDialog> createState() =>
+      _EditBillingPriceDialogState();
+}
+
+class _EditBillingPriceDialogState extends State<_EditBillingPriceDialog> {
+  final formKey = GlobalKey<FormState>();
+  late final TextEditingController controller;
+  bool saving = false;
+  String? errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = TextEditingController(
+      text: widget.initialPrice.toStringAsFixed(2),
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    icon: Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: blue.withValues(alpha: .09),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(Icons.currency_rupee_rounded, color: blue),
+    ),
+    title: const Text('Update selling price'),
+    content: SingleChildScrollView(
+      child: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.product['name']?.toString() ?? 'Product',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: ink, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              key: const Key('billing-price-field'),
+              controller: controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Selling price',
+                prefixText: '₹ ',
+              ),
+              validator: (value) {
+                final price = double.tryParse(value?.trim() ?? '');
+                if (price == null || price <= 0) {
+                  return 'Enter a valid price greater than zero';
+                }
+                return null;
+              },
+            ),
+            if (errorText != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                errorText!,
+                style: const TextStyle(color: red, fontSize: 11),
+              ),
+            ],
+          ],
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: saving ? null : () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton.icon(
+        onPressed: saving ? null : _save,
+        icon: saving
+            ? const SizedBox.square(
+                dimension: 15,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.check_rounded),
+        label: Text(saving ? 'Saving...' : 'Save price'),
+      ),
+    ],
+  );
+
+  Future<void> _save() async {
+    if (formKey.currentState?.validate() != true) return;
+    setState(() {
+      saving = true;
+      errorText = null;
+    });
+    try {
+      await widget.state.updateProduct(widget.product['id'] as int, {
+        'selling_price': controller.text.trim(),
+      });
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        saving = false;
+        errorText = error.toString();
+      });
+    }
+  }
+}
+
 class BillingPosScreen extends StatefulWidget {
   const BillingPosScreen(this.state, {super.key});
   final AdminState state;
@@ -60,10 +192,14 @@ class _BillingPosScreenState extends State<BillingPosScreen> {
           child: TextField(
             controller: search,
             onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Scan barcode / search product or SKU',
-              prefixIcon: Icon(Icons.search),
-              suffixIcon: Icon(Icons.qr_code_scanner),
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: IconButton(
+                tooltip: 'Scan barcode',
+                onPressed: _scanBarcode,
+                icon: const Icon(Icons.qr_code_scanner),
+              ),
             ),
           ),
         ),
@@ -73,47 +209,274 @@ class _BillingPosScreenState extends State<BillingPosScreen> {
     ),
   );
 
-  Widget _catalog() => products.isEmpty
-      ? const _EmptyState(
-          'No products found.',
-          icon: Icons.inventory_2_outlined,
-        )
-      : ListView.separated(
-          padding: const EdgeInsets.all(14),
-          itemCount: products.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 8),
-          itemBuilder: (_, index) {
-            final product = products[index];
-            final stock =
-                int.tryParse(product['stock_quantity'].toString()) ?? 0;
-            return SectionCard(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: product['image']?.toString().isNotEmpty == true
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          product['image'],
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              const Icon(Icons.inventory_2),
+  Widget _catalog() {
+    final visibleProducts = products;
+    if (visibleProducts.isEmpty) {
+      return const _EmptyState(
+        'No products found.',
+        icon: Icons.inventory_2_outlined,
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 18),
+      itemCount: visibleProducts.length + 1,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(2, 0, 2, 2),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: blue.withValues(alpha: .09),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: const Icon(
+                    Icons.storefront_outlined,
+                    size: 18,
+                    color: blue,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${visibleProducts.length} products available',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: ink,
                         ),
-                      )
-                    : const Icon(Icons.inventory_2_outlined),
-                title: Text(product['name'].toString(), maxLines: 1),
-                subtitle: Text('${product['sku']} • Stock $stock'),
-                trailing: FilledButton(
-                  onPressed: stock <= 0
-                      ? null
-                      : () => setState(() => cart[product['id'] as int] = 1),
-                  child: Text('₹${_price(product).toStringAsFixed(2)}  +'),
+                      ),
+                      const Text(
+                        'Tap price to add  •  Use menu to manage',
+                        style: TextStyle(fontSize: 9, color: muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return _catalogProductCard(visibleProducts[index - 1]);
+      },
+    );
+  }
+
+  Widget _catalogProductCard(Map<String, dynamic> product) {
+    final stock = int.tryParse(product['stock_quantity'].toString()) ?? 0;
+    final image = product['image']?.toString() ?? '';
+    return SectionCard(
+      padding: const EdgeInsets.fromLTRB(12, 12, 9, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 64,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F9FC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: line),
+            ),
+            child: image.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      image,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) =>
+                          const Icon(Icons.inventory_2_outlined, color: muted),
+                    ),
+                  )
+                : const Icon(Icons.inventory_2_outlined, color: muted),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product['name'].toString(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                    color: ink,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  '${product['sku'] ?? 'No SKU'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 9.5, color: muted),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: stock > 0
+                        ? green.withValues(alpha: .09)
+                        : red.withValues(alpha: .09),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    stock > 0 ? '$stock in stock' : 'Out of stock',
+                    style: TextStyle(
+                      color: stock > 0 ? green : red,
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              PopupMenuButton<_BillingProductAction>(
+                key: ValueKey('billing-product-menu-${product['id']}'),
+                tooltip: 'Manage product',
+                padding: EdgeInsets.zero,
+                onSelected: (action) => _handleProductAction(action, product),
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: _BillingProductAction.editPrice,
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.edit_outlined, color: blue),
+                      title: Text('Edit price'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _BillingProductAction.delete,
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.delete_outline, color: red),
+                      title: Text('Delete product'),
+                    ),
+                  ),
+                ],
+                icon: const Icon(Icons.more_horiz_rounded, color: muted),
+              ),
+              const SizedBox(height: 2),
+              FilledButton.icon(
+                key: ValueKey('billing-add-product-${product['id']}'),
+                onPressed: stock <= 0
+                    ? null
+                    : () => setState(
+                        () => cart[product['id'] as int] =
+                            (cart[product['id'] as int] ?? 0) + 1,
+                      ),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(108, 42),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+                icon: const Icon(Icons.add_rounded, size: 17),
+                label: Text(
+                  '₹${_price(product).toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
-            );
-          },
-        );
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _scanBarcode() async {
+    final code = await showBarcodeScanner(context);
+    if (!mounted || code == null || code.trim().isEmpty) return;
+    search.text = code.trim();
+    search.selection = TextSelection.collapsed(offset: search.text.length);
+    setState(() {});
+  }
+
+  Future<void> _handleProductAction(
+    _BillingProductAction action,
+    Map<String, dynamic> product,
+  ) async {
+    switch (action) {
+      case _BillingProductAction.editPrice:
+        await _editProductPrice(product);
+      case _BillingProductAction.delete:
+        await _deleteProduct(product);
+    }
+  }
+
+  Future<void> _editProductPrice(Map<String, dynamic> product) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => _EditBillingPriceDialog(
+        state: widget.state,
+        product: product,
+        initialPrice: _price(product),
+      ),
+    );
+    if (saved == true && mounted) {
+      setState(() {});
+      showNotice(context, 'Selling price updated.');
+    }
+  }
+
+  Future<void> _deleteProduct(Map<String, dynamic> product) async {
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              color: red,
+              size: 38,
+            ),
+            title: const Text('Delete product?'),
+            content: Text(
+              '${product['name']} will be permanently removed from the catalogue.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: red),
+                onPressed: () => Navigator.pop(dialogContext, true),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    try {
+      await widget.state.deleteProduct(product['id'] as int);
+      if (!mounted) return;
+      setState(() => cart.remove(product['id']));
+      showNotice(context, 'Product deleted.');
+    } catch (error) {
+      if (mounted) showNotice(context, error.toString());
+    }
+  }
 
   Widget _cart() => ListView(
     padding: const EdgeInsets.all(14),

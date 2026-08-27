@@ -82,6 +82,9 @@ class AdminState extends ChangeNotifier {
       destination = 0;
     }
     screen = destination;
+    // Page-level request errors should not follow the user into an unrelated
+    // workspace. A fresh request on the destination can report its own error.
+    error = null;
     navIndex = switch (destination) {
       1 => 0,
       2 || 3 || 18 => 1,
@@ -433,6 +436,7 @@ class AdminState extends ChangeNotifier {
       .join(' ');
 
   void setNav(int index) {
+    error = null;
     navIndex = index;
     screen = switch (index) {
       0 => 1,
