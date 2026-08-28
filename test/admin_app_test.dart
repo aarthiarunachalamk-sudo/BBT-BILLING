@@ -6,7 +6,10 @@ import 'package:bbt_billing/main.dart' as app;
 import 'package:bbt_billing/frontend/screens/admin/admin_api.dart';
 import 'package:bbt_billing/frontend/screens/admin/admin_app.dart';
 import 'package:bbt_billing/frontend/screens/admin/admin_state.dart';
-import 'package:bbt_billing/frontend/screens/admin/admin_screens.dart';
+import 'package:bbt_billing/services/barcode_label_service.dart';
+import 'package:bbt_billing/frontend/screens/user/user_models.dart';
+import 'package:bbt_billing/frontend/screens/user/user_screens.dart';
+import 'package:bbt_billing/frontend/screens/user/user_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -1227,6 +1230,48 @@ void main() {
       expect(bytes.length, greaterThan(500));
       expect(String.fromCharCodes(bytes.take(4)), '%PDF');
     }
+  });
+
+  testWidgets('user Add Product has the admin barcode and print workflow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = UserState()
+      ..loading = false
+      ..page = UserPage.addProduct
+      ..categories = [
+        {'id': 1, 'name': 'Beverages', 'is_active': true},
+      ]
+      ..racks = [
+        {'id': 1, 'name': 'Fridge', 'is_active': true},
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedBuilder(
+          animation: state,
+          builder: (_, _) => buildUserScreen(state),
+        ),
+      ),
+    );
+
+    expect(find.text('Barcode setup'), findsOneWidget);
+    expect(find.text('Scan barcode'), findsOneWidget);
+    expect(find.text('Generate new'), findsOneWidget);
+    expect(find.text('50 × 25 mm label'), findsOneWidget);
+    expect(find.text('Print after save'), findsOneWidget);
+
+    await tester.tap(find.text('Generate new'));
+    await tester.pump();
+    final barcodeField = tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, 'Barcode / SKU *'),
+    );
+    expect(barcodeField.controller!.text, matches(RegExp(r'^29\d{11}$')));
+    expect(find.textContaining('Valid EAN-13'), findsOneWidget);
   });
 
   test('existing category is reused without another backend request', () async {

@@ -9,8 +9,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../services/barcode_label_service.dart';
 import '../../../widgets/barcode_scanner_screen.dart';
 import 'admin_state.dart';
 import 'admin_widgets.dart';
@@ -34,7 +34,6 @@ part 'returns_refunds_screen.dart';
 part 'whatsapp_invoice_screen.dart';
 part 'reports_store_settings_screen.dart';
 part 'report_export_service.dart';
-part 'barcode_label_service.dart';
 part 'audit_log_logout_screen.dart';
 part 'history_screen.dart';
 

@@ -1,8 +1,12 @@
-part of 'admin_screens.dart';
+import 'dart:typed_data';
+
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 enum BarcodeLabelFormat { compact50x25, square40x30, roll58mm, a4Sheet }
 
-extension _BarcodeLabelFormatDetails on BarcodeLabelFormat {
+extension BarcodeLabelFormatDetails on BarcodeLabelFormat {
   String get title => switch (this) {
     BarcodeLabelFormat.compact50x25 => '50 × 25 mm label',
     BarcodeLabelFormat.square40x30 => '40 × 30 mm label',
@@ -37,7 +41,7 @@ extension _BarcodeLabelFormatDetails on BarcodeLabelFormat {
   };
 }
 
-String _generateEan13Barcode(Iterable<Map<String, dynamic>> products) {
+String generateEan13Barcode(Iterable<Map<String, dynamic>> products) {
   final existing = products
       .expand((product) => [product['barcode'], product['sku']])
       .map((value) => value?.toString().trim() ?? '')
@@ -60,7 +64,7 @@ int _ean13CheckDigit(String twelveDigits) {
   return (10 - (sum % 10)) % 10;
 }
 
-bool _isValidEan13(String value) {
+bool isValidEan13(String value) {
   if (!RegExp(r'^\d{13}$').hasMatch(value)) return false;
   return int.parse(value[12]) == _ean13CheckDigit(value.substring(0, 12));
 }
@@ -124,7 +128,7 @@ Future<Uint8List> buildBarcodeLabelPdf({
   return document.save();
 }
 
-Future<bool> _printBarcodeLabels({
+Future<bool> printBarcodeLabels({
   required String productName,
   required String barcode,
   required String price,
@@ -152,7 +156,7 @@ pw.Widget _barcodeLabel(
   String price, {
   required bool compact,
 }) {
-  final type = _isValidEan13(barcode)
+  final type = isValidEan13(barcode)
       ? pw.Barcode.ean13()
       : pw.Barcode.code128();
   return pw.Container(
