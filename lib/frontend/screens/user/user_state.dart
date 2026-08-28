@@ -307,6 +307,12 @@ class UserState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void clearCart() {
+    _invalidateDiscountApproval();
+    cart.clear();
+    notifyListeners();
+  }
+
   double get subtotal => cart.fold(0, (sum, line) => sum + line.total);
   double get gst => cart.fold(
     0,
@@ -513,9 +519,26 @@ class UserState extends ChangeNotifier {
 
   Future<bool> deleteProduct(int productId) async => _perform(() async {
     await api.delete('products/$productId');
+    _invalidateDiscountApproval();
+    cart.removeWhere((line) => line.id == productId);
     products.removeWhere(
       (product) => '${product['product_id'] ?? product['id']}' == '$productId',
     );
+  });
+
+  Future<bool> updateProduct(
+    int productId,
+    Map<String, dynamic> fields,
+  ) async => _perform(() async {
+    final updated = await api.patch('products/$productId', fields);
+    for (final product in products) {
+      if ('${product['product_id'] ?? product['id']}' == '$productId') {
+        product.addAll(updated);
+      }
+    }
+    for (final line in cart) {
+      if (line.id == productId) line.product.addAll(updated);
+    }
   });
 
   Future<bool> scheduleProductPrice(

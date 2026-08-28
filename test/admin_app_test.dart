@@ -1317,6 +1317,59 @@ void main() {
     },
   );
 
+  testWidgets('user billing matches admin catalogue and cart actions', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = UserState()
+      ..loading = false
+      ..page = UserPage.billing
+      ..user = {'role': 'cashier'}
+      ..products = [
+        {
+          'id': 21,
+          'name': 'Premium Tea 250 g',
+          'sku': 'TEA-250',
+          'barcode': '2901234567896',
+          'selling_price': '125.00',
+          'tax_percent': '5.00',
+          'stock_quantity': 8,
+          'is_active': true,
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedBuilder(
+          animation: state,
+          builder: (_, _) => buildUserScreen(state),
+        ),
+      ),
+    );
+
+    expect(find.byTooltip('Scan barcode'), findsOneWidget);
+    expect(find.text('1 products available'), findsOneWidget);
+    expect(find.text('TEA-250'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('user-billing-edit-product-21')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('user-billing-delete-product-21')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('user-billing-add-product-21')));
+    await tester.pump();
+    expect(find.text('Clear (1)'), findsOneWidget);
+    expect(find.textContaining('₹125.00 × 1'), findsOneWidget);
+    expect(find.text('Proceed to Payment'), findsOneWidget);
+  });
+
   test('user approved discount is included in checkout exactly once', () async {
     Map<String, dynamic>? checkoutBody;
     final api = UserApi(

@@ -1,9 +1,30 @@
 part of 'user_screens.dart';
 
-class UserBillingScreen extends StatelessWidget {
+class UserBillingScreen extends StatefulWidget {
   const UserBillingScreen(this.state, {super.key});
 
   final UserState state;
+
+  @override
+  State<UserBillingScreen> createState() => _UserBillingScreenState();
+}
+
+class _UserBillingScreenState extends State<UserBillingScreen> {
+  final search = TextEditingController();
+
+  UserState get state => widget.state;
+
+  @override
+  void initState() {
+    super.initState();
+    search.text = state.search;
+  }
+
+  @override
+  void dispose() {
+    search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => UserShell(
@@ -14,68 +35,65 @@ class UserBillingScreen extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.all(12),
           child: TextField(
+            controller: search,
             onChanged: state.setSearch,
-            decoration: const InputDecoration(
-              hintText: 'Search or scan product',
-              prefixIcon: Icon(Icons.search),
-              suffixIcon: Icon(Icons.qr_code_scanner),
+            decoration: InputDecoration(
+              hintText: 'Scan barcode / search product or SKU',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: IconButton(
+                tooltip: 'Scan barcode',
+                onPressed: _scanBarcode,
+                icon: const Icon(Icons.qr_code_scanner),
+              ),
             ),
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: userBlue.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Icon(
+                  Icons.storefront_outlined,
+                  size: 18,
+                  color: userBlue,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  '${state.visibleProducts.length} products available',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: userNavy,
+                  ),
+                ),
+              ),
+              if (state.cart.isNotEmpty)
+                TextButton.icon(
+                  onPressed: _clearCart,
+                  icon: const Icon(Icons.delete_sweep_outlined, size: 17),
+                  label: Text('Clear (${state.cart.length})'),
+                ),
+            ],
+          ),
+        ),
         SizedBox(
-          height: 190,
+          height: state.cart.isEmpty ? 300 : 220,
           child: state.visibleProducts.isEmpty
-              ? const EmptyMessage('No available products.')
-              : ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+              ? const EmptyMessage('No products found.')
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   itemCount: state.visibleProducts.length,
-                  itemBuilder: (_, index) {
-                    final product = state.visibleProducts[index];
-                    final quantity = number(
-                      product['total_stock'] ?? product['stock_quantity'],
-                    );
-                    return SizedBox(
-                      width: 150,
-                      child: UserCard(
-                        padding: const EdgeInsets.all(10),
-                        onTap: () => state.addProduct(product),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Center(
-                              child: UserProductImage(
-                                imageUrl: product['image']?.toString(),
-                                quantity: quantity,
-                                size: 70,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${product['name']}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              money(product['selling_price']),
-                              style: const TextStyle(
-                                color: userBlue,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            Text(
-                              '$quantity available',
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (_, index) =>
+                      _catalogProductCard(state.visibleProducts[index]),
                 ),
         ),
         const Divider(),
@@ -235,6 +253,218 @@ class UserBillingScreen extends StatelessWidget {
       ],
     ),
   );
+
+  Widget _catalogProductCard(Map<String, dynamic> product) {
+    final quantity = number(
+      product['total_stock'] ?? product['stock_quantity'],
+    );
+    final id = int.tryParse('${product['id']}');
+    return UserCard(
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      child: Row(
+        children: [
+          UserProductImage(
+            imageUrl: product['image']?.toString(),
+            quantity: quantity,
+            size: 58,
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${product['name']}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${product['sku'] ?? product['barcode'] ?? 'No SKU'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, color: Colors.blueGrey),
+                ),
+                const SizedBox(height: 5),
+                StatusPill(
+                  quantity > 0 ? '$quantity in stock' : 'Out of stock',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (state.canManageInventory && id != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton.filledTonal(
+                      key: ValueKey('user-billing-edit-product-$id'),
+                      tooltip: 'Edit price',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _editProductPrice(product),
+                      icon: const Icon(Icons.edit_rounded, size: 17),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton.filledTonal(
+                      key: ValueKey('user-billing-delete-product-$id'),
+                      tooltip: 'Delete product',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => _deleteProduct(product),
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 17,
+                        color: userRed,
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 5),
+              FilledButton.icon(
+                key: ValueKey('user-billing-add-product-$id'),
+                onPressed: quantity <= 0
+                    ? null
+                    : () => state.addProduct(product),
+                icon: const Icon(Icons.add_rounded, size: 17),
+                label: Text(
+                  money(product['selling_price']),
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _scanBarcode() async {
+    final code = await showBarcodeScanner(context);
+    if (!mounted || code == null || code.trim().isEmpty) return;
+    final value = code.trim();
+    search.text = value;
+    search.selection = TextSelection.collapsed(offset: value.length);
+    state.setSearch(value);
+    final exact = state.products.where(
+      (product) => [product['barcode'], product['sku']].any(
+        (candidate) =>
+            candidate?.toString().trim().toLowerCase() == value.toLowerCase(),
+      ),
+    );
+    if (exact.length == 1) {
+      state.addProduct(exact.first);
+      if (mounted) _notice(context, '${exact.first['name']} added to bill.');
+    }
+  }
+
+  void _clearCart() {
+    state.clearCart();
+    search.clear();
+    state.setSearch('');
+  }
+
+  Future<void> _editProductPrice(Map<String, dynamic> product) async {
+    final controller = TextEditingController(
+      text: (double.tryParse('${product['selling_price']}') ?? 0)
+          .toStringAsFixed(2),
+    );
+    final formKey = GlobalKey<FormState>();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Update selling price'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            key: const Key('user-billing-price-field'),
+            controller: controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Selling price',
+              prefixText: '₹ ',
+            ),
+            validator: (text) {
+              final price = double.tryParse(text?.trim() ?? '');
+              return price == null || price <= 0
+                  ? 'Enter a valid price greater than zero'
+                  : null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() == true) {
+                Navigator.pop(dialogContext, controller.text.trim());
+              }
+            },
+            child: const Text('Save price'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null) return;
+    final id = int.tryParse('${product['id']}');
+    if (id == null) return;
+    final saved = await state.updateProduct(id, {'selling_price': value});
+    if (mounted) {
+      _notice(
+        context,
+        saved ? 'Selling price updated.' : state.error ?? 'Update failed.',
+      );
+    }
+  }
+
+  Future<void> _deleteProduct(Map<String, dynamic> product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.delete_outline_rounded,
+          color: userRed,
+          size: 38,
+        ),
+        title: const Text('Delete product?'),
+        content: Text(
+          '${product['name']} will be permanently removed from the catalogue.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: userRed),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final id = int.tryParse('${product['id']}');
+    if (id == null) return;
+    final deleted = await state.deleteProduct(id);
+    if (mounted) {
+      _notice(
+        context,
+        deleted ? 'Product deleted.' : state.error ?? 'Delete failed.',
+      );
+    }
+  }
 }
 
 class _DiscountStatusCard extends StatelessWidget {
