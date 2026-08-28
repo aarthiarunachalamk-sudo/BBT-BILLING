@@ -801,6 +801,82 @@ class StaffAdminIntegrationTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
+    def test_cashier_discount_request_admin_approval_and_checkout_flow(self):
+        cashier = User.objects.create_user(
+            username="cashier-discount",
+            email="cashier-discount@example.com",
+            password="Cashier@123",
+            role=User.Role.CASHIER,
+        )
+        cashier_client = APIClient()
+        cashier_client.force_authenticate(cashier)
+        product = Item.objects.get(sku="TEST-ITEM")
+        product.store_stock = 2
+        product.save(update_fields=["store_stock"])
+
+        requested = cashier_client.post(
+            "/api/discount-approvals/request-billing/",
+            {
+                "items": [{"item": product.pk, "quantity": 1}],
+                "requested_percent": "20.00",
+                "request_note": "Loyal customer",
+            },
+            format="json",
+        )
+        self.assertEqual(requested.status_code, status.HTTP_201_CREATED, requested.data)
+        self.assertEqual(requested.data["status"], DiscountApproval.Status.PENDING)
+        self.assertEqual(requested.data["request_type"], "billing")
+        approval_id = requested.data["id"]
+
+        pending_checkout = cashier_client.post(
+            "/api/billing/checkout/",
+            {
+                "items": [{"item": product.pk, "quantity": 1}],
+                "discount_percent": "20.00",
+                "discount_approval": approval_id,
+                "payments": [{"method": "cash", "amount": "14.16"}],
+            },
+            format="json",
+        )
+        self.assertEqual(pending_checkout.status_code, status.HTTP_409_CONFLICT)
+
+        decided = self.client.post(
+            f"/api/discount-approvals/{approval_id}/decide/",
+            {"decision": "approved", "review_note": "Approved for retention"},
+            format="json",
+        )
+        self.assertEqual(decided.status_code, status.HTTP_200_OK, decided.data)
+        self.assertEqual(decided.data["status"], DiscountApproval.Status.APPROVED)
+
+        checkout_response = cashier_client.post(
+            "/api/billing/checkout/",
+            {
+                "items": [{"item": product.pk, "quantity": 1}],
+                "discount_percent": "20.00",
+                "discount_approval": approval_id,
+                "payments": [{"method": "cash", "amount": "14.16"}],
+            },
+            format="json",
+        )
+        self.assertEqual(checkout_response.status_code, status.HTTP_201_CREATED, checkout_response.data)
+        invoice = Invoice.objects.get(pk=checkout_response.data["id"])
+        self.assertEqual(invoice.discount_amount, Decimal("3.00"))
+        self.assertEqual(invoice.total, Decimal("14.16"))
+        approval = DiscountApproval.objects.get(pk=approval_id)
+        self.assertEqual(approval.applied_invoice_id, invoice.pk)
+
+        reused = cashier_client.post(
+            "/api/billing/checkout/",
+            {
+                "items": [{"item": product.pk, "quantity": 1}],
+                "discount_percent": "20.00",
+                "discount_approval": approval_id,
+                "payments": [{"method": "cash", "amount": "14.16"}],
+            },
+            format="json",
+        )
+        self.assertEqual(reused.status_code, status.HTTP_409_CONFLICT)
+
     def test_checkout_recalculates_totals_and_deducts_stock_atomically(self):
         product = Item.objects.get(sku="TEST-ITEM")
         product.store_stock = 2

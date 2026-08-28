@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -25,7 +27,8 @@ class UserState extends ChangeNotifier {
   Map<String, dynamic> user = {},
       dashboard = {},
       lastInvoice = {},
-      paymentSummary = {};
+      paymentSummary = {},
+      discountApproval = {};
   List<Map<String, dynamic>> categories = [],
       racks = [],
       products = [],
@@ -34,6 +37,7 @@ class UserState extends ChangeNotifier {
       invoices = [],
       stockMovements = [];
   final List<CartLine> cart = [];
+  double discountPercent = 0;
   int navIndex = 0;
   String search = '',
       stockFilter = 'All',
@@ -279,23 +283,27 @@ class UserState extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (existing.isEmpty)
+    _invalidateDiscountApproval();
+    if (existing.isEmpty) {
       cart.add(CartLine(product: product));
-    else if (existing.first.quantity < available)
+    } else if (existing.first.quantity < available) {
       existing.first.quantity++;
-    else
+    } else {
       error = 'Only $available units are available.';
+    }
     notifyListeners();
   }
 
   void changeQuantity(CartLine line, int delta) {
+    _invalidateDiscountApproval();
     final next = line.quantity + delta;
-    if (next <= 0)
+    if (next <= 0) {
       cart.remove(line);
-    else if (next <= line.available)
+    } else if (next <= line.available) {
       line.quantity = next;
-    else
+    } else {
       error = 'Only ${line.available} units are available.';
+    }
     notifyListeners();
   }
 
@@ -308,18 +316,82 @@ class UserState extends ChangeNotifier {
             (double.tryParse('${line.product['tax_percent'] ?? 0}') ?? 0) /
             100,
   );
-  double get grandTotal => subtotal + gst;
+  double get discountAmount => subtotal * discountPercent / 100;
+  double get discountedGst => gst * (100 - discountPercent) / 100;
+  double get grandTotal => subtotal - discountAmount + discountedGst;
+
+  String get discountStatus => discountApproval['status']?.toString() ?? '';
+  bool get discountPending => discountStatus == 'pending';
+  bool get discountApproved =>
+      discountStatus == 'approved' || discountStatus == 'not_required';
+
+  List<Map<String, dynamic>> get _cartPayload =>
+      cart.map((line) => {'item': line.id, 'quantity': line.quantity}).toList();
+
+  Future<bool> requestDiscount(double percent, String note) async =>
+      _perform(() async {
+        final response = await api.post('discount-approvals/request-billing', {
+          'items': _cartPayload,
+          'requested_percent': percent.toStringAsFixed(2),
+          'request_note': note.trim(),
+        });
+        discountApproval = response;
+        if (response['status'] == 'not_required') {
+          discountPercent =
+              double.tryParse('${response['requested_percent']}') ?? percent;
+        } else {
+          discountPercent = 0;
+        }
+      });
+
+  Future<bool> refreshDiscountApproval() async => _perform(() async {
+    final id = int.tryParse('${discountApproval['id'] ?? ''}');
+    if (id == null) return;
+    final approvals = await api.getList('discount-approvals');
+    final matches = approvals.where((row) => row['id'] == id);
+    if (matches.isEmpty) return;
+    discountApproval = matches.first;
+    if (discountApproval['status'] == 'approved') {
+      discountPercent =
+          double.tryParse('${discountApproval['requested_percent']}') ?? 0;
+    } else if (discountApproval['status'] != 'not_required') {
+      discountPercent = 0;
+    }
+  });
+
+  void removeDiscount() {
+    _invalidateDiscountApproval();
+    notifyListeners();
+  }
+
+  void _invalidateDiscountApproval() {
+    final pendingId = discountStatus == 'pending'
+        ? int.tryParse('${discountApproval['id']}')
+        : null;
+    if (pendingId != null) {
+      unawaited(
+        api
+            .post('discount-approvals/$pendingId/cancel', const {})
+            .catchError((_) => <String, dynamic>{}),
+      );
+    }
+    discountApproval = {};
+    discountPercent = 0;
+  }
 
   Future<bool> checkout(List<Map<String, dynamic>> payments) async =>
       _perform(() async {
         lastInvoice = await api.post('billing/checkout', {
-          'items': cart
-              .map((line) => {'item': line.id, 'quantity': line.quantity})
-              .toList(),
+          'items': _cartPayload,
           'payments': payments,
+          'discount_percent': discountPercent.toStringAsFixed(2),
+          if (discountApproval['id'] != null)
+            'discount_approval': discountApproval['id'],
         });
         invoices = await api.getList('invoices');
         cart.clear();
+        discountApproval = {};
+        discountPercent = 0;
         page = UserPage.invoice;
       });
 
@@ -403,9 +475,10 @@ class UserState extends ChangeNotifier {
         }
       }
       products = await api.getShelfStock();
-      if (failed > 0)
+      if (failed > 0) {
         error =
             '$failed selected product${failed == 1 ? '' : 's'} could not be updated.';
+      }
       return BulkShelfActionResult(completed, failed);
     } finally {
       loading = false;

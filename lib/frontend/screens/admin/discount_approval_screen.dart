@@ -34,6 +34,17 @@ class DiscountApprovalScreen extends StatelessWidget {
                         approval['quotation_number']?.toString() ?? '',
                       ),
                       LabeledValue(
+                        'Request Type',
+                        approval['request_type'] == 'billing'
+                            ? 'Live POS Bill'
+                            : 'Quotation',
+                      ),
+                      if (approval['request_type'] == 'billing')
+                        LabeledValue(
+                          'Cart Items',
+                          '${(approval['billing_items'] as List?)?.length ?? 0}',
+                        ),
+                      LabeledValue(
                         'Cashier',
                         approval['requested_by_name']?.toString() ?? '',
                       ),
@@ -121,8 +132,39 @@ Future<void> _decideDiscount(
   AdminState state,
   bool approved,
 ) async {
+  final note = TextEditingController();
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(approved ? 'Approve Discount?' : 'Reject Discount?'),
+      content: TextField(
+        controller: note,
+        autofocus: true,
+        maxLines: 3,
+        decoration: InputDecoration(
+          labelText: 'Review note',
+          hintText: approved
+              ? 'Optional approval note'
+              : 'Explain why this request is rejected',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: Text(approved ? 'Approve' : 'Reject'),
+        ),
+      ],
+    ),
+  );
+  final reviewNote = note.text.trim();
+  note.dispose();
+  if (confirmed != true) return;
   try {
-    await state.decideDiscount(approved);
+    await state.decideDiscount(approved, reviewNote: reviewNote);
     if (context.mounted) {
       showNotice(context, approved ? 'Discount approved' : 'Discount rejected');
     }

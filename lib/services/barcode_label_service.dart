@@ -73,6 +73,7 @@ Future<Uint8List> buildBarcodeLabelPdf({
   required String productName,
   required String barcode,
   required String price,
+  String department = '',
   required BarcodeLabelFormat format,
   required int copies,
 }) async {
@@ -101,6 +102,7 @@ Future<Uint8List> buildBarcodeLabelPdf({
                   productName,
                   barcode,
                   price,
+                  department: department,
                   compact: true,
                 ),
               ),
@@ -118,6 +120,7 @@ Future<Uint8List> buildBarcodeLabelPdf({
             productName,
             barcode,
             price,
+            department: department,
             compact: format == BarcodeLabelFormat.compact50x25,
           ),
         ),
@@ -132,6 +135,7 @@ Future<bool> printBarcodeLabels({
   required String productName,
   required String barcode,
   required String price,
+  String department = '',
   required BarcodeLabelFormat format,
   required int copies,
 }) async {
@@ -139,6 +143,7 @@ Future<bool> printBarcodeLabels({
     productName: productName,
     barcode: barcode,
     price: price,
+    department: department,
     format: format,
     copies: copies,
   );
@@ -154,6 +159,7 @@ pw.Widget _barcodeLabel(
   String productName,
   String barcode,
   String price, {
+  required String department,
   required bool compact,
 }) {
   final type = isValidEan13(barcode)
@@ -182,7 +188,7 @@ pw.Widget _barcodeLabel(
             ),
             if (price.trim().isNotEmpty)
               pw.Text(
-                'Rs $price',
+                'MRP Rs $price',
                 style: pw.TextStyle(
                   fontSize: compact ? 7 : 8.5,
                   fontWeight: pw.FontWeight.bold,
@@ -191,6 +197,15 @@ pw.Widget _barcodeLabel(
           ],
         ),
         pw.SizedBox(height: 2),
+        if (department.trim().isNotEmpty)
+          pw.Text(
+            department.trim(),
+            maxLines: 1,
+            style: pw.TextStyle(
+              fontSize: compact ? 5.5 : 6.5,
+              color: PdfColors.grey700,
+            ),
+          ),
         pw.Expanded(
           child: pw.BarcodeWidget(
             barcode: type,

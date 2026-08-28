@@ -14,6 +14,7 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
   final sku = TextEditingController();
   final purchasePrice = TextEditingController();
   final sellingPrice = TextEditingController();
+  final mrp = TextEditingController();
   final openingStock = TextEditingController(text: '0');
   final labelCopies = TextEditingController(text: '1');
   String? rackLocation;
@@ -41,6 +42,7 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
     sku.dispose();
     purchasePrice.dispose();
     sellingPrice.dispose();
+    mrp.dispose();
     openingStock.dispose();
     labelCopies.dispose();
     super.dispose();
@@ -74,6 +76,16 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
     return null;
   }
 
+  String get _selectedDepartmentName {
+    for (final category in widget.state.categories) {
+      if (int.tryParse('${category['id']}') == categoryId) {
+        final name = '${category['name'] ?? ''}'.trim();
+        if (name.isNotEmpty) return name;
+      }
+    }
+    return 'General';
+  }
+
   @override
   Widget build(BuildContext context) => UserShell(
     state: widget.state,
@@ -104,8 +116,12 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
           DropdownButtonFormField<int>(
             initialValue: categoryId,
             isExpanded: true,
+            menuMaxHeight: 320,
+            borderRadius: BorderRadius.circular(16),
+            dropdownColor: Colors.white,
+            elevation: 4,
             decoration: const InputDecoration(
-              labelText: 'Category *',
+              labelText: 'Department Name *',
               prefixIcon: Icon(Icons.category_outlined),
             ),
             items: widget.state.categories
@@ -165,6 +181,18 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
             ),
             validator: (value) => _price(value, allowZero: false),
           ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: mrp,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'MRP *',
+              hintText: 'Maximum retail price',
+              prefixText: '₹ ',
+              prefixIcon: Icon(Icons.price_check_outlined),
+            ),
+            validator: _mrpValidator,
+          ),
           const SizedBox(height: 20),
           _GstSlabField(
             selected: gst,
@@ -193,6 +221,10 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
           DropdownButtonFormField<String>(
             initialValue: rackLocation,
             isExpanded: true,
+            menuMaxHeight: 280,
+            borderRadius: BorderRadius.circular(16),
+            dropdownColor: Colors.white,
+            elevation: 4,
             decoration: const InputDecoration(
               labelText: 'Rack / Fridge Location *',
               prefixIcon: Icon(Icons.location_on_outlined),
@@ -299,6 +331,17 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
     return null;
   }
 
+  String? _mrpValidator(String? value) {
+    final error = _price(value, allowZero: false);
+    if (error != null) return error;
+    final retail = double.tryParse(sellingPrice.text.trim());
+    final maximum = double.tryParse(value!.trim());
+    if (retail != null && maximum != null && maximum < retail) {
+      return 'MRP cannot be lower than selling price.';
+    }
+    return null;
+  }
+
   String? _stock(String? value) {
     if (value == null || value.trim().isEmpty) return 'Quantity is required.';
     final quantity = int.tryParse(value.trim());
@@ -377,7 +420,7 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
           controller: sku,
           textCapitalization: TextCapitalization.characters,
           decoration: InputDecoration(
-            labelText: 'Barcode / SKU *',
+            labelText: 'Barcode Number / SKU *',
             hintText: 'Scan, generate or enter manually',
             prefixIcon: const Icon(Icons.numbers_rounded),
             suffixIcon: sku.text.isEmpty
@@ -436,6 +479,10 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
         DropdownButtonFormField<BarcodeLabelFormat>(
           initialValue: labelFormat,
           isExpanded: true,
+          menuMaxHeight: 280,
+          borderRadius: BorderRadius.circular(16),
+          dropdownColor: Colors.white,
+          elevation: 4,
           decoration: const InputDecoration(
             labelText: 'Print format',
             prefixIcon: Icon(Icons.print_outlined),
@@ -622,8 +669,10 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
       'sku': sku.text.trim(),
       'barcode': sku.text.trim(),
       'category': categoryId,
+      'store_section': _selectedDepartmentName,
       'purchase_price': purchasePrice.text.trim(),
       'selling_price': sellingPrice.text.trim(),
+      'mrp': mrp.text.trim(),
       'tax_percent': gst,
       if (_selectedRackId != null) 'rack': _selectedRackId,
       'rack_location': rackLocation,
@@ -641,7 +690,8 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
           await printBarcodeLabels(
             productName: name.text.trim(),
             barcode: sku.text.trim(),
-            price: sellingPrice.text.trim(),
+            price: mrp.text.trim(),
+            department: _selectedDepartmentName,
             format: labelFormat,
             copies: int.tryParse(labelCopies.text.trim()) ?? 1,
           );

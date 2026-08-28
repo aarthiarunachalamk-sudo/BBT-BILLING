@@ -8,6 +8,7 @@ import 'package:bbt_billing/frontend/screens/admin/admin_app.dart';
 import 'package:bbt_billing/frontend/screens/admin/admin_state.dart';
 import 'package:bbt_billing/services/barcode_label_service.dart';
 import 'package:bbt_billing/frontend/screens/user/user_models.dart';
+import 'package:bbt_billing/frontend/screens/user/user_api.dart';
 import 'package:bbt_billing/frontend/screens/user/user_screens.dart';
 import 'package:bbt_billing/frontend/screens/user/user_state.dart';
 import 'package:flutter/material.dart';
@@ -1199,7 +1200,7 @@ void main() {
     await tester.pump();
 
     final barcodeField = tester.widget<TextFormField>(
-      find.widgetWithText(TextFormField, 'Barcode / SKU *'),
+      find.widgetWithText(TextFormField, 'Barcode Number / SKU *'),
     );
     final barcode = barcodeField.controller!.text;
     expect(barcode, matches(RegExp(r'^29\d{11}$')));
@@ -1213,6 +1214,7 @@ void main() {
     expect(find.textContaining('Valid EAN-13'), findsOneWidget);
     expect(find.text('50 × 25 mm label'), findsOneWidget);
     expect(find.text('Print after save'), findsOneWidget);
+    expect(find.text('Department Name *'), findsOneWidget);
   });
 
   test('barcode label PDF is generated for label and A4 formats', () async {
@@ -1268,10 +1270,129 @@ void main() {
     await tester.tap(find.text('Generate new'));
     await tester.pump();
     final barcodeField = tester.widget<TextFormField>(
-      find.widgetWithText(TextFormField, 'Barcode / SKU *'),
+      find.widgetWithText(TextFormField, 'Barcode Number / SKU *'),
     );
     expect(barcodeField.controller!.text, matches(RegExp(r'^29\d{11}$')));
     expect(find.textContaining('Valid EAN-13'), findsOneWidget);
+  });
+
+  testWidgets(
+    'user billing shows discount request and pending approval state',
+    (tester) async {
+      tester.view.physicalSize = const Size(430, 1100);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final state = UserState()
+        ..loading = false
+        ..page = UserPage.billing;
+      state.addProduct({
+        'id': 1,
+        'name': 'Premium Tea',
+        'selling_price': '100.00',
+        'tax_percent': '5.00',
+        'stock_quantity': 5,
+      });
+      addTearDown(state.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AnimatedBuilder(
+            animation: state,
+            builder: (_, _) => buildUserScreen(state),
+          ),
+        ),
+      );
+      expect(find.text('Request Discount'), findsOneWidget);
+
+      state.discountApproval = {
+        'id': 7,
+        'status': 'pending',
+        'requested_percent': '20.00',
+      };
+      state.notify();
+      await tester.pump();
+      expect(find.text('Waiting for Admin Approval'), findsWidgets);
+      expect(find.text('Check Approval'), findsOneWidget);
+    },
+  );
+
+  test('user approved discount is included in checkout exactly once', () async {
+    Map<String, dynamic>? checkoutBody;
+    final api = UserApi(
+      client: MockClient((request) async {
+        if (request.method == 'POST' &&
+            request.url.path.endsWith('/discount-approvals/request-billing/')) {
+          return http.Response(
+            jsonEncode({
+              'id': 7,
+              'status': 'pending',
+              'requested_percent': '20.00',
+            }),
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'GET' &&
+            request.url.path.endsWith('/discount-approvals/')) {
+          return http.Response(
+            jsonEncode([
+              {
+                'id': 7,
+                'status': 'approved',
+                'requested_percent': '20.00',
+                'review_note': 'Approved',
+              },
+            ]),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'POST' &&
+            request.url.path.endsWith('/billing/checkout/')) {
+          checkoutBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode({'id': 99, 'number': 'INV-99'}),
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.method == 'GET' &&
+            request.url.path.endsWith('/invoices/')) {
+          return http.Response(
+            '[]',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{}', 404);
+      }),
+    );
+    final state = UserState(api: api)..loading = false;
+    addTearDown(state.dispose);
+    state.addProduct({
+      'id': 1,
+      'name': 'Premium Tea',
+      'selling_price': '100.00',
+      'tax_percent': '5.00',
+      'stock_quantity': 5,
+    });
+
+    expect(await state.requestDiscount(20, 'Loyal customer'), isTrue);
+    expect(state.discountPending, isTrue);
+    expect(await state.refreshDiscountApproval(), isTrue);
+    expect(state.discountApproved, isTrue);
+    expect(state.grandTotal, 84.0);
+    expect(
+      await state.checkout([
+        {'method': 'cash', 'amount': '84.00'},
+      ]),
+      isTrue,
+    );
+    expect(checkoutBody?['discount_percent'], '20.00');
+    expect(checkoutBody?['discount_approval'], 7);
+    expect(state.discountApproval, isEmpty);
+    expect(state.discountPercent, 0);
   });
 
   test('existing category is reused without another backend request', () async {

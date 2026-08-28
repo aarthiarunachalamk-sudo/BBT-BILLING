@@ -429,7 +429,17 @@ class DiscountApproval(TimeStampedModel):
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
 
-    quotation = models.ForeignKey(Quotation, on_delete=models.CASCADE, related_name="approvals")
+    quotation = models.ForeignKey(
+        Quotation,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="approvals",
+    )
+    billing_items = models.JSONField(default=list, blank=True)
+    billing_subtotal = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    billing_tax = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    billing_total = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
     requested_percent = models.DecimalField(max_digits=5, decimal_places=2)
     requested_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="requested_approvals")
     reviewed_by = models.ForeignKey(
@@ -439,6 +449,13 @@ class DiscountApproval(TimeStampedModel):
     request_note = models.TextField(blank=True)
     review_note = models.TextField(blank=True)
     decided_at = models.DateTimeField(null=True, blank=True)
+    applied_invoice = models.OneToOneField(
+        "Invoice",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="discount_approval",
+    )
 
     class Meta:
         ordering = ["-created_at"]

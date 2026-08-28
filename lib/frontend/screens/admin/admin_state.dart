@@ -641,7 +641,7 @@ class AdminState extends ChangeNotifier {
     }
   }
 
-  Future<void> decideDiscount(bool approved) async {
+  Future<void> decideDiscount(bool approved, {String reviewNote = ''}) async {
     if (decidingDiscount) return;
     final pending = discountApprovals.where(
       (row) => row['status'] == 'pending',
@@ -652,12 +652,11 @@ class AdminState extends ChangeNotifier {
     decidingDiscount = true;
     notifyListeners();
     try {
-      await api.action(
-        'discount-approvals',
-        pending.first['id'] as int,
-        'decide',
-        {'decision': approved ? 'approved' : 'rejected'},
-      );
+      await api
+          .action('discount-approvals', pending.first['id'] as int, 'decide', {
+            'decision': approved ? 'approved' : 'rejected',
+            'review_note': reviewNote.trim(),
+          });
       discountApprovals = await api.getList('discount-approvals');
       dashboard = await api.getMap('dashboard');
     } finally {

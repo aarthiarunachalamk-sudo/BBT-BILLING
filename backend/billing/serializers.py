@@ -245,6 +245,7 @@ class ItemSerializer(serializers.ModelSerializer):
         selling_price = attrs.get(
             "selling_price", getattr(self.instance, "selling_price", 0)
         )
+        mrp = attrs.get("mrp", getattr(self.instance, "mrp", None))
         stock = attrs.get(
             "stock_quantity", getattr(self.instance, "stock_quantity", 0)
         )
@@ -259,6 +260,10 @@ class ItemSerializer(serializers.ModelSerializer):
             errors["purchase_price"] = "Purchase price cannot be negative."
         if selling_price <= 0:
             errors["selling_price"] = "Selling price must be greater than zero."
+        if mrp is not None and mrp <= 0:
+            errors["mrp"] = "MRP must be greater than zero."
+        elif mrp is not None and mrp < selling_price:
+            errors["mrp"] = "MRP cannot be lower than selling price."
         if stock < 0:
             errors["stock_quantity"] = "Opening stock cannot be negative."
         if reorder < 0:
@@ -422,10 +427,11 @@ class QuotationSerializer(serializers.ModelSerializer):
 class DiscountApprovalSerializer(serializers.ModelSerializer):
     requested_by_name = serializers.CharField(source="requested_by.get_full_name", read_only=True)
     reviewed_by_name = serializers.CharField(source="reviewed_by.get_full_name", read_only=True)
-    quotation_number = serializers.CharField(source="quotation.number", read_only=True)
-    customer_name = serializers.CharField(source="quotation.client.name", read_only=True)
-    bill_amount = serializers.DecimalField(source="quotation.total", max_digits=14, decimal_places=2, read_only=True)
+    quotation_number = serializers.SerializerMethodField()
+    customer_name = serializers.SerializerMethodField()
+    bill_amount = serializers.SerializerMethodField()
     discount_amount = serializers.SerializerMethodField()
+    request_type = serializers.SerializerMethodField()
 
     class Meta:
         model = DiscountApproval
@@ -438,7 +444,20 @@ class DiscountApprovalSerializer(serializers.ModelSerializer):
         return value
 
     def get_discount_amount(self, obj):
-        return obj.quotation.subtotal * obj.requested_percent / Decimal("100")
+        subtotal = obj.quotation.subtotal if obj.quotation_id else obj.billing_subtotal
+        return (subtotal or Decimal("0")) * obj.requested_percent / Decimal("100")
+
+    def get_quotation_number(self, obj):
+        return obj.quotation.number if obj.quotation_id else f"POS-{obj.pk}"
+
+    def get_customer_name(self, obj):
+        return obj.quotation.client.name if obj.quotation_id else "Walk-in Customer"
+
+    def get_bill_amount(self, obj):
+        return obj.quotation.total if obj.quotation_id else obj.billing_total
+
+    def get_request_type(self, obj):
+        return "quotation" if obj.quotation_id else "billing"
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):

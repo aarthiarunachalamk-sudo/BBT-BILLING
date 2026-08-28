@@ -326,6 +326,13 @@ def _active_price_schedule(product):
         return None
 
 
+def _billing_item_snapshot(normalized):
+    return sorted(
+        ({"item": product_id, "quantity": quantity} for product_id, quantity in normalized),
+        key=lambda row: (row["item"], row["quantity"]),
+    )
+
+
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 @transaction.atomic
@@ -393,11 +400,65 @@ def checkout(request):
         return Response({"discount_percent": str(exception)}, status=status.HTTP_400_BAD_REQUEST)
     settings = StoreSettings.objects.first()
     maximum_discount = settings.max_cashier_discount if settings else Decimal("10.00")
-    if discount_percent < 0 or discount_percent > maximum_discount:
+    discount_approval = None
+    if discount_percent < 0 or discount_percent > Decimal("100"):
         return Response(
-            {"discount_percent": f"Discount must be between 0 and {maximum_discount}%."},
+            {"discount_percent": "Discount must be between 0 and 100%."},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    if discount_percent > maximum_discount:
+        approval_id = request.data.get("discount_approval")
+        try:
+            discount_approval = DiscountApproval.objects.select_for_update().get(
+                pk=approval_id,
+                quotation__isnull=True,
+            )
+        except (DiscountApproval.DoesNotExist, TypeError, ValueError):
+            return Response(
+                {
+                    "discount_approval": (
+                        f"Admin approval is required above {maximum_discount}%."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if discount_approval.requested_by_id != request.user.pk:
+            return Response(
+                {"discount_approval": "This approval belongs to another user."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if discount_approval.status != DiscountApproval.Status.APPROVED:
+            return Response(
+                {"discount_approval": "The discount request is not approved."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if discount_approval.applied_invoice_id:
+            return Response(
+                {"discount_approval": "This discount approval has already been used."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if discount_approval.requested_percent != discount_percent:
+            return Response(
+                {"discount_approval": "The approved discount percentage does not match."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if discount_approval.billing_items != _billing_item_snapshot(normalized):
+            return Response(
+                {"discount_approval": "The cart changed after approval. Request approval again."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if (
+            discount_approval.billing_subtotal != subtotal
+            or discount_approval.billing_tax != tax_total
+        ):
+            return Response(
+                {
+                    "discount_approval": (
+                        "Product price or tax changed after approval. Request approval again."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
     discount_amount = (subtotal * discount_percent / Decimal("100")).quantize(Decimal("0.01"))
     taxable_amount = subtotal - discount_amount
     # Reduce GST proportionally when a bill-level discount is applied.
@@ -467,6 +528,9 @@ def checkout(request):
         total=grand_total,
         notes=str(request.data.get("notes", "")),
     )
+    if discount_approval is not None:
+        discount_approval.applied_invoice = invoice
+        discount_approval.save(update_fields=["applied_invoice", "updated_at"])
     InvoiceItem.objects.bulk_create([
         InvoiceItem(
             invoice=invoice,
@@ -1326,11 +1390,132 @@ class QuotationViewSet(SearchableModelViewSet):
 
 
 class DiscountApprovalViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = DiscountApproval.objects.select_related("quotation", "requested_by", "reviewed_by").all()
+    queryset = DiscountApproval.objects.select_related(
+        "quotation",
+        "quotation__client",
+        "requested_by",
+        "reviewed_by",
+        "applied_invoice",
+    ).all()
     serializer_class = DiscountApprovalSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if user.is_superuser or user.role in {User.Role.ADMIN, User.Role.MANAGER}:
+            return queryset
+        return queryset.filter(requested_by=user)
+
+    @action(detail=False, methods=["post"], url_path="request-billing")
+    def request_billing(self, request):
+        lines = request.data.get("items")
+        if not isinstance(lines, list) or not lines:
+            return Response(
+                {"items": "Add at least one product."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            requested_percent = _money(request.data.get("requested_percent"))
+        except ValueError as exception:
+            return Response(
+                {"requested_percent": str(exception)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if requested_percent <= 0 or requested_percent > Decimal("100"):
+            return Response(
+                {"requested_percent": "Discount must be between 0 and 100%."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        normalized = []
+        product_ids = []
+        for index, line in enumerate(lines):
+            try:
+                product_id = int(line.get("product", line.get("item")))
+                quantity = int(line.get("quantity"))
+            except (AttributeError, TypeError, ValueError):
+                return Response(
+                    {"items": f"Line {index + 1} is invalid."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if quantity <= 0:
+                return Response(
+                    {"items": f"Line {index + 1} quantity must be positive."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            normalized.append((product_id, quantity))
+            product_ids.append(product_id)
+
+        products = {
+            product.pk: product
+            for product in Item.objects.filter(pk__in=set(product_ids), is_active=True)
+        }
+        if len(products) != len(set(product_ids)):
+            return Response(
+                {"items": "One or more products are unavailable."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        subtotal = Decimal("0.00")
+        tax = Decimal("0.00")
+        for product_id, quantity in normalized:
+            product = products[product_id]
+            scheduled_price = _active_price_schedule(product)
+            price = scheduled_price.selling_price if scheduled_price else product.selling_price
+            tax_percent = scheduled_price.tax_percent if scheduled_price else product.tax_percent
+            line_total = (price * quantity).quantize(Decimal("0.01"))
+            subtotal += line_total
+            tax += (line_total * tax_percent / Decimal("100")).quantize(Decimal("0.01"))
+
+        settings = StoreSettings.objects.first()
+        cashier_limit = settings.max_cashier_discount if settings else Decimal("10.00")
+        if requested_percent <= cashier_limit:
+            return Response(
+                {
+                    "status": "not_required",
+                    "requested_percent": str(requested_percent),
+                    "cashier_limit": str(cashier_limit),
+                    "message": "This discount is within the cashier limit.",
+                }
+            )
+
+        snapshot = _billing_item_snapshot(normalized)
+        pending = DiscountApproval.objects.filter(
+            quotation__isnull=True,
+            requested_by=request.user,
+            status=DiscountApproval.Status.PENDING,
+        ).first()
+        if pending is not None:
+            if pending.billing_items == snapshot and pending.requested_percent == requested_percent:
+                return Response(self.get_serializer(pending).data)
+            return Response(
+                {"detail": "You already have a pending discount request. Wait for an admin decision."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        approval = DiscountApproval.objects.create(
+            requested_percent=requested_percent,
+            requested_by=request.user,
+            request_note=str(request.data.get("request_note", "")).strip(),
+            billing_items=snapshot,
+            billing_subtotal=subtotal,
+            billing_tax=tax,
+            billing_total=subtotal + tax,
+        )
+        return Response(
+            self.get_serializer(approval).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"])
     def decide(self, request, pk=None):
+        if not (
+            request.user.is_superuser
+            or request.user.role in {User.Role.ADMIN, User.Role.MANAGER}
+        ):
+            return Response(
+                {"detail": "Only an admin or manager can decide discount requests."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         approval = self.get_object()
         decision = request.data.get("decision")
         if approval.status != DiscountApproval.Status.PENDING:
@@ -1345,6 +1530,8 @@ class DiscountApprovalViewSet(viewsets.ReadOnlyModelViewSet):
         approval.save()
 
         quotation = approval.quotation
+        if quotation is None:
+            return Response(self.get_serializer(approval).data)
         if decision == DiscountApproval.Status.APPROVED:
             quotation.discount_percent = approval.requested_percent
             quotation.status = Quotation.Status.APPROVED
@@ -1353,6 +1540,25 @@ class DiscountApprovalViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             quotation.status = Quotation.Status.REJECTED
             quotation.save(update_fields=["status", "updated_at"])
+        return Response(self.get_serializer(approval).data)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        approval = self.get_object()
+        if approval.requested_by_id != request.user.pk:
+            return Response(
+                {"detail": "Only the requester can cancel this discount request."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if approval.status != DiscountApproval.Status.PENDING:
+            return Response(
+                {"detail": "Only a pending request can be cancelled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        approval.status = DiscountApproval.Status.REJECTED
+        approval.review_note = "Cancelled because the billing cart changed."
+        approval.decided_at = timezone.now()
+        approval.save(update_fields=["status", "review_note", "decided_at", "updated_at"])
         return Response(self.get_serializer(approval).data)
 
 
