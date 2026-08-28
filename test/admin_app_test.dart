@@ -6,6 +6,7 @@ import 'package:bbt_billing/main.dart' as app;
 import 'package:bbt_billing/frontend/screens/admin/admin_api.dart';
 import 'package:bbt_billing/frontend/screens/admin/admin_app.dart';
 import 'package:bbt_billing/frontend/screens/admin/admin_state.dart';
+import 'package:bbt_billing/frontend/screens/admin/admin_screens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -1150,6 +1151,66 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Category name'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
+  });
+
+  testWidgets('add product can generate a valid printable EAN-13 barcode', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 5
+      ..categories = [
+        {'id': 1, 'name': 'Beverages', 'is_active': true},
+      ]
+      ..racks = [
+        {'id': 1, 'name': 'Rack 1', 'is_active': true},
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    expect(find.text('Barcode setup'), findsOneWidget);
+    expect(find.text('Scan barcode'), findsOneWidget);
+    expect(find.text('Generate new'), findsOneWidget);
+
+    await tester.tap(find.text('Generate new'));
+    await tester.pump();
+
+    final barcodeField = tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, 'Barcode / SKU *'),
+    );
+    final barcode = barcodeField.controller!.text;
+    expect(barcode, matches(RegExp(r'^29\d{11}$')));
+    final body = barcode.substring(0, 12);
+    var sum = 0;
+    for (var index = 0; index < body.length; index++) {
+      final digit = int.parse(body[index]);
+      sum += index.isEven ? digit : digit * 3;
+    }
+    expect(int.parse(barcode[12]), (10 - (sum % 10)) % 10);
+    expect(find.textContaining('Valid EAN-13'), findsOneWidget);
+    expect(find.text('50 × 25 mm label'), findsOneWidget);
+    expect(find.text('Print after save'), findsOneWidget);
+  });
+
+  test('barcode label PDF is generated for label and A4 formats', () async {
+    for (final format in [
+      BarcodeLabelFormat.compact50x25,
+      BarcodeLabelFormat.a4Sheet,
+    ]) {
+      final bytes = await buildBarcodeLabelPdf(
+        productName: 'Premium Tea 250 g',
+        barcode: '2901234567896',
+        price: '125.00',
+        format: format,
+        copies: format == BarcodeLabelFormat.a4Sheet ? 24 : 2,
+      );
+      expect(bytes.length, greaterThan(500));
+      expect(String.fromCharCodes(bytes.take(4)), '%PDF');
+    }
   });
 
   test('existing category is reused without another backend request', () async {

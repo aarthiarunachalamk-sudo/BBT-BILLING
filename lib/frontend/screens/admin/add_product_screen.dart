@@ -26,7 +26,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool imageError = false;
   bool printAfterSave = true;
   String barcodeSource = 'Not selected';
-  _BarcodeLabelFormat labelFormat = _BarcodeLabelFormat.compact50x25;
+  BarcodeLabelFormat labelFormat = BarcodeLabelFormat.compact50x25;
 
   @override
   void initState() {
@@ -64,14 +64,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
   List<String> get _locationOptions {
     final names = <String>{
       for (final rack in widget.state.racks)
-        if (rack['is_active'] != false && '${rack['name'] ?? ''}'.trim().isNotEmpty)
+        if (rack['is_active'] != false &&
+            '${rack['name'] ?? ''}'.trim().isNotEmpty)
           '${rack['name']}'.trim(),
       for (final product in widget.state.products)
-        if ('${product['rack_name'] ?? product['rack_location'] ?? ''}'.trim().isNotEmpty)
+        if ('${product['rack_name'] ?? product['rack_location'] ?? ''}'
+            .trim()
+            .isNotEmpty)
           '${product['rack_name'] ?? product['rack_location']}'.trim(),
     };
-    if (names.isEmpty) names.addAll(const ['Rack 1', 'Rack 2', 'Rack 3', 'Fridge']);
-    return names.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    if (names.isEmpty) {
+      names.addAll(const ['Rack 1', 'Rack 2', 'Rack 3', 'Fridge']);
+    }
+    return names.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   }
 
   int? get _selectedRackId {
@@ -185,8 +191,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
               final fields = [
                 TextFormField(
                   controller: purchasePrice,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Purchase Price *',
                     prefixText: '₹ ',
@@ -196,8 +203,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
                 TextFormField(
                   controller: sellingPrice,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Selling Price *',
                     prefixText: '₹ ',
@@ -208,7 +216,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ];
               if (constraints.maxWidth < 560) {
                 return Column(
-                  children: [fields.first, const SizedBox(height: 14), fields.last],
+                  children: [
+                    fields.first,
+                    const SizedBox(height: 14),
+                    fields.last,
+                  ],
                 );
               }
               return Row(
@@ -273,7 +285,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ];
               if (constraints.maxWidth < 560) {
                 return Column(
-                  children: [fields.first, const SizedBox(height: 14), fields.last],
+                  children: [
+                    fields.first,
+                    const SizedBox(height: 14),
+                    fields.last,
+                  ],
                 );
               }
               return Row(
@@ -419,7 +435,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
         (existing) => existing?.toString().trim().toLowerCase() == normalized,
       ),
     );
-    return duplicate ? 'This barcode is already used by another product.' : null;
+    return duplicate
+        ? 'This barcode is already used by another product.'
+        : null;
   }
 
   Widget _barcodeSetup() => Container(
@@ -432,18 +450,35 @@ class _AddProductScreenState extends State<AddProductScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: Color(0xFFE9E3FF),
-            child: Icon(Icons.qr_code_2_rounded, color: Color(0xFF6547D5), size: 20),
-          ),
-          SizedBox(width: 10),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Barcode setup', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
-            Text('Scan an existing code or generate a new retail barcode.', style: TextStyle(fontSize: 9.5, color: muted)),
-          ])),
-        ]),
+        const Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: Color(0xFFE9E3FF),
+              child: Icon(
+                Icons.qr_code_2_rounded,
+                color: Color(0xFF6547D5),
+                size: 20,
+              ),
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Barcode setup',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                  ),
+                  Text(
+                    'Scan an existing code or generate a new retail barcode.',
+                    style: TextStyle(fontSize: 9.5, color: muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         TextFormField(
           controller: sku,
@@ -457,10 +492,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ? null
                 : IconButton(
                     tooltip: 'Clear barcode',
-                    onPressed: saving ? null : () => setState(() {
-                      sku.clear();
-                      barcodeSource = 'Not selected';
-                    }),
+                    onPressed: saving
+                        ? null
+                        : () => setState(() {
+                            sku.clear();
+                            barcodeSource = 'Not selected';
+                          }),
                     icon: const Icon(Icons.close_rounded),
                   ),
           ),
@@ -468,72 +505,127 @@ class _AddProductScreenState extends State<AddProductScreen> {
           validator: _barcodeValidator,
         ),
         const SizedBox(height: 10),
-        Row(children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: saving ? null : _scanBarcode,
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Scan barcode'),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: saving ? null : _scanBarcode,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Scan barcode'),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF6547D5)),
-              onPressed: saving ? null : _generateBarcode,
-              icon: const Icon(Icons.auto_awesome_rounded),
-              label: const Text('Generate new'),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF6547D5),
+                ),
+                onPressed: saving ? null : _generateBarcode,
+                icon: const Icon(Icons.auto_awesome_rounded),
+                label: const Text('Generate new'),
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
         const SizedBox(height: 7),
         Text(
           barcodeSource == 'Generated by BBT' && _isValidEan13(sku.text)
               ? '$barcodeSource • Valid EAN-13'
               : barcodeSource,
-          style: const TextStyle(fontSize: 9.5, color: Color(0xFF6547D5), fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            fontSize: 9.5,
+            color: Color(0xFF6547D5),
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const Divider(height: 24),
-        const Text('Print label setup', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900)),
+        const Text(
+          'Print label setup',
+          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900),
+        ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<_BarcodeLabelFormat>(
+        DropdownButtonFormField<BarcodeLabelFormat>(
           initialValue: labelFormat,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Print format', prefixIcon: Icon(Icons.print_outlined)),
-          items: _BarcodeLabelFormat.values
-              .map((format) => DropdownMenuItem(value: format, child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(format.title, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
-                Text(format.description, style: const TextStyle(fontSize: 8.5, color: muted)),
-              ])))
+          decoration: const InputDecoration(
+            labelText: 'Print format',
+            prefixIcon: Icon(Icons.print_outlined),
+          ),
+          items: BarcodeLabelFormat.values
+              .map(
+                (format) => DropdownMenuItem(
+                  value: format,
+                  child: Text(
+                    format.title,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              )
               .toList(),
-          onChanged: saving ? null : (value) => setState(() => labelFormat = value ?? labelFormat),
+          onChanged: saving
+              ? null
+              : (value) => setState(() => labelFormat = value ?? labelFormat),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 12, top: 5),
+          child: Text(
+            labelFormat.description,
+            style: const TextStyle(fontSize: 8.8, color: muted),
+          ),
         ),
         const SizedBox(height: 9),
-        Row(children: [
-          Expanded(
-            child: TextFormField(
-              controller: labelCopies,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Label copies', prefixIcon: Icon(Icons.copy_all_outlined)),
-              validator: (value) {
-                final copies = int.tryParse(value?.trim() ?? '');
-                if (copies == null || copies < 1) return 'Enter 1 or more.';
-                if (copies > (labelFormat == _BarcodeLabelFormat.a4Sheet ? 96 : 20)) return 'Too many copies.';
-                return null;
-              },
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: labelCopies,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Label copies',
+                  prefixIcon: Icon(Icons.copy_all_outlined),
+                ),
+                validator: (value) {
+                  final copies = int.tryParse(value?.trim() ?? '');
+                  if (copies == null || copies < 1) {
+                    return 'Enter 1 or more.';
+                  }
+                  if (copies >
+                      (labelFormat == BarcodeLabelFormat.a4Sheet ? 96 : 20)) {
+                    return 'Too many copies.';
+                  }
+                  return null;
+                },
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SwitchListTile.adaptive(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-              title: const Text('Print after save', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800)),
-              subtitle: const Text('Open print preview', style: TextStyle(fontSize: 8.5)),
-              value: printAfterSave,
-              onChanged: saving ? null : (value) => setState(() => printAfterSave = value),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: SwitchListTile.adaptive(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  title: const Text(
+                    'Print after save',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Open print preview',
+                    style: TextStyle(fontSize: 8.5),
+                  ),
+                  value: printAfterSave,
+                  onChanged: saving
+                      ? null
+                      : (value) => setState(() => printAfterSave = value),
+                ),
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ],
     ),
   );
@@ -641,35 +733,49 @@ class _AddProductScreenState extends State<AddProductScreen> {
     setState(() => saving = true);
     try {
       final stock = int.parse(openingStock.text.trim());
-      final product = await widget.state.createProduct({
-        'item_type': 'material',
-        'name': name.text.trim(),
-        'sku': sku.text.trim(),
-        'barcode': sku.text.trim(),
-        'category': categoryId,
-        'purchase_price': purchasePrice.text.trim(),
-        'selling_price': sellingPrice.text.trim(),
-        'tax_percent': gst,
-        if (_selectedRackId != null) 'rack': _selectedRackId,
-        'rack_location': rackLocation,
-        'store_stock': stock,
-        'shelf_stock': 0,
-        'stock_quantity': stock,
-        'is_active': true,
-      }, imageBytes: productImageBytes, imageName: productImage?.name);
+      final product = await widget.state.createProduct(
+        {
+          'item_type': 'material',
+          'name': name.text.trim(),
+          'sku': sku.text.trim(),
+          'barcode': sku.text.trim(),
+          'category': categoryId,
+          'purchase_price': purchasePrice.text.trim(),
+          'selling_price': sellingPrice.text.trim(),
+          'tax_percent': gst,
+          if (_selectedRackId != null) 'rack': _selectedRackId,
+          'rack_location': rackLocation,
+          'store_stock': stock,
+          'shelf_stock': 0,
+          'stock_quantity': stock,
+          'is_active': true,
+        },
+        imageBytes: productImageBytes,
+        imageName: productImage?.name,
+      );
       if (!mounted) return;
-      showNotice(context, '${product['name'] ?? name.text.trim()} added successfully.');
+      showNotice(
+        context,
+        '${product['name'] ?? name.text.trim()} added successfully.',
+      );
       if (printAfterSave) {
         try {
           await _printBarcodeLabels(
             productName: product['name']?.toString() ?? name.text.trim(),
             barcode: product['barcode']?.toString() ?? sku.text.trim(),
-            price: product['selling_price']?.toString() ?? sellingPrice.text.trim(),
+            price:
+                product['selling_price']?.toString() ??
+                sellingPrice.text.trim(),
             format: labelFormat,
             copies: int.tryParse(labelCopies.text.trim()) ?? 1,
           );
         } catch (_) {
-          if (mounted) showNotice(context, 'Product saved. Printer preview could not be opened.');
+          if (mounted) {
+            showNotice(
+              context,
+              'Product saved. Printer preview could not be opened.',
+            );
+          }
         }
       }
       if (!mounted) return;

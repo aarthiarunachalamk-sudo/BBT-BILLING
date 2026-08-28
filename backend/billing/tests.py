@@ -742,6 +742,31 @@ class StaffAdminIntegrationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("sku", response.data)
 
+    def test_product_creation_rejects_duplicate_barcode(self):
+        existing = Item.objects.get(sku="TEST-ITEM")
+        existing.barcode = "2901234567894"
+        existing.save(update_fields=["barcode"])
+        response = self.client.post(
+            "/api/items/",
+            {
+                "item_type": "material",
+                "name": "Duplicate barcode",
+                "sku": "UNIQUE-SKU-2",
+                "barcode": existing.barcode,
+                "category": existing.category_id,
+                "unit": "Pack",
+                "purchase_price": "10.00",
+                "selling_price": "15.00",
+                "tax_percent": "5.00",
+                "stock_quantity": 1,
+                "reorder_level": 1,
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("barcode", response.data)
+
     def test_products_can_be_filtered_by_category(self):
         category = Category.objects.get(name="Test Category")
         response = self.client.get(f"/api/items/?category={category.pk}")
