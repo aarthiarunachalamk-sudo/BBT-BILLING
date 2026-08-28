@@ -47,6 +47,22 @@ void main() {
     expect(find.text('Confirm New Password'), findsOneWidget);
   });
 
+  testWidgets('login hides server wake-up attempt copy', (tester) async {
+    final state = AdminState()
+      ..loading = true
+      ..wakingServer = true
+      ..wakeAttempt = 2
+      ..wakeMaxAttempts = 4;
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.textContaining('Waking up server'), findsNothing);
+    expect(find.textContaining('Attempt'), findsNothing);
+    expect(find.textContaining('First connection can take'), findsNothing);
+  });
+
   testWidgets('admin workspace can be removed without inherited dependents', (
     tester,
   ) async {

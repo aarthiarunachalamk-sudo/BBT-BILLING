@@ -192,26 +192,16 @@ class _LoginScreenState extends State<LoginScreen> {
             Column(
               children: [
                 const CircularProgressIndicator(),
-                const SizedBox(height: 14),
-                Text(
-                  _isWakingUp
-                      ? 'Waking up server... Attempt '
-                            '${widget.state.wakeAttempt} of '
-                            '${widget.state.wakeMaxAttempts}'
-                      : 'Logging in...',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: muted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (_isWakingUp) ...[
-                  const SizedBox(height: 6),
+                if (!_isWakingUp) ...[
+                  const SizedBox(height: 14),
                   const Text(
-                    'First connection can take up to a minute. Keep this screen open.',
+                    'Logging in...',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 10, color: muted),
+                    style: TextStyle(
+                      color: muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ],
