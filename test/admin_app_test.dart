@@ -1264,7 +1264,7 @@ void main() {
   testWidgets('final add product step previews sticker placement', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(430, 1100);
+    tester.view.physicalSize = const Size(430, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -1327,28 +1327,45 @@ void main() {
     expect(find.byKey(const Key('product-sticker-preview')), findsOneWidget);
     expect(find.text('Premium Tea 250 g'), findsWidgets);
     expect(find.text('MRP ₹155.00'), findsOneWidget);
+    expect(find.text('6% OFF'), findsWidgets);
     expect(find.text('Add Product'), findsNWidgets(2));
 
-    await tester.tap(find.byKey(const ValueKey('sticker-placement-topLeft')));
+    await tester.drag(
+      find.byKey(const Key('draggable-product-sticker')),
+      const Offset(-45, -25),
+    );
     await tester.pump();
 
-    expect(
-      tester
-          .widget<ChoiceChip>(
-            find.byKey(const ValueKey('sticker-placement-topLeft')),
-          )
-          .selected,
-      isTrue,
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('product-rotation-90')),
     );
+    await tester.tap(find.byKey(const ValueKey('product-rotation-90')));
     expect(tester.takeException(), isNull);
 
+    await tester.ensureVisible(find.byKey(const Key('sticker-size-decrease')));
+    await tester.tap(find.byKey(const Key('sticker-size-decrease')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('sticker-rotation-90')),
+    );
+    await tester.tap(find.byKey(const ValueKey('sticker-rotation-90')));
+    await tester.pump();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('add-product-primary-action')),
+    );
     await tester.tap(find.byKey(const Key('add-product-primary-action')));
     await tester.pumpAndSettle();
 
-    expect(createBody?['manual_details'], {
-      'sticker_placement': 'topLeft',
-      'sticker_format': 'compact50x25',
-    });
+    final manualDetails = (createBody?['manual_details'] as Map)
+        .cast<String, dynamic>();
+    expect(manualDetails['sticker_placement'], 'custom');
+    expect(manualDetails['sticker_position_x'], greaterThan(0));
+    expect(manualDetails['sticker_position_y'], greaterThan(0));
+    expect(manualDetails['sticker_scale'], .9);
+    expect(manualDetails['sticker_rotation_degrees'], 90);
+    expect(manualDetails['product_preview_rotation_degrees'], 90);
+    expect(manualDetails['sticker_format'], 'compact50x25');
+    expect(manualDetails['sticker_discount_percent'], 6);
     expect(state.screen, 4);
   });
 
@@ -1361,6 +1378,9 @@ void main() {
         productName: 'Premium Tea 250 g',
         barcode: '2901234567896',
         price: '125.00',
+        department: 'Beverages',
+        sellingPrice: '110.00',
+        discountPercent: 12,
         format: format,
         copies: format == BarcodeLabelFormat.a4Sheet ? 24 : 2,
       );

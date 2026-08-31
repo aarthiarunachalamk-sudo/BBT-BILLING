@@ -18,11 +18,11 @@ extension on _StickerPlacement {
     _StickerPlacement.bottomRight => 'Bottom right',
   };
 
-  Alignment get alignment => switch (this) {
-    _StickerPlacement.topLeft => Alignment.topLeft,
-    _StickerPlacement.topRight => Alignment.topRight,
-    _StickerPlacement.bottomLeft => Alignment.bottomLeft,
-    _StickerPlacement.bottomRight => Alignment.bottomRight,
+  Offset get position => switch (this) {
+    _StickerPlacement.topLeft => Offset.zero,
+    _StickerPlacement.topRight => const Offset(1, 0),
+    _StickerPlacement.bottomLeft => const Offset(0, 1),
+    _StickerPlacement.bottomRight => const Offset(1, 1),
   };
 }
 
@@ -47,6 +47,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
   String barcodeSource = 'Not selected';
   BarcodeLabelFormat labelFormat = BarcodeLabelFormat.compact50x25;
   _StickerPlacement stickerPlacement = _StickerPlacement.bottomRight;
+  Offset stickerPosition = const Offset(1, 1);
+  double stickerScale = 1;
+  int stickerQuarterTurns = 0;
+  int productQuarterTurns = 0;
+  bool customStickerPosition = false;
+
+  int get _discountPercent {
+    final maximum = double.tryParse(mrp.text.trim()) ?? 0;
+    final selling = double.tryParse(sellingPrice.text.trim()) ?? 0;
+    if (maximum <= 0 || selling <= 0 || selling >= maximum) return 0;
+    return ((maximum - selling) * 100 / maximum).round();
+  }
 
   @override
   void initState() {
@@ -801,46 +813,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 1.25,
-              child: Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: line),
-                ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: productImageBytes == null
-                          ? const Icon(
-                              Icons.inventory_2_outlined,
-                              size: 72,
-                              color: muted,
-                            )
-                          : Image.memory(
-                              productImageBytes!,
-                              fit: BoxFit.contain,
-                            ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Align(
-                        alignment: stickerPlacement.alignment,
-                        child: _ProductStickerMockup(
-                          productName: name.text.trim(),
-                          barcode: sku.text.trim(),
-                          price: mrp.text.trim(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _interactiveProductPreview(),
             const SizedBox(height: 10),
             const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,7 +822,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 SizedBox(width: 7),
                 Expanded(
                   child: Text(
-                    'Preview guidance only. Keep the sticker away from the brand name, quantity, expiry date and product instructions.',
+                    'Drag the sticker anywhere on the product. Keep it away from the brand name, quantity, expiry date and product instructions.',
                     style: TextStyle(fontSize: 9.5, height: 1.35, color: muted),
                   ),
                 ),
@@ -858,6 +831,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ],
         ),
       ),
+      const SizedBox(height: 16),
+      _productRotationControls(),
       const SizedBox(height: 16),
       const Text(
         'Sticker position',
@@ -874,23 +849,36 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 avatar: Icon(
                   Icons.crop_free_rounded,
                   size: 15,
-                  color: stickerPlacement == placement ? Colors.white : blue,
+                  color: !customStickerPosition && stickerPlacement == placement
+                      ? Colors.white
+                      : blue,
                 ),
                 label: Text(placement.label),
-                selected: stickerPlacement == placement,
+                selected:
+                    !customStickerPosition && stickerPlacement == placement,
                 selectedColor: blue,
                 labelStyle: TextStyle(
-                  color: stickerPlacement == placement ? Colors.white : ink,
+                  color: !customStickerPosition && stickerPlacement == placement
+                      ? Colors.white
+                      : ink,
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                 ),
                 onSelected: saving
                     ? null
-                    : (_) => setState(() => stickerPlacement = placement),
+                    : (_) => setState(() {
+                        stickerPlacement = placement;
+                        stickerPosition = placement.position;
+                        customStickerPosition = false;
+                      }),
               ),
             )
             .toList(),
       ),
+      const SizedBox(height: 18),
+      _stickerSizeControls(),
+      const SizedBox(height: 16),
+      _stickerRotationControls(),
       const SizedBox(height: 18),
       Container(
         padding: const EdgeInsets.all(13),
@@ -905,13 +893,257 @@ class _AddProductScreenState extends State<AddProductScreen> {
             _previewDetail('Barcode / SKU', sku.text.trim()),
             _previewDetail('MRP', '₹${mrp.text.trim()}'),
             _previewDetail('Selling price', '₹${sellingPrice.text.trim()}'),
+            if (_discountPercent > 0)
+              _previewDetail('Discount', '$_discountPercent% OFF'),
             _previewDetail('GST', '${gst ?? 0}%'),
             _previewDetail('Opening stock', openingStock.text.trim()),
             _previewDetail('Location', rackLocation ?? 'Not selected'),
             _previewDetail('Sticker format', labelFormat.title),
+            _previewDetail(
+              'Sticker placement',
+              customStickerPosition
+                  ? 'Custom position'
+                  : stickerPlacement.label,
+            ),
+            _previewDetail('Sticker size', '${(stickerScale * 100).round()}%'),
+            _previewDetail('Rotation', '${stickerQuarterTurns * 90}°'),
+            _previewDetail('Product view', '${productQuarterTurns * 90}°'),
             _previewDetail('Copies', labelCopies.text.trim(), divider: false),
           ],
         ),
+      ),
+    ],
+  );
+
+  Widget _interactiveProductPreview() => AspectRatio(
+    aspectRatio: 1.25,
+    child: Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: line),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stickerWidth = 132 * stickerScale;
+          final stickerHeight = 72 * stickerScale;
+          final rotated = stickerQuarterTurns.isOdd;
+          final displayWidth = rotated ? stickerHeight : stickerWidth;
+          final displayHeight = rotated ? stickerWidth : stickerHeight;
+          final maxLeft = (constraints.maxWidth - displayWidth)
+              .clamp(0.0, constraints.maxWidth)
+              .toDouble();
+          final maxTop = (constraints.maxHeight - displayHeight)
+              .clamp(0.0, constraints.maxHeight)
+              .toDouble();
+          final left = stickerPosition.dx * maxLeft;
+          final top = stickerPosition.dy * maxTop;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: productImageBytes == null
+                    ? const Icon(
+                        Icons.inventory_2_outlined,
+                        size: 72,
+                        color: muted,
+                      )
+                    : RotatedBox(
+                        quarterTurns: productQuarterTurns,
+                        child: Image.memory(
+                          productImageBytes!,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+              ),
+              Positioned(
+                left: left,
+                top: top,
+                child: GestureDetector(
+                  key: const Key('draggable-product-sticker'),
+                  behavior: HitTestBehavior.opaque,
+                  onPanUpdate: saving
+                      ? null
+                      : (details) {
+                          final nextLeft = (left + details.delta.dx)
+                              .clamp(0.0, maxLeft)
+                              .toDouble();
+                          final nextTop = (top + details.delta.dy)
+                              .clamp(0.0, maxTop)
+                              .toDouble();
+                          setState(() {
+                            stickerPosition = Offset(
+                              maxLeft == 0 ? 0 : nextLeft / maxLeft,
+                              maxTop == 0 ? 0 : nextTop / maxTop,
+                            );
+                            customStickerPosition = true;
+                          });
+                        },
+                  child: RotatedBox(
+                    quarterTurns: stickerQuarterTurns,
+                    child: SizedBox(
+                      width: stickerWidth,
+                      height: stickerHeight,
+                      child: FittedBox(
+                        fit: BoxFit.fill,
+                        child: _ProductStickerMockup(
+                          productName: name.text.trim(),
+                          barcode: sku.text.trim(),
+                          department: _selectedDepartmentName,
+                          sellingPrice: sellingPrice.text.trim(),
+                          mrp: mrp.text.trim(),
+                          discountPercent: _discountPercent,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+
+  Widget _stickerSizeControls() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Sticker size',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+            ),
+          ),
+          Text(
+            '${(stickerScale * 100).round()}%',
+            style: const TextStyle(
+              color: blue,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+      Row(
+        children: [
+          IconButton.outlined(
+            key: const Key('sticker-size-decrease'),
+            tooltip: 'Minimise sticker',
+            onPressed: saving || stickerScale <= .5
+                ? null
+                : () => setState(
+                    () => stickerScale = (stickerScale - .1).clamp(.5, 1.5),
+                  ),
+            icon: const Icon(Icons.remove_rounded),
+          ),
+          Expanded(
+            child: Slider(
+              key: const Key('sticker-size-slider'),
+              value: stickerScale,
+              min: .5,
+              max: 1.5,
+              divisions: 10,
+              label: '${(stickerScale * 100).round()}%',
+              onChanged: saving
+                  ? null
+                  : (value) => setState(() => stickerScale = value),
+            ),
+          ),
+          IconButton.outlined(
+            key: const Key('sticker-size-increase'),
+            tooltip: 'Maximise sticker',
+            onPressed: saving || stickerScale >= 1.5
+                ? null
+                : () => setState(
+                    () => stickerScale = (stickerScale + .1).clamp(.5, 1.5),
+                  ),
+            icon: const Icon(Icons.add_rounded),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  Widget _productRotationControls() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Product view rotation',
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+      ),
+      const SizedBox(height: 4),
+      const Text(
+        'Rotate the product photo, then place the sticker on the required side.',
+        style: TextStyle(fontSize: 9.5, color: muted),
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: List.generate(4, (turns) {
+          final degrees = turns * 90;
+          return ChoiceChip(
+            key: ValueKey('product-rotation-$degrees'),
+            avatar: Icon(
+              Icons.threesixty_rounded,
+              size: 16,
+              color: productQuarterTurns == turns ? Colors.white : blue,
+            ),
+            label: Text('$degrees°'),
+            selected: productQuarterTurns == turns,
+            selectedColor: blue,
+            labelStyle: TextStyle(
+              color: productQuarterTurns == turns ? Colors.white : ink,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+            onSelected: saving
+                ? null
+                : (_) => setState(() => productQuarterTurns = turns),
+          );
+        }),
+      ),
+    ],
+  );
+
+  Widget _stickerRotationControls() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Sticker rotation',
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: List.generate(4, (turns) {
+          final degrees = turns * 90;
+          return ChoiceChip(
+            key: ValueKey('sticker-rotation-$degrees'),
+            avatar: Icon(
+              Icons.rotate_right_rounded,
+              size: 16,
+              color: stickerQuarterTurns == turns ? Colors.white : blue,
+            ),
+            label: Text('$degrees°'),
+            selected: stickerQuarterTurns == turns,
+            selectedColor: blue,
+            labelStyle: TextStyle(
+              color: stickerQuarterTurns == turns ? Colors.white : ink,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+            onSelected: saving
+                ? null
+                : (_) => setState(() => stickerQuarterTurns = turns),
+          );
+        }),
       ),
     ],
   );
@@ -980,8 +1212,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
           'mrp': mrp.text.trim(),
           'tax_percent': gst,
           'manual_details': {
-            'sticker_placement': stickerPlacement.name,
+            'sticker_placement': customStickerPosition
+                ? 'custom'
+                : stickerPlacement.name,
+            'sticker_position_x': double.parse(
+              stickerPosition.dx.toStringAsFixed(4),
+            ),
+            'sticker_position_y': double.parse(
+              stickerPosition.dy.toStringAsFixed(4),
+            ),
+            'sticker_scale': double.parse(stickerScale.toStringAsFixed(2)),
+            'sticker_rotation_degrees': stickerQuarterTurns * 90,
+            'product_preview_rotation_degrees': productQuarterTurns * 90,
             'sticker_format': labelFormat.name,
+            'sticker_discount_percent': _discountPercent,
           },
           if (_selectedRackId != null) 'rack': _selectedRackId,
           'rack_location': rackLocation,
@@ -1024,6 +1268,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
         barcode: product['barcode']?.toString() ?? sku.text.trim(),
         price: product['mrp']?.toString() ?? mrp.text.trim(),
         department: _selectedDepartmentName,
+        sellingPrice:
+            product['selling_price']?.toString() ?? sellingPrice.text.trim(),
+        discountPercent: _discountPercent,
         format: labelFormat,
         copies: int.tryParse(labelCopies.text.trim()) ?? 1,
       );
@@ -1045,12 +1292,18 @@ class _ProductStickerMockup extends StatelessWidget {
   const _ProductStickerMockup({
     required this.productName,
     required this.barcode,
-    required this.price,
+    required this.department,
+    required this.sellingPrice,
+    required this.mrp,
+    required this.discountPercent,
   });
 
   final String productName;
   final String barcode;
-  final String price;
+  final String department;
+  final String sellingPrice;
+  final String mrp;
+  final int discountPercent;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -1076,28 +1329,72 @@ class _ProductStickerMockup extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
+                department.isEmpty ? 'GENERAL' : department.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 5.5,
+                  fontWeight: FontWeight.w800,
+                  color: blue,
+                ),
+              ),
+            ),
+            if (discountPercent > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE5F7EC),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: Text(
+                  '$discountPercent% OFF',
+                  style: const TextStyle(
+                    color: green,
+                    fontSize: 5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 1),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
                 productName.isEmpty ? 'Product name' : productName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 7.5,
+                  fontSize: 6.8,
                   fontWeight: FontWeight.w900,
                   color: Colors.black,
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 3),
             Text(
-              'MRP ₹${price.isEmpty ? '0.00' : price}',
+              '₹${sellingPrice.isEmpty ? '0.00' : sellingPrice}',
               style: const TextStyle(
-                fontSize: 6.5,
+                fontSize: 6.4,
                 fontWeight: FontWeight.w900,
                 color: Colors.black,
               ),
             ),
+            if (mrp.isNotEmpty && mrp != sellingPrice) ...[
+              const SizedBox(width: 2),
+              Text(
+                'MRP ₹$mrp',
+                style: const TextStyle(
+                  fontSize: 5,
+                  color: Colors.black54,
+                  decoration: TextDecoration.lineThrough,
+                ),
+              ),
+            ],
           ],
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 2),
         const Expanded(child: CustomPaint(painter: _StickerBarcodePainter())),
         const SizedBox(height: 2),
         Text(

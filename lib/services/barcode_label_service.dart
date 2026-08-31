@@ -75,6 +75,8 @@ Future<Uint8List> buildBarcodeLabelPdf({
   required String price,
   String pricePrefix = 'MRP',
   String department = '',
+  String sellingPrice = '',
+  int discountPercent = 0,
   required BarcodeLabelFormat format,
   required int copies,
 }) async {
@@ -105,6 +107,8 @@ Future<Uint8List> buildBarcodeLabelPdf({
                   price,
                   pricePrefix: pricePrefix,
                   department: department,
+                  sellingPrice: sellingPrice,
+                  discountPercent: discountPercent,
                   compact: true,
                 ),
               ),
@@ -124,6 +128,8 @@ Future<Uint8List> buildBarcodeLabelPdf({
             price,
             pricePrefix: pricePrefix,
             department: department,
+            sellingPrice: sellingPrice,
+            discountPercent: discountPercent,
             compact: format == BarcodeLabelFormat.compact50x25,
           ),
         ),
@@ -140,6 +146,8 @@ Future<bool> printBarcodeLabels({
   required String price,
   String pricePrefix = 'MRP',
   String department = '',
+  String sellingPrice = '',
+  int discountPercent = 0,
   required BarcodeLabelFormat format,
   required int copies,
 }) async {
@@ -149,6 +157,8 @@ Future<bool> printBarcodeLabels({
     price: price,
     pricePrefix: pricePrefix,
     department: department,
+    sellingPrice: sellingPrice,
+    discountPercent: discountPercent,
     format: format,
     copies: copies,
   );
@@ -166,6 +176,8 @@ pw.Widget _barcodeLabel(
   String price, {
   required String pricePrefix,
   required String department,
+  required String sellingPrice,
+  required int discountPercent,
   required bool compact,
 }) {
   final type = isValidEan13(barcode)
@@ -203,14 +215,42 @@ pw.Widget _barcodeLabel(
           ],
         ),
         pw.SizedBox(height: 2),
-        if (department.trim().isNotEmpty)
-          pw.Text(
-            department.trim(),
-            maxLines: 1,
-            style: pw.TextStyle(
-              fontSize: compact ? 5.5 : 6.5,
-              color: PdfColors.grey700,
-            ),
+        if (department.trim().isNotEmpty || sellingPrice.trim().isNotEmpty)
+          pw.Row(
+            children: [
+              if (department.trim().isNotEmpty)
+                pw.Expanded(
+                  child: pw.Text(
+                    department.trim(),
+                    maxLines: 1,
+                    style: pw.TextStyle(
+                      fontSize: compact ? 5.5 : 6.5,
+                      color: PdfColors.grey700,
+                    ),
+                  ),
+                )
+              else
+                pw.Spacer(),
+              if (sellingPrice.trim().isNotEmpty)
+                pw.Text(
+                  'Price Rs ${sellingPrice.trim()}',
+                  style: pw.TextStyle(
+                    fontSize: compact ? 5.7 : 6.8,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              if (discountPercent > 0) ...[
+                pw.SizedBox(width: 3),
+                pw.Text(
+                  '$discountPercent% OFF',
+                  style: pw.TextStyle(
+                    fontSize: compact ? 5.5 : 6.5,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.green700,
+                  ),
+                ),
+              ],
+            ],
           ),
         pw.Expanded(
           child: pw.BarcodeWidget(
