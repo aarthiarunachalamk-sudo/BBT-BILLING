@@ -175,6 +175,7 @@ class SplitStockServiceTests(APITestCase):
             item_type=Item.ItemType.MATERIAL,
             name="Milk 1L",
             sku="SPLIT-MILK-1L",
+            barcode="2901234567896",
             category=category,
             selling_price=Decimal("50.00"),
             purchase_price=Decimal("40.00"),
@@ -240,6 +241,10 @@ class SplitStockServiceTests(APITestCase):
         shelf_row = next(row for row in shelf_rows.data["results"] if row["product_id"] == self.product.pk)
         self.assertEqual(store_row["store_quantity"], 45)
         self.assertEqual(shelf_row["shelf_quantity"], 15)
+        self.assertEqual(store_row["sku"], self.product.sku)
+        self.assertEqual(store_row["barcode"], self.product.barcode)
+        self.assertEqual(shelf_row["sku"], self.product.sku)
+        self.assertEqual(shelf_row["barcode"], self.product.barcode)
         summary = self.client.get("/api/inventory/stock-summary/")
         self.assertEqual(summary.status_code, status.HTTP_200_OK)
         row = next(item for item in summary.data if item["product_id"] == self.product.pk)

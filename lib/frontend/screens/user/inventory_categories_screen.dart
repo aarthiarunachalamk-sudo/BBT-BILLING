@@ -9,8 +9,7 @@ class InventoryCategoriesScreen extends StatefulWidget {
       _InventoryCategoriesScreenState();
 }
 
-class _InventoryCategoriesScreenState
-    extends State<InventoryCategoriesScreen> {
+class _InventoryCategoriesScreenState extends State<InventoryCategoriesScreen> {
   String _query = '';
   String? _selectedRack;
 
@@ -33,8 +32,8 @@ class _InventoryCategoriesScreenState
       return searchable.contains(query);
     }).toList();
     final groups = _groupUserProducts(filteredProducts);
-    final selectedRack = query.isEmpty &&
-            groups.any((group) => group.name == _selectedRack)
+    final selectedRack =
+        query.isEmpty && groups.any((group) => group.name == _selectedRack)
         ? _selectedRack
         : null;
     final visibleGroups = selectedRack == null
@@ -100,8 +99,7 @@ class _InventoryCategoriesScreenState
                           locations: groups.length,
                           categories: groups.fold(
                             0,
-                            (total, group) =>
-                                total + group.categories.length,
+                            (total, group) => total + group.categories.length,
                           ),
                           products: filteredProducts.length,
                         );
@@ -200,9 +198,7 @@ class _UserRackChip extends StatelessWidget {
     child: Material(
       color: selected ? userBlue : Colors.white,
       shape: StadiumBorder(
-        side: BorderSide(
-          color: selected ? userBlue : const Color(0xFFDCE3EC),
-        ),
+        side: BorderSide(color: selected ? userBlue : const Color(0xFFDCE3EC)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -437,11 +433,7 @@ class _UserCategorySection extends StatelessWidget {
             color: userBlue.withValues(alpha: .08),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
-            Icons.category_outlined,
-            color: userBlue,
-            size: 17,
-          ),
+          child: const Icon(Icons.category_outlined, color: userBlue, size: 17),
         ),
         title: Text(
           category.name,
@@ -471,6 +463,10 @@ class _UserProductRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final quantity = number(product['store_quantity']);
     final minimum = number(product['minimum_quantity']);
+    final savedBarcode = product['barcode']?.toString().trim() ?? '';
+    final barcode = savedBarcode.isNotEmpty
+        ? savedBarcode
+        : product['sku']?.toString().trim() ?? '';
     final status = quantity == 0
         ? 'Out of Stock'
         : quantity <= minimum
@@ -492,14 +488,49 @@ class _UserProductRow extends StatelessWidget {
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 5),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _UserStockChip(label: 'Store', value: quantity, color: userBlue),
-            const SizedBox(width: 5),
-            _UserStockChip(
-              label: 'Minimum',
-              value: minimum,
-              color: userOrange,
+            if (barcode.isNotEmpty) ...[
+              Row(
+                children: [
+                  const Icon(
+                    Icons.qr_code_2_rounded,
+                    size: 13,
+                    color: userBlue,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Barcode: $barcode',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        color: Colors.blueGrey,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+            ],
+            Wrap(
+              spacing: 5,
+              runSpacing: 4,
+              children: [
+                _UserStockChip(
+                  label: 'Store',
+                  value: quantity,
+                  color: userBlue,
+                ),
+                _UserStockChip(
+                  label: 'Minimum',
+                  value: minimum,
+                  color: userOrange,
+                ),
+              ],
             ),
           ],
         ),
@@ -541,10 +572,8 @@ class _UserRackGroup {
   final String name;
   final List<_UserCategoryGroup> categories;
 
-  int get productCount => categories.fold(
-    0,
-    (total, category) => total + category.products.length,
-  );
+  int get productCount =>
+      categories.fold(0, (total, category) => total + category.products.length);
 }
 
 class _UserCategoryGroup {
@@ -554,9 +583,7 @@ class _UserCategoryGroup {
   final List<Map<String, dynamic>> products;
 }
 
-List<_UserRackGroup> _groupUserProducts(
-  List<Map<String, dynamic>> products,
-) {
+List<_UserRackGroup> _groupUserProducts(List<Map<String, dynamic>> products) {
   final grouped = <String, Map<String, List<Map<String, dynamic>>>>{};
   for (final product in products) {
     final rack = _firstUserProductLabel(product, const [
@@ -564,11 +591,9 @@ List<_UserRackGroup> _groupUserProducts(
       'rack_location',
       'store_section',
     ], fallback: 'Unassigned');
-    final category = _firstUserProductLabel(
-      product,
-      const ['category_name'],
-      fallback: 'Uncategorized',
-    );
+    final category = _firstUserProductLabel(product, const [
+      'category_name',
+    ], fallback: 'Uncategorized');
     grouped
         .putIfAbsent(rack, () => {})
         .putIfAbsent(category, () => [])
@@ -576,22 +601,22 @@ List<_UserRackGroup> _groupUserProducts(
   }
 
   final racks = grouped.entries.map((rack) {
-    final categories = rack.value.entries.map((category) {
-      category.value.sort(
-        (a, b) => '${a['product_name'] ?? a['name'] ?? ''}'
-            .toLowerCase()
-            .compareTo(
-              '${b['product_name'] ?? b['name'] ?? ''}'.toLowerCase(),
-            ),
-      );
-      return _UserCategoryGroup(
-        name: category.key,
-        products: category.value,
-      );
-    }).toList()
-      ..sort(
-        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-      );
+    final categories =
+        rack.value.entries.map((category) {
+          category.value.sort(
+            (a, b) => '${a['product_name'] ?? a['name'] ?? ''}'
+                .toLowerCase()
+                .compareTo(
+                  '${b['product_name'] ?? b['name'] ?? ''}'.toLowerCase(),
+                ),
+          );
+          return _UserCategoryGroup(
+            name: category.key,
+            products: category.value,
+          );
+        }).toList()..sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
     return _UserRackGroup(name: rack.key, categories: categories);
   }).toList();
   racks.sort((a, b) {

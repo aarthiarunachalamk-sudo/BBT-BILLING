@@ -778,6 +778,7 @@ class _MobileProductRow extends StatelessWidget {
     final shelf = product['shelf_stock'] ?? 0;
     final total = product['total_stock'] ?? product['stock_quantity'] ?? 0;
     final price = double.tryParse('${product['selling_price'] ?? ''}');
+    final barcode = product['barcode']?.toString().trim() ?? '';
     return ListTile(
       minTileHeight: 92,
       contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -830,10 +831,7 @@ class _MobileProductRow extends StatelessWidget {
               product['name']?.toString() ?? '',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
             ),
           ),
           IconButton(
@@ -856,6 +854,27 @@ class _MobileProductRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 9, color: muted),
             ),
+            if (barcode.isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  const Icon(Icons.qr_code_2_rounded, size: 12, color: blue),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Barcode: $barcode',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: muted,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 5),
             Wrap(
               spacing: 4,
@@ -1733,8 +1752,7 @@ class _ProductStickerSheetState extends State<_ProductStickerSheet> {
         barcode: barcode,
         price: selectedPrice,
         pricePrefix: priceSource == 'MRP' ? 'MRP' : 'Price',
-        department:
-            widget.product['category_name']?.toString().trim() ?? '',
+        department: widget.product['category_name']?.toString().trim() ?? '',
         format: format,
         copies: copies,
       );
@@ -1743,7 +1761,8 @@ class _ProductStickerSheetState extends State<_ProductStickerSheet> {
       if (!mounted) return;
       setState(() {
         printing = false;
-        errorText = 'The sticker preview could not be opened. Please try again.';
+        errorText =
+            'The sticker preview could not be opened. Please try again.';
       });
     }
   }

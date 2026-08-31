@@ -105,6 +105,8 @@ class UserApi {
       return legacy.map((item) => {
         'product_id': item['id'],
         'product_name': item['name'],
+        'sku': item['sku'],
+        'barcode': item['barcode'],
         'image_url': item['image_url'] ?? item['image'],
         'branch': item['branch'] ?? 'Main Branch',
         'store_quantity': item['store_stock'] ?? item['stock_quantity'] ?? 0,
@@ -138,6 +140,8 @@ class UserApi {
       return legacy.map((item) => {
                 'product_id': item['id'],
                 'product_name': item['name'],
+                'sku': item['sku'],
+                'barcode': item['barcode'],
                 'image_url': item['image_url'] ?? item['image'],
                 'branch': item['branch'] ?? 'Main Branch',
                 'shelf_quantity': item['shelf_stock'] ?? item['shelf_quantity'] ?? 0,
@@ -161,12 +165,18 @@ class UserApi {
       final request = http.MultipartRequest('POST', uri);
       if (_token != null) request.headers['Authorization'] = 'Bearer ${_token!.replaceFirst(RegExp(r'^Bearer\s+'), '').trim()}';
       for (final entry in values.entries) {
-        if (entry.value != null) request.fields[entry.key] = '${entry.value}';
+        if (entry.value != null) {
+          request.fields[entry.key] = entry.value is Map || entry.value is List
+              ? jsonEncode(entry.value)
+              : entry.value.toString();
+        }
       }
       final bytes = await image.readAsBytes();
       final contentType = image.mimeType == null ? MediaType('image', 'jpeg') : MediaType.parse(image.mimeType!);
       request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: image.name, contentType: contentType));
-      final response = await http.Response.fromStream(await request.send().timeout(const Duration(seconds: 45)));
+      final response = await http.Response.fromStream(
+        await _client.send(request).timeout(const Duration(seconds: 45)),
+      );
       dynamic decoded;
       try {
         decoded = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body);

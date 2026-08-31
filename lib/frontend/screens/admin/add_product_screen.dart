@@ -50,7 +50,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Offset stickerPosition = const Offset(1, 1);
   double stickerScale = 1;
   int stickerQuarterTurns = 0;
-  int productQuarterTurns = 0;
+  int productRotationDegrees = 0;
   bool customStickerPosition = false;
 
   int get _discountPercent {
@@ -907,7 +907,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ),
             _previewDetail('Sticker size', '${(stickerScale * 100).round()}%'),
             _previewDetail('Rotation', '${stickerQuarterTurns * 90}°'),
-            _previewDetail('Product view', '${productQuarterTurns * 90}°'),
+            _previewDetail('Product view', '$productRotationDegrees°'),
             _previewDetail('Copies', labelCopies.text.trim(), divider: false),
           ],
         ),
@@ -950,8 +950,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         size: 72,
                         color: muted,
                       )
-                    : RotatedBox(
-                        quarterTurns: productQuarterTurns,
+                    : Transform.rotate(
+                        angle: productRotationDegrees * math.pi / 180,
                         child: Image.memory(
                           productImageBytes!,
                           fit: BoxFit.contain,
@@ -1072,41 +1072,65 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Widget _productRotationControls() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text(
-        'Product view rotation',
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+      Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Product view rotation',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+            ),
+          ),
+          Text(
+            '$productRotationDegrees°',
+            key: const Key('product-rotation-value'),
+            style: const TextStyle(
+              color: blue,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
       const SizedBox(height: 4),
       const Text(
         'Rotate the product photo, then place the sticker on the required side.',
         style: TextStyle(fontSize: 9.5, color: muted),
       ),
-      const SizedBox(height: 8),
+      Slider(
+        key: const Key('product-rotation-slider'),
+        value: productRotationDegrees.toDouble(),
+        min: 0,
+        max: 360,
+        divisions: 72,
+        label: '$productRotationDegrees°',
+        onChanged: saving
+            ? null
+            : (value) => setState(() => productRotationDegrees = value.round()),
+      ),
       Wrap(
         spacing: 8,
         runSpacing: 8,
-        children: List.generate(4, (turns) {
-          final degrees = turns * 90;
+        children: [0, 90, 180, 270, 360].map((degrees) {
           return ChoiceChip(
             key: ValueKey('product-rotation-$degrees'),
             avatar: Icon(
               Icons.threesixty_rounded,
               size: 16,
-              color: productQuarterTurns == turns ? Colors.white : blue,
+              color: productRotationDegrees == degrees ? Colors.white : blue,
             ),
             label: Text('$degrees°'),
-            selected: productQuarterTurns == turns,
+            selected: productRotationDegrees == degrees,
             selectedColor: blue,
             labelStyle: TextStyle(
-              color: productQuarterTurns == turns ? Colors.white : ink,
+              color: productRotationDegrees == degrees ? Colors.white : ink,
               fontSize: 10,
               fontWeight: FontWeight.w800,
             ),
             onSelected: saving
                 ? null
-                : (_) => setState(() => productQuarterTurns = turns),
+                : (_) => setState(() => productRotationDegrees = degrees),
           );
-        }),
+        }).toList(),
       ),
     ],
   );
@@ -1223,7 +1247,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ),
             'sticker_scale': double.parse(stickerScale.toStringAsFixed(2)),
             'sticker_rotation_degrees': stickerQuarterTurns * 90,
-            'product_preview_rotation_degrees': productQuarterTurns * 90,
+            'product_preview_rotation_degrees': productRotationDegrees,
             'sticker_format': labelFormat.name,
             'sticker_discount_percent': _discountPercent,
           },

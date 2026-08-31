@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -1337,9 +1338,9 @@ void main() {
     await tester.pump();
 
     await tester.ensureVisible(
-      find.byKey(const ValueKey('product-rotation-90')),
+      find.byKey(const ValueKey('product-rotation-360')),
     );
-    await tester.tap(find.byKey(const ValueKey('product-rotation-90')));
+    await tester.tap(find.byKey(const ValueKey('product-rotation-360')));
     expect(tester.takeException(), isNull);
 
     await tester.ensureVisible(find.byKey(const Key('sticker-size-decrease')));
@@ -1363,7 +1364,7 @@ void main() {
     expect(manualDetails['sticker_position_y'], greaterThan(0));
     expect(manualDetails['sticker_scale'], .9);
     expect(manualDetails['sticker_rotation_degrees'], 90);
-    expect(manualDetails['product_preview_rotation_degrees'], 90);
+    expect(manualDetails['product_preview_rotation_degrees'], 360);
     expect(manualDetails['sticker_format'], 'compact50x25');
     expect(manualDetails['sticker_discount_percent'], 6);
     expect(state.screen, 4);
@@ -1429,6 +1430,192 @@ void main() {
     );
     expect(barcodeField.controller!.text, matches(RegExp(r'^29\d{11}$')));
     expect(find.textContaining('Valid EAN-13'), findsOneWidget);
+  });
+
+  testWidgets('user final product step matches the admin sticker editor', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    Map<String, dynamic>? createBody;
+    final api = UserApi(
+      client: MockClient((request) async {
+        if (request.method == 'POST' &&
+            request.url.path.endsWith('/products/')) {
+          createBody = (jsonDecode(request.body) as Map)
+              .cast<String, dynamic>();
+          return http.Response(
+            jsonEncode({...createBody!, 'id': 61}),
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.url.path.endsWith('/categories/')) {
+          return http.Response(
+            jsonEncode([
+              {'id': 1, 'name': 'Beverages', 'is_active': true},
+            ]),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response(
+          '[]',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+    final state = UserState(api: api)
+      ..loading = false
+      ..page = UserPage.addProduct
+      ..categories = [
+        {'id': 1, 'name': 'Beverages', 'is_active': true},
+      ]
+      ..racks = [
+        {'id': 1, 'name': 'Fridge', 'is_active': true},
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedBuilder(
+          animation: state,
+          builder: (_, _) => buildUserScreen(state),
+        ),
+      ),
+    );
+    final dynamic formState = tester.state(find.byType(UserAddProductScreen));
+    formState.name.text = 'Premium Milk 1 L';
+    formState.sku.text = '2901234567896';
+    formState.purchasePrice.text = '50.00';
+    formState.sellingPrice.text = '60.00';
+    formState.mrp.text = '75.00';
+    formState.openingStock.text = '10';
+    formState.setState(() {
+      formState.categoryId = 1;
+      formState.gst = 5;
+      formState.rackLocation = 'Fridge';
+      formState.productImageBytes = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      );
+      formState.printAfterSave = false;
+      formState.currentStep = 3;
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Product & sticker preview'), findsOneWidget);
+    expect(find.text('Step 4 of 4  •  Review before saving'), findsOneWidget);
+    expect(find.text('20% OFF'), findsWidgets);
+    final dragTarget = tester.widget<GestureDetector>(
+      find.byKey(const Key('user-draggable-product-sticker')),
+    );
+    dragTarget.onPanUpdate!(
+      DragUpdateDetails(
+        globalPosition: Offset.zero,
+        delta: const Offset(-80, 0),
+      ),
+    );
+    await tester.pump();
+    expect(formState.customStickerPosition, isTrue);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('user-product-rotation-360')),
+    );
+    await tester.tap(find.byKey(const ValueKey('user-product-rotation-360')));
+    await tester.ensureVisible(
+      find.byKey(const Key('user-sticker-size-decrease')),
+    );
+    await tester.tap(find.byKey(const Key('user-sticker-size-decrease')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('user-sticker-rotation-90')),
+    );
+    await tester.tap(find.byKey(const ValueKey('user-sticker-rotation-90')));
+    await tester.ensureVisible(
+      find.byKey(const Key('user-add-product-primary-action')),
+    );
+    await tester.tap(find.byKey(const Key('user-add-product-primary-action')));
+    await tester.pumpAndSettle();
+
+    final manualDetails = (createBody?['manual_details'] as Map)
+        .cast<String, dynamic>();
+    expect(manualDetails['sticker_placement'], 'custom');
+    expect(manualDetails['sticker_scale'], .9);
+    expect(manualDetails['sticker_rotation_degrees'], 90);
+    expect(manualDetails['product_preview_rotation_degrees'], 360);
+    expect(manualDetails['sticker_discount_percent'], 20);
+    expect(state.page, UserPage.inventory);
+  });
+
+  test('user multipart product upload JSON-encodes sticker metadata', () async {
+    late http.Request captured;
+    final api = UserApi(
+      client: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode({'id': 71}),
+          201,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    await api.uploadProduct(
+      {
+        'name': 'Premium Milk 1 L',
+        'manual_details': {
+          'sticker_placement': 'custom',
+          'sticker_scale': .8,
+          'sticker_rotation_degrees': 90,
+        },
+      },
+      image: XFile.fromData(
+        Uint8List.fromList([1, 2, 3]),
+        name: 'milk.jpg',
+        mimeType: 'image/jpeg',
+      ),
+    );
+
+    final multipartBody = latin1.decode(captured.bodyBytes);
+    expect(multipartBody, contains('name="manual_details"'));
+    expect(multipartBody, contains('"sticker_placement":"custom"'));
+    expect(multipartBody, contains('"sticker_rotation_degrees":90'));
+  });
+
+  testWidgets('user product list displays the saved barcode', (tester) async {
+    tester.view.physicalSize = const Size(430, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = UserState()
+      ..loading = false
+      ..page = UserPage.inventory
+      ..user = {'role': 'inventory'}
+      ..products = [
+        {
+          'product_id': 81,
+          'product_name': 'Premium Milk 1 L',
+          'sku': 'MILK-1L',
+          'barcode': '2901234567896',
+          'store_quantity': 10,
+          'minimum_quantity': 2,
+          'category_name': 'Dairy',
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AnimatedBuilder(
+          animation: state,
+          builder: (_, _) => buildUserScreen(state),
+        ),
+      ),
+    );
+
+    expect(find.text('Premium Milk 1 L'), findsOneWidget);
+    expect(find.text('Barcode: 2901234567896'), findsOneWidget);
   });
 
   testWidgets(

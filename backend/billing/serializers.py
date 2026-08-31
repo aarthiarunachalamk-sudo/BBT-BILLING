@@ -288,6 +288,8 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
 class StoreStockSerializer(serializers.ModelSerializer):
     product_id = serializers.IntegerField(read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
+    sku = serializers.CharField(source="product.sku", read_only=True)
+    barcode = serializers.CharField(source="product.barcode", read_only=True, allow_null=True)
     store_quantity = serializers.IntegerField(source="quantity", read_only=True)
     image_url = serializers.SerializerMethodField()
     rack_name = serializers.CharField(source="product.rack.name", read_only=True, default=None)
@@ -296,7 +298,7 @@ class StoreStockSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StoreStock
-        fields = ["id", "product_id", "product_name", "image_url", "rack_name", "category_name", "location_label", "branch", "store_quantity", "minimum_quantity", "updated_by", "created_at", "updated_at"]
+        fields = ["id", "product_id", "product_name", "sku", "barcode", "image_url", "rack_name", "category_name", "location_label", "branch", "store_quantity", "minimum_quantity", "updated_by", "created_at", "updated_at"]
 
     def get_image_url(self, obj):
         image = getattr(obj.product, "image", None)
@@ -311,6 +313,8 @@ class StoreStockSerializer(serializers.ModelSerializer):
 class ShelfStockSerializer(serializers.ModelSerializer):
     product_id = serializers.IntegerField(read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
+    sku = serializers.CharField(source="product.sku", read_only=True)
+    barcode = serializers.CharField(source="product.barcode", read_only=True, allow_null=True)
     shelf_quantity = serializers.IntegerField(source="quantity", read_only=True)
     refill_required = serializers.IntegerField(read_only=True)
     status = serializers.CharField(source="shelf_status", read_only=True)
@@ -324,7 +328,7 @@ class ShelfStockSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ShelfStock
-        fields = ["id", "product_id", "product_name", "image_url", "rack_name", "category_name", "location_label", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "age_days", "last_stock_review_date", "last_refill_date", "updated_by", "created_at", "updated_at"]
+        fields = ["id", "product_id", "product_name", "sku", "barcode", "image_url", "rack_name", "category_name", "location_label", "branch", "shelf_quantity", "target_quantity", "minimum_quantity", "refill_required", "store_quantity", "status", "shelf_added_date", "age_days", "last_stock_review_date", "last_refill_date", "updated_by", "created_at", "updated_at"]
 
     def get_age_days(self, obj):
         if not obj.shelf_added_date:

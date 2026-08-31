@@ -8,6 +8,24 @@ class UserAddProductScreen extends StatefulWidget {
   State<UserAddProductScreen> createState() => _UserAddProductScreenState();
 }
 
+enum _UserStickerPlacement { topLeft, topRight, bottomLeft, bottomRight }
+
+extension on _UserStickerPlacement {
+  String get label => switch (this) {
+    _UserStickerPlacement.topLeft => 'Top left',
+    _UserStickerPlacement.topRight => 'Top right',
+    _UserStickerPlacement.bottomLeft => 'Bottom left',
+    _UserStickerPlacement.bottomRight => 'Bottom right',
+  };
+
+  Offset get position => switch (this) {
+    _UserStickerPlacement.topLeft => Offset.zero,
+    _UserStickerPlacement.topRight => const Offset(1, 0),
+    _UserStickerPlacement.bottomLeft => const Offset(0, 1),
+    _UserStickerPlacement.bottomRight => const Offset(1, 1),
+  };
+}
+
 class _UserAddProductScreenState extends State<UserAddProductScreen> {
   final stepKeys = List.generate(3, (_) => GlobalKey<FormState>());
   final name = TextEditingController();
@@ -27,6 +45,19 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
   bool printAfterSave = true;
   String barcodeSource = 'Not selected';
   BarcodeLabelFormat labelFormat = BarcodeLabelFormat.compact50x25;
+  _UserStickerPlacement stickerPlacement = _UserStickerPlacement.bottomRight;
+  Offset stickerPosition = const Offset(1, 1);
+  double stickerScale = 1;
+  int stickerQuarterTurns = 0;
+  int productRotationDegrees = 0;
+  bool customStickerPosition = false;
+
+  int get _discountPercent {
+    final maximum = double.tryParse(mrp.text.trim()) ?? 0;
+    final selling = double.tryParse(sellingPrice.text.trim()) ?? 0;
+    if (maximum <= 0 || selling <= 0 || selling >= maximum) return 0;
+    return ((maximum - selling) * 100 / maximum).round();
+  }
 
   @override
   void initState() {
@@ -201,7 +232,7 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
         ],
       ),
     ),
-    _ => Form(
+    2 => Form(
       key: stepKeys[2],
       child: _StepSurface(
         icon: Icons.shelves,
@@ -270,6 +301,7 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
         ],
       ),
     ),
+    _ => _productStickerPreview(),
   };
 
   Widget _bottomActions() => Container(
@@ -304,13 +336,14 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
           Expanded(
             flex: 2,
             child: ElevatedButton.icon(
+              key: const Key('user-add-product-primary-action'),
               onPressed: widget.state.loading ? null : _continue,
               icon: Icon(
-                currentStep == 2
+                currentStep == 3
                     ? Icons.check_rounded
                     : Icons.arrow_forward_rounded,
               ),
-              label: Text(currentStep == 2 ? 'Add Product' : 'Continue'),
+              label: Text(currentStep == 3 ? 'Add Product' : 'Continue'),
             ),
           ),
         ],
@@ -648,13 +681,432 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
     ),
   );
 
+  Widget _productStickerPreview() => _StepSurface(
+    icon: Icons.preview_outlined,
+    title: 'Product & sticker preview',
+    caption: 'Resize, rotate and place the sticker before saving the product.',
+    children: [
+      Container(
+        key: const Key('user-product-sticker-preview'),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F8FC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFDCE3EC)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _interactiveProductPreview(),
+            const SizedBox(height: 10),
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.touch_app_outlined, size: 17, color: userBlue),
+                SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'Drag the sticker anywhere on the product. Keep it away from the brand, quantity, expiry date and instructions.',
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      height: 1.35,
+                      color: Colors.blueGrey,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      _rotationControls(product: true),
+      const SizedBox(height: 16),
+      const Text(
+        'Sticker position',
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _UserStickerPlacement.values
+            .map(
+              (placement) => ChoiceChip(
+                key: ValueKey('user-sticker-placement-${placement.name}'),
+                avatar: Icon(
+                  Icons.crop_free_rounded,
+                  size: 15,
+                  color: !customStickerPosition && stickerPlacement == placement
+                      ? Colors.white
+                      : userBlue,
+                ),
+                label: Text(placement.label),
+                selected:
+                    !customStickerPosition && stickerPlacement == placement,
+                selectedColor: userBlue,
+                labelStyle: TextStyle(
+                  color: !customStickerPosition && stickerPlacement == placement
+                      ? Colors.white
+                      : userNavy,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+                onSelected: widget.state.loading
+                    ? null
+                    : (_) => setState(() {
+                        stickerPlacement = placement;
+                        stickerPosition = placement.position;
+                        customStickerPosition = false;
+                      }),
+              ),
+            )
+            .toList(),
+      ),
+      const SizedBox(height: 18),
+      _stickerSizeControls(),
+      const SizedBox(height: 16),
+      _rotationControls(product: false),
+      const SizedBox(height: 18),
+      Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFDCE3EC)),
+        ),
+        child: Column(
+          children: [
+            _previewDetail('Product', name.text.trim()),
+            _previewDetail('Department', _selectedDepartmentName),
+            _previewDetail('Barcode / SKU', sku.text.trim()),
+            _previewDetail('MRP', '₹${mrp.text.trim()}'),
+            _previewDetail('Selling price', '₹${sellingPrice.text.trim()}'),
+            if (_discountPercent > 0)
+              _previewDetail('Discount', '$_discountPercent% OFF'),
+            _previewDetail('GST', '${gst ?? 0}%'),
+            _previewDetail('Opening stock', openingStock.text.trim()),
+            _previewDetail('Location', rackLocation ?? 'Not selected'),
+            _previewDetail('Sticker format', labelFormat.title),
+            _previewDetail(
+              'Sticker placement',
+              customStickerPosition
+                  ? 'Custom position'
+                  : stickerPlacement.label,
+            ),
+            _previewDetail('Sticker size', '${(stickerScale * 100).round()}%'),
+            _previewDetail('Sticker rotation', '${stickerQuarterTurns * 90}°'),
+            _previewDetail('Product view', '$productRotationDegrees°'),
+            _previewDetail('Copies', labelCopies.text.trim(), divider: false),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  Widget _interactiveProductPreview() => AspectRatio(
+    aspectRatio: 1.25,
+    child: Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFDCE3EC)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stickerWidth = 132 * stickerScale;
+          final stickerHeight = 72 * stickerScale;
+          final stickerRotated = stickerQuarterTurns.isOdd;
+          final displayWidth = stickerRotated ? stickerHeight : stickerWidth;
+          final displayHeight = stickerRotated ? stickerWidth : stickerHeight;
+          final maxLeft = (constraints.maxWidth - displayWidth)
+              .clamp(0.0, constraints.maxWidth)
+              .toDouble();
+          final maxTop = (constraints.maxHeight - displayHeight)
+              .clamp(0.0, constraints.maxHeight)
+              .toDouble();
+          final left = stickerPosition.dx * maxLeft;
+          final top = stickerPosition.dy * maxTop;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: productImageBytes == null
+                    ? const Icon(
+                        Icons.inventory_2_outlined,
+                        size: 72,
+                        color: Colors.blueGrey,
+                      )
+                    : Transform.rotate(
+                        angle: productRotationDegrees * math.pi / 180,
+                        child: Image.memory(
+                          productImageBytes!,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+              ),
+              Positioned(
+                left: left,
+                top: top,
+                child: GestureDetector(
+                  key: const Key('user-draggable-product-sticker'),
+                  behavior: HitTestBehavior.opaque,
+                  onPanUpdate: widget.state.loading
+                      ? null
+                      : (details) {
+                          final nextLeft = (left + details.delta.dx)
+                              .clamp(0.0, maxLeft)
+                              .toDouble();
+                          final nextTop = (top + details.delta.dy)
+                              .clamp(0.0, maxTop)
+                              .toDouble();
+                          setState(() {
+                            stickerPosition = Offset(
+                              maxLeft == 0 ? 0 : nextLeft / maxLeft,
+                              maxTop == 0 ? 0 : nextTop / maxTop,
+                            );
+                            customStickerPosition = true;
+                          });
+                        },
+                  child: RotatedBox(
+                    quarterTurns: stickerQuarterTurns,
+                    child: SizedBox(
+                      width: stickerWidth,
+                      height: stickerHeight,
+                      child: FittedBox(
+                        fit: BoxFit.fill,
+                        child: _UserProductStickerMockup(
+                          productName: name.text.trim(),
+                          barcode: sku.text.trim(),
+                          department: _selectedDepartmentName,
+                          sellingPrice: sellingPrice.text.trim(),
+                          mrp: mrp.text.trim(),
+                          discountPercent: _discountPercent,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+
+  Widget _stickerSizeControls() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Sticker size',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+            ),
+          ),
+          Text(
+            '${(stickerScale * 100).round()}%',
+            style: const TextStyle(
+              color: userBlue,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+      Row(
+        children: [
+          IconButton.outlined(
+            key: const Key('user-sticker-size-decrease'),
+            tooltip: 'Minimise sticker',
+            onPressed: widget.state.loading || stickerScale <= .5
+                ? null
+                : () => setState(
+                    () => stickerScale = (stickerScale - .1).clamp(.5, 1.5),
+                  ),
+            icon: const Icon(Icons.remove_rounded),
+          ),
+          Expanded(
+            child: Slider(
+              key: const Key('user-sticker-size-slider'),
+              value: stickerScale,
+              min: .5,
+              max: 1.5,
+              divisions: 10,
+              onChanged: widget.state.loading
+                  ? null
+                  : (value) => setState(() => stickerScale = value),
+            ),
+          ),
+          IconButton.outlined(
+            key: const Key('user-sticker-size-increase'),
+            tooltip: 'Maximise sticker',
+            onPressed: widget.state.loading || stickerScale >= 1.5
+                ? null
+                : () => setState(
+                    () => stickerScale = (stickerScale + .1).clamp(.5, 1.5),
+                  ),
+            icon: const Icon(Icons.add_rounded),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  Widget _rotationControls({required bool product}) {
+    if (product) return _productRotationControls();
+    final selectedTurns = stickerQuarterTurns;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Sticker rotation',
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: List.generate(4, (turns) {
+            final degrees = turns * 90;
+            return ChoiceChip(
+              key: ValueKey('user-sticker-rotation-$degrees'),
+              avatar: Icon(
+                Icons.rotate_right_rounded,
+                size: 16,
+                color: selectedTurns == turns ? Colors.white : userBlue,
+              ),
+              label: Text('$degrees°'),
+              selected: selectedTurns == turns,
+              selectedColor: userBlue,
+              labelStyle: TextStyle(
+                color: selectedTurns == turns ? Colors.white : userNavy,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+              onSelected: widget.state.loading
+                  ? null
+                  : (_) => setState(() => stickerQuarterTurns = turns),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _productRotationControls() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'Product view rotation',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+            ),
+          ),
+          Text(
+            '$productRotationDegrees°',
+            key: const Key('user-product-rotation-value'),
+            style: const TextStyle(
+              color: userBlue,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+      Slider(
+        key: const Key('user-product-rotation-slider'),
+        value: productRotationDegrees.toDouble(),
+        min: 0,
+        max: 360,
+        divisions: 72,
+        label: '$productRotationDegrees°',
+        onChanged: widget.state.loading
+            ? null
+            : (value) => setState(() => productRotationDegrees = value.round()),
+      ),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [0, 90, 180, 270, 360].map((degrees) {
+          return ChoiceChip(
+            key: ValueKey('user-product-rotation-$degrees'),
+            avatar: Icon(
+              Icons.threesixty_rounded,
+              size: 16,
+              color: productRotationDegrees == degrees
+                  ? Colors.white
+                  : userBlue,
+            ),
+            label: Text('$degrees°'),
+            selected: productRotationDegrees == degrees,
+            selectedColor: userBlue,
+            labelStyle: TextStyle(
+              color: productRotationDegrees == degrees
+                  ? Colors.white
+                  : userNavy,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+            ),
+            onSelected: widget.state.loading
+                ? null
+                : (_) => setState(() => productRotationDegrees = degrees),
+          );
+        }).toList(),
+      ),
+    ],
+  );
+
+  Widget _previewDetail(String label, String value, {bool divider = true}) =>
+      Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 110,
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      color: Colors.blueGrey,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (divider) const Divider(height: 1),
+        ],
+      );
+
   void _continue() {
-    if (!(stepKeys[currentStep].currentState?.validate() ?? false)) return;
+    if (currentStep < stepKeys.length &&
+        !(stepKeys[currentStep].currentState?.validate() ?? false)) {
+      return;
+    }
     if (currentStep == 0 && productImageBytes == null) {
       setState(() => imageError = true);
       return;
     }
-    if (currentStep < 2) {
+    if (currentStep < 3) {
       setState(() => currentStep++);
       return;
     }
@@ -674,6 +1126,22 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
       'selling_price': sellingPrice.text.trim(),
       'mrp': mrp.text.trim(),
       'tax_percent': gst,
+      'manual_details': {
+        'sticker_placement': customStickerPosition
+            ? 'custom'
+            : stickerPlacement.name,
+        'sticker_position_x': double.parse(
+          stickerPosition.dx.toStringAsFixed(4),
+        ),
+        'sticker_position_y': double.parse(
+          stickerPosition.dy.toStringAsFixed(4),
+        ),
+        'sticker_scale': double.parse(stickerScale.toStringAsFixed(2)),
+        'sticker_rotation_degrees': stickerQuarterTurns * 90,
+        'product_preview_rotation_degrees': productRotationDegrees,
+        'sticker_format': labelFormat.name,
+        'sticker_discount_percent': _discountPercent,
+      },
       if (_selectedRackId != null) 'rack': _selectedRackId,
       'rack_location': rackLocation,
       'store_stock': stock,
@@ -684,32 +1152,189 @@ class _UserAddProductScreenState extends State<UserAddProductScreen> {
     final success = await widget.state.createProduct(body, image: productImage);
     if (!mounted) return;
     if (success) {
+      final messenger = ScaffoldMessenger.of(context);
       _notice(context, '${name.text.trim()} added successfully.');
-      if (printAfterSave) {
-        try {
-          await printBarcodeLabels(
-            productName: name.text.trim(),
-            barcode: sku.text.trim(),
-            price: mrp.text.trim(),
-            department: _selectedDepartmentName,
-            format: labelFormat,
-            copies: int.tryParse(labelCopies.text.trim()) ?? 1,
-          );
-        } catch (_) {
-          if (mounted) {
-            _notice(
-              context,
-              'Product saved. Printer preview could not be opened.',
-            );
-          }
-        }
-      }
-      if (!mounted) return;
       widget.state.go(UserPage.inventory);
+      if (printAfterSave) {
+        unawaited(_printSavedProduct(messenger));
+      }
     } else {
       _notice(context, widget.state.error ?? 'Unable to create product.');
     }
   }
+
+  Future<void> _printSavedProduct(ScaffoldMessengerState messenger) async {
+    try {
+      await printBarcodeLabels(
+        productName: name.text.trim(),
+        barcode: sku.text.trim(),
+        price: mrp.text.trim(),
+        department: _selectedDepartmentName,
+        sellingPrice: sellingPrice.text.trim(),
+        discountPercent: _discountPercent,
+        format: labelFormat,
+        copies: int.tryParse(labelCopies.text.trim()) ?? 1,
+      );
+    } catch (_) {
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Product saved. Printer preview could not be opened.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+}
+
+class _UserProductStickerMockup extends StatelessWidget {
+  const _UserProductStickerMockup({
+    required this.productName,
+    required this.barcode,
+    required this.department,
+    required this.sellingPrice,
+    required this.mrp,
+    required this.discountPercent,
+  });
+
+  final String productName;
+  final String barcode;
+  final String department;
+  final String sellingPrice;
+  final String mrp;
+  final int discountPercent;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 132,
+    height: 72,
+    padding: const EdgeInsets.fromLTRB(7, 5, 7, 4),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: userNavy, width: .8),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x33000000),
+          blurRadius: 6,
+          offset: Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                department.isEmpty ? 'GENERAL' : department.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 5.5,
+                  fontWeight: FontWeight.w800,
+                  color: userBlue,
+                ),
+              ),
+            ),
+            if (discountPercent > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE5F7EC),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: Text(
+                  '$discountPercent% OFF',
+                  style: const TextStyle(
+                    color: userGreen,
+                    fontSize: 5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 1),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                productName.isEmpty ? 'Product name' : productName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 6.8,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              '₹${sellingPrice.isEmpty ? '0.00' : sellingPrice}',
+              style: const TextStyle(
+                fontSize: 6.4,
+                fontWeight: FontWeight.w900,
+                color: Colors.black,
+              ),
+            ),
+            if (mrp.isNotEmpty && mrp != sellingPrice) ...[
+              const SizedBox(width: 2),
+              Text(
+                'MRP ₹$mrp',
+                style: const TextStyle(
+                  fontSize: 5,
+                  color: Colors.black54,
+                  decoration: TextDecoration.lineThrough,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 2),
+        const Expanded(
+          child: CustomPaint(painter: _UserStickerBarcodePainter()),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          barcode.isEmpty ? '0000000000000' : barcode,
+          maxLines: 1,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 6.5,
+            letterSpacing: .7,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _UserStickerBarcodePainter extends CustomPainter {
+  const _UserStickerBarcodePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black;
+    const pattern = [1.0, 2.0, 1.0, 1.0, 3.0, 1.0, 2.0, 1.0];
+    var x = 0.0;
+    var index = 0;
+    while (x < size.width) {
+      final width = pattern[index % pattern.length];
+      canvas.drawRect(Rect.fromLTWH(x, 0, width, size.height), paint);
+      x += width + (index.isEven ? 1.4 : 1.0);
+      index++;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _GstSlabField extends StatelessWidget {
@@ -774,7 +1399,7 @@ class _ProductWorkflowHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Product', 'Pricing', 'Placement'];
+    const labels = ['Product', 'Pricing', 'Stock', 'Preview'];
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
@@ -804,7 +1429,7 @@ class _ProductWorkflowHeader extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Step ${currentStep + 1} of 3  •  Mandatory fields only',
+            'Step ${currentStep + 1} of 4  •  ${currentStep == 3 ? 'Review before saving' : 'Mandatory fields only'}',
             style: const TextStyle(
               color: Colors.blueGrey,
               fontSize: 10,
