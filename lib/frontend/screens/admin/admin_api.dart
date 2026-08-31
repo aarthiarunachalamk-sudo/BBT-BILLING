@@ -19,6 +19,7 @@ class AdminApi {
     http.Client? client,
     String? baseUrl,
     this.readRetryBaseDelay = const Duration(seconds: 2),
+    this.writeTimeout = const Duration(seconds: 45),
   }) : _client = client ?? http.Client(),
        baseUrl = _canonicalBaseUrl(
          baseUrl ??
@@ -30,6 +31,7 @@ class AdminApi {
 
   final http.Client _client;
   final Duration readRetryBaseDelay;
+  final Duration writeTimeout;
   String baseUrl;
   String? _accessToken;
 
@@ -245,10 +247,12 @@ class AdminApi {
     String path,
     Map<String, dynamic> body,
   ) async => _decodeMap(
-    await _client.post(
-      Uri.parse('$baseUrl/$path/'),
-      headers: _headers,
-      body: jsonEncode(body),
+    await _withWriteTimeout(
+      _client.post(
+        Uri.parse('$baseUrl/$path/'),
+        headers: _headers,
+        body: jsonEncode(body),
+      ),
     ),
   );
 
@@ -314,8 +318,43 @@ class AdminApi {
         contentType: MediaType.parse(mime),
       ),
     );
-    final streamed = await _client.send(request);
-    return _decodeMap(await http.Response.fromStream(streamed));
+    try {
+      final streamed = await _client.send(request).timeout(writeTimeout);
+      final response = await http.Response.fromStream(
+        streamed,
+      ).timeout(writeTimeout);
+      return _decodeMap(response);
+    } on TimeoutException {
+      throw const ApiException(
+        'Product upload timed out. Check Products before retrying because the product may already have been saved.',
+      );
+    } on SocketException {
+      throw const ApiException(
+        'Connection was lost while saving. Check your internet and Products before retrying.',
+      );
+    } on http.ClientException {
+      throw const ApiException(
+        'Could not send the product to the server. Check your connection and try again.',
+      );
+    }
+  }
+
+  Future<http.Response> _withWriteTimeout(Future<http.Response> request) async {
+    try {
+      return await request.timeout(writeTimeout);
+    } on TimeoutException {
+      throw const ApiException(
+        'Save request timed out. Check the relevant list before retrying because it may already have completed.',
+      );
+    } on SocketException {
+      throw const ApiException(
+        'Connection was lost while saving. Check your internet and try again.',
+      );
+    } on http.ClientException {
+      throw const ApiException(
+        'Could not reach the server. Check your connection and try again.',
+      );
+    }
   }
 
   Future<Map<String, dynamic>> update(

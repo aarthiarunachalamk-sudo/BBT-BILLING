@@ -700,13 +700,20 @@ class AdminState extends ChangeNotifier {
       ...products.where((product) => product['id'] != created['id']),
     ];
     productQuery = '';
+    notifyListeners();
+    // Product creation is complete at this point. Dashboard aggregation is a
+    // secondary read and must never keep the Add Product button in "Saving".
+    unawaited(_refreshDashboardAfterProductCreate());
+    return created;
+  }
+
+  Future<void> _refreshDashboardAfterProductCreate() async {
     try {
       dashboard = await api.getMap('dashboard');
-    } on ApiException {
+    } catch (_) {
       // The product is already saved; dashboard can refresh on the next visit.
     }
     notifyListeners();
-    return created;
   }
 
   Future<Map<String, dynamic>> createBrand(Map<String, dynamic> values) async {

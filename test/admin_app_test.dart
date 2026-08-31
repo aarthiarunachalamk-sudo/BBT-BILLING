@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:bbt_billing/main.dart' as app;
 import 'package:bbt_billing/frontend/screens/admin/admin_api.dart';
 import 'package:bbt_billing/frontend/screens/admin/admin_app.dart';
+import 'package:bbt_billing/frontend/screens/admin/admin_screens.dart';
 import 'package:bbt_billing/frontend/screens/admin/admin_state.dart';
 import 'package:bbt_billing/services/barcode_label_service.dart';
 import 'package:bbt_billing/frontend/screens/user/user_models.dart';
@@ -1260,6 +1261,97 @@ void main() {
     expect(find.text('Department Name *'), findsOneWidget);
   });
 
+  testWidgets('final add product step previews sticker placement', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    Map<String, dynamic>? createBody;
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        if (request.method == 'POST' && request.url.path.endsWith('/items/')) {
+          createBody = (jsonDecode(request.body) as Map)
+              .cast<String, dynamic>();
+          return http.Response(
+            jsonEncode({...createBody!, 'id': 51}),
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.url.path.endsWith('/dashboard/')) {
+          return http.Response(
+            '{}',
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{}', 404);
+      }),
+    );
+    final state = AdminState(api: api)
+      ..loggedIn = true
+      ..screen = 5
+      ..categories = [
+        {'id': 1, 'name': 'Beverages', 'is_active': true},
+      ]
+      ..racks = [
+        {'id': 1, 'name': 'Rack 1', 'is_active': true},
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    final dynamic formState = tester.state(find.byType(AddProductScreen));
+    formState.name.text = 'Premium Tea 250 g';
+    formState.sku.text = '2901234567896';
+    formState.purchasePrice.text = '110.00';
+    formState.sellingPrice.text = '145.00';
+    formState.mrp.text = '155.00';
+    formState.openingStock.text = '10';
+    formState.setState(() {
+      formState.categoryId = 1;
+      formState.gst = 5;
+      formState.rackLocation = 'Rack 1';
+      formState.productImageBytes = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      );
+      formState.printAfterSave = false;
+      formState.currentStep = 3;
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text('Product & sticker preview'), findsOneWidget);
+    expect(find.text('Step 4 of 4  •  Review before saving'), findsOneWidget);
+    expect(find.byKey(const Key('product-sticker-preview')), findsOneWidget);
+    expect(find.text('Premium Tea 250 g'), findsWidgets);
+    expect(find.text('MRP ₹155.00'), findsOneWidget);
+    expect(find.text('Add Product'), findsNWidgets(2));
+
+    await tester.tap(find.byKey(const ValueKey('sticker-placement-topLeft')));
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<ChoiceChip>(
+            find.byKey(const ValueKey('sticker-placement-topLeft')),
+          )
+          .selected,
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(const Key('add-product-primary-action')));
+    await tester.pumpAndSettle();
+
+    expect(createBody?['manual_details'], {
+      'sticker_placement': 'topLeft',
+      'sticker_format': 'compact50x25',
+    });
+    expect(state.screen, 4);
+  });
+
   test('barcode label PDF is generated for label and A4 formats', () async {
     for (final format in [
       BarcodeLabelFormat.compact50x25,
@@ -1528,6 +1620,62 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('product save request times out with a recoverable message', () async {
+    final pendingResponse = Completer<http.Response>();
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      writeTimeout: const Duration(milliseconds: 10),
+      client: MockClient((_) => pendingResponse.future),
+    );
+    addTearDown(api.dispose);
+
+    expect(
+      () => api.create('items', {'name': 'Slow product'}),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.message,
+          'message',
+          contains('timed out'),
+        ),
+      ),
+    );
+  });
+
+  test('product creation does not wait for dashboard refresh', () async {
+    final dashboardResponse = Completer<http.Response>();
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        if (request.method == 'POST' && request.url.path.endsWith('/items/')) {
+          return http.Response(
+            jsonEncode({'id': 40, 'name': 'Fast Product', 'sku': 'FAST-40'}),
+            201,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.url.path.endsWith('/dashboard/')) {
+          return dashboardResponse.future;
+        }
+        return http.Response('{}', 404);
+      }),
+    );
+    final state = AdminState(api: api);
+    addTearDown(state.dispose);
+
+    final product = await state.createProduct({'name': 'Fast Product'});
+
+    expect(product['id'], 40);
+    expect(state.products.single['name'], 'Fast Product');
+    dashboardResponse.complete(
+      http.Response(
+        jsonEncode({'total_products': 1}),
+        200,
+        headers: {'content-type': 'application/json'},
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
   });
 
   test('saved product is added to the dynamic product list', () async {

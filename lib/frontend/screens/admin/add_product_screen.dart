@@ -8,6 +8,24 @@ class AddProductScreen extends StatefulWidget {
   State<AddProductScreen> createState() => _AddProductScreenState();
 }
 
+enum _StickerPlacement { topLeft, topRight, bottomLeft, bottomRight }
+
+extension on _StickerPlacement {
+  String get label => switch (this) {
+    _StickerPlacement.topLeft => 'Top left',
+    _StickerPlacement.topRight => 'Top right',
+    _StickerPlacement.bottomLeft => 'Bottom left',
+    _StickerPlacement.bottomRight => 'Bottom right',
+  };
+
+  Alignment get alignment => switch (this) {
+    _StickerPlacement.topLeft => Alignment.topLeft,
+    _StickerPlacement.topRight => Alignment.topRight,
+    _StickerPlacement.bottomLeft => Alignment.bottomLeft,
+    _StickerPlacement.bottomRight => Alignment.bottomRight,
+  };
+}
+
 class _AddProductScreenState extends State<AddProductScreen> {
   final stepKeys = List.generate(3, (_) => GlobalKey<FormState>());
   final name = TextEditingController();
@@ -28,6 +46,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   bool printAfterSave = true;
   String barcodeSource = 'Not selected';
   BarcodeLabelFormat labelFormat = BarcodeLabelFormat.compact50x25;
+  _StickerPlacement stickerPlacement = _StickerPlacement.bottomRight;
 
   @override
   void initState() {
@@ -269,7 +288,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ],
       ),
     ),
-    _ => Form(
+    2 => Form(
       key: stepKeys[2],
       child: _AdminStepSurface(
         icon: Icons.shelves,
@@ -359,6 +378,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ],
       ),
     ),
+    _ => _productStickerPreview(),
   };
 
   Widget _bottomActions() => Container(
@@ -399,12 +419,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
             child: PrimaryAction(
               saving
                   ? 'Saving…'
-                  : currentStep == 2
+                  : currentStep == 3
                   ? 'Add Product'
                   : 'Continue',
+              key: const Key('add-product-primary-action'),
               icon: saving
                   ? null
-                  : currentStep == 2
+                  : currentStep == 3
                   ? Icons.check_rounded
                   : Icons.arrow_forward_rounded,
               onPressed: saving ? null : _continue,
@@ -763,13 +784,179 @@ class _AddProductScreenState extends State<AddProductScreen> {
     ),
   );
 
+  Widget _productStickerPreview() => _AdminStepSurface(
+    icon: Icons.preview_outlined,
+    title: 'Product & sticker preview',
+    caption:
+        'Choose where the physical sticker should be placed before saving.',
+    children: [
+      Container(
+        key: const Key('product-sticker-preview'),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F8FC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 1.25,
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: line),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: productImageBytes == null
+                          ? const Icon(
+                              Icons.inventory_2_outlined,
+                              size: 72,
+                              color: muted,
+                            )
+                          : Image.memory(
+                              productImageBytes!,
+                              fit: BoxFit.contain,
+                            ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Align(
+                        alignment: stickerPlacement.alignment,
+                        child: _ProductStickerMockup(
+                          productName: name.text.trim(),
+                          barcode: sku.text.trim(),
+                          price: mrp.text.trim(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, size: 17, color: blue),
+                SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'Preview guidance only. Keep the sticker away from the brand name, quantity, expiry date and product instructions.',
+                    style: TextStyle(fontSize: 9.5, height: 1.35, color: muted),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      const Text(
+        'Sticker position',
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _StickerPlacement.values
+            .map(
+              (placement) => ChoiceChip(
+                key: ValueKey('sticker-placement-${placement.name}'),
+                avatar: Icon(
+                  Icons.crop_free_rounded,
+                  size: 15,
+                  color: stickerPlacement == placement ? Colors.white : blue,
+                ),
+                label: Text(placement.label),
+                selected: stickerPlacement == placement,
+                selectedColor: blue,
+                labelStyle: TextStyle(
+                  color: stickerPlacement == placement ? Colors.white : ink,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                ),
+                onSelected: saving
+                    ? null
+                    : (_) => setState(() => stickerPlacement = placement),
+              ),
+            )
+            .toList(),
+      ),
+      const SizedBox(height: 18),
+      Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: line),
+        ),
+        child: Column(
+          children: [
+            _previewDetail('Product', name.text.trim()),
+            _previewDetail('Barcode / SKU', sku.text.trim()),
+            _previewDetail('MRP', '₹${mrp.text.trim()}'),
+            _previewDetail('Selling price', '₹${sellingPrice.text.trim()}'),
+            _previewDetail('GST', '${gst ?? 0}%'),
+            _previewDetail('Opening stock', openingStock.text.trim()),
+            _previewDetail('Location', rackLocation ?? 'Not selected'),
+            _previewDetail('Sticker format', labelFormat.title),
+            _previewDetail('Copies', labelCopies.text.trim(), divider: false),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  Widget _previewDetail(String label, String value, {bool divider = true}) =>
+      Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 104,
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontSize: 9.5, color: muted),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (divider) const Divider(height: 1),
+        ],
+      );
+
   void _continue() {
-    if (!(stepKeys[currentStep].currentState?.validate() ?? false)) return;
+    if (currentStep < stepKeys.length &&
+        !(stepKeys[currentStep].currentState?.validate() ?? false)) {
+      return;
+    }
     if (currentStep == 0 && productImageBytes == null) {
       setState(() => imageError = true);
       return;
     }
-    if (currentStep < 2) {
+    if (currentStep < 3) {
       setState(() => currentStep++);
       return;
     }
@@ -792,6 +979,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
           'selling_price': sellingPrice.text.trim(),
           'mrp': mrp.text.trim(),
           'tax_percent': gst,
+          'manual_details': {
+            'sticker_placement': stickerPlacement.name,
+            'sticker_format': labelFormat.name,
+          },
           if (_selectedRackId != null) 'rack': _selectedRackId,
           'rack_location': rackLocation,
           'store_stock': stock,
@@ -803,37 +994,147 @@ class _AddProductScreenState extends State<AddProductScreen> {
         imageName: productImage?.name,
       );
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       showNotice(
         context,
         '${product['name'] ?? name.text.trim()} added successfully.',
       );
-      if (printAfterSave) {
-        try {
-          await printBarcodeLabels(
-            productName: product['name']?.toString() ?? name.text.trim(),
-            barcode: product['barcode']?.toString() ?? sku.text.trim(),
-            price: product['mrp']?.toString() ?? mrp.text.trim(),
-            department: _selectedDepartmentName,
-            format: labelFormat,
-            copies: int.tryParse(labelCopies.text.trim()) ?? 1,
-          );
-        } catch (_) {
-          if (mounted) {
-            showNotice(
-              context,
-              'Product saved. Printer preview could not be opened.',
-            );
-          }
-        }
-      }
-      if (!mounted) return;
+      // Saving is finished once the API has created the product. Dashboard
+      // refresh and the platform print preview are follow-up work and must not
+      // leave this form disabled with a permanent "Saving..." label.
+      setState(() => saving = false);
       widget.state.go(4);
+      if (printAfterSave) {
+        unawaited(_printSavedProduct(product, messenger));
+      }
     } catch (error) {
       if (mounted) showNotice(context, error.toString());
     } finally {
       if (mounted) setState(() => saving = false);
     }
   }
+
+  Future<void> _printSavedProduct(
+    Map<String, dynamic> product,
+    ScaffoldMessengerState messenger,
+  ) async {
+    try {
+      await printBarcodeLabels(
+        productName: product['name']?.toString() ?? name.text.trim(),
+        barcode: product['barcode']?.toString() ?? sku.text.trim(),
+        price: product['mrp']?.toString() ?? mrp.text.trim(),
+        department: _selectedDepartmentName,
+        format: labelFormat,
+        copies: int.tryParse(labelCopies.text.trim()) ?? 1,
+      );
+    } catch (_) {
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Product saved. Printer preview could not be opened.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+}
+
+class _ProductStickerMockup extends StatelessWidget {
+  const _ProductStickerMockup({
+    required this.productName,
+    required this.barcode,
+    required this.price,
+  });
+
+  final String productName;
+  final String barcode;
+  final String price;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 132,
+    height: 72,
+    padding: const EdgeInsets.fromLTRB(7, 5, 7, 4),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: ink, width: .8),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x33000000),
+          blurRadius: 6,
+          offset: Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                productName.isEmpty ? 'Product name' : productName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 7.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'MRP ₹${price.isEmpty ? '0.00' : price}',
+              style: const TextStyle(
+                fontSize: 6.5,
+                fontWeight: FontWeight.w900,
+                color: Colors.black,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        const Expanded(child: CustomPaint(painter: _StickerBarcodePainter())),
+        const SizedBox(height: 2),
+        Text(
+          barcode.isEmpty ? '0000000000000' : barcode,
+          maxLines: 1,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.black,
+            fontSize: 6.5,
+            letterSpacing: .7,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _StickerBarcodePainter extends CustomPainter {
+  const _StickerBarcodePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black;
+    const pattern = [1.0, 2.0, 1.0, 1.0, 3.0, 1.0, 2.0, 1.0];
+    var x = 0.0;
+    var index = 0;
+    while (x < size.width) {
+      final width = pattern[index % pattern.length];
+      canvas.drawRect(Rect.fromLTWH(x, 0, width, size.height), paint);
+      x += width + (index.isEven ? 1.4 : 1.0);
+      index++;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _AdminGstSlabField extends StatelessWidget {
@@ -896,7 +1197,7 @@ class _AdminProductWorkflowHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Product', 'Pricing', 'Placement'];
+    const labels = ['Product', 'Pricing', 'Stock', 'Preview'];
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
       color: Colors.white,
@@ -923,7 +1224,7 @@ class _AdminProductWorkflowHeader extends StatelessWidget {
           ),
           const SizedBox(height: 9),
           Text(
-            'Step ${currentStep + 1} of 3  •  Mandatory fields only',
+            'Step ${currentStep + 1} of 4  •  ${currentStep == 3 ? 'Review before saving' : 'Mandatory fields only'}',
             style: const TextStyle(
               color: muted,
               fontSize: 10,
