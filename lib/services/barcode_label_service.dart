@@ -73,6 +73,7 @@ Future<Uint8List> buildBarcodeLabelPdf({
   required String productName,
   required String barcode,
   required String price,
+  String pricePrefix = 'MRP',
   String department = '',
   required BarcodeLabelFormat format,
   required int copies,
@@ -102,6 +103,7 @@ Future<Uint8List> buildBarcodeLabelPdf({
                   productName,
                   barcode,
                   price,
+                  pricePrefix: pricePrefix,
                   department: department,
                   compact: true,
                 ),
@@ -120,6 +122,7 @@ Future<Uint8List> buildBarcodeLabelPdf({
             productName,
             barcode,
             price,
+            pricePrefix: pricePrefix,
             department: department,
             compact: format == BarcodeLabelFormat.compact50x25,
           ),
@@ -135,6 +138,7 @@ Future<bool> printBarcodeLabels({
   required String productName,
   required String barcode,
   required String price,
+  String pricePrefix = 'MRP',
   String department = '',
   required BarcodeLabelFormat format,
   required int copies,
@@ -143,6 +147,7 @@ Future<bool> printBarcodeLabels({
     productName: productName,
     barcode: barcode,
     price: price,
+    pricePrefix: pricePrefix,
     department: department,
     format: format,
     copies: copies,
@@ -159,6 +164,7 @@ pw.Widget _barcodeLabel(
   String productName,
   String barcode,
   String price, {
+  required String pricePrefix,
   required String department,
   required bool compact,
 }) {
@@ -188,7 +194,7 @@ pw.Widget _barcodeLabel(
             ),
             if (price.trim().isNotEmpty)
               pw.Text(
-                'MRP Rs $price',
+                '${pricePrefix.trim().isEmpty ? 'MRP' : pricePrefix.trim()} Rs $price',
                 style: pw.TextStyle(
                   fontSize: compact ? 7 : 8.5,
                   fontWeight: pw.FontWeight.bold,

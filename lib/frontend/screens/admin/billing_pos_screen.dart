@@ -349,6 +349,15 @@ class _BillingPosScreenState extends State<BillingPosScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _productActionButton(
+                    key: ValueKey('billing-sticker-product-${product['id']}'),
+                    tooltip: 'Generate product sticker',
+                    icon: Icons.qr_code_2_rounded,
+                    foreground: blue,
+                    background: blue.withValues(alpha: .10),
+                    onPressed: () => _showProductStickerSheet(context, product),
+                  ),
+                  const SizedBox(width: 6),
+                  _productActionButton(
                     key: ValueKey('billing-edit-product-${product['id']}'),
                     tooltip: 'Edit price',
                     icon: Icons.edit_rounded,

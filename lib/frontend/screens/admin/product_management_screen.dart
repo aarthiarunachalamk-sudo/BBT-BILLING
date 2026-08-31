@@ -823,11 +823,27 @@ class _MobileProductRow extends StatelessWidget {
           ],
         ),
       ),
-      title: Text(
-        product['name']?.toString() ?? '',
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              product['name']?.toString() ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          IconButton(
+            key: ValueKey('product-sticker-${product['id']}'),
+            tooltip: 'Generate product sticker',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => _showProductStickerSheet(context, product),
+            icon: const Icon(Icons.qr_code_2_rounded, color: blue, size: 19),
+          ),
+        ],
       ),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 4),
@@ -1405,6 +1421,22 @@ class _ProductCatalogCard extends StatelessWidget {
                     style: const TextStyle(fontSize: 9, color: muted),
                   ),
                   const Spacer(),
+                  IconButton(
+                    key: ValueKey('product-sticker-${product['id']}'),
+                    tooltip: 'Generate product sticker',
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    padding: const EdgeInsets.all(5),
+                    onPressed: () => _showProductStickerSheet(context, product),
+                    icon: const Icon(
+                      Icons.qr_code_2_rounded,
+                      size: 17,
+                      color: blue,
+                    ),
+                  ),
                   if (verified)
                     Tooltip(
                       message:
@@ -1433,6 +1465,287 @@ class _ProductCatalogCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+Future<void> _showProductStickerSheet(
+  BuildContext context,
+  Map<String, dynamic> product,
+) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (_) => _ProductStickerSheet(product: product),
+  );
+}
+
+class _ProductStickerSheet extends StatefulWidget {
+  const _ProductStickerSheet({required this.product});
+
+  final Map<String, dynamic> product;
+
+  @override
+  State<_ProductStickerSheet> createState() => _ProductStickerSheetState();
+}
+
+class _ProductStickerSheetState extends State<_ProductStickerSheet> {
+  final copiesController = TextEditingController(text: '1');
+  BarcodeLabelFormat format = BarcodeLabelFormat.compact50x25;
+  late String priceSource;
+  bool printing = false;
+  String? errorText;
+
+  String get productName =>
+      widget.product['name']?.toString().trim() ?? 'BBT Product';
+
+  String get barcode {
+    final savedBarcode = widget.product['barcode']?.toString().trim() ?? '';
+    return savedBarcode.isNotEmpty
+        ? savedBarcode
+        : widget.product['sku']?.toString().trim() ?? '';
+  }
+
+  String get mrp => widget.product['mrp']?.toString().trim() ?? '';
+  String get sellingPrice =>
+      widget.product['selling_price']?.toString().trim() ?? '';
+  String get selectedPrice => priceSource == 'MRP' ? mrp : sellingPrice;
+
+  @override
+  void initState() {
+    super.initState();
+    priceSource = mrp.isNotEmpty ? 'MRP' : 'Selling price';
+  }
+
+  @override
+  void dispose() {
+    copiesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxCopies = format == BarcodeLabelFormat.a4Sheet ? 96 : 20;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        4,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .82,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.qr_code_2_rounded, color: blue),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Generate billing sticker',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: printing ? null : () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const Text(
+                'The sticker details are filled from the selected product.',
+                style: TextStyle(fontSize: 11, color: muted),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: page,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: line),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      productName,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      barcode.isEmpty ? 'No barcode or SKU saved' : barcode,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: barcode.isEmpty ? red : muted,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      widget.product['category_name']?.toString() ??
+                          'Uncategorized',
+                      style: const TextStyle(fontSize: 10, color: muted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<BarcodeLabelFormat>(
+                initialValue: format,
+                decoration: const InputDecoration(
+                  labelText: 'Sticker format',
+                  prefixIcon: Icon(Icons.print_outlined),
+                ),
+                items: BarcodeLabelFormat.values
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(value.title),
+                      ),
+                    )
+                    .toList(),
+                onChanged: printing
+                    ? null
+                    : (value) => setState(() {
+                        format = value ?? format;
+                        errorText = null;
+                      }),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                format.description,
+                style: const TextStyle(fontSize: 9, color: muted),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: priceSource,
+                      decoration: const InputDecoration(
+                        labelText: 'Sticker price',
+                        prefixIcon: Icon(Icons.currency_rupee_rounded),
+                      ),
+                      items: [
+                        if (mrp.isNotEmpty)
+                          DropdownMenuItem(
+                            value: 'MRP',
+                            child: Text('MRP · ₹$mrp'),
+                          ),
+                        DropdownMenuItem(
+                          value: 'Selling price',
+                          child: Text(
+                            sellingPrice.isEmpty
+                                ? 'Price · Not set'
+                                : 'Price · ₹$sellingPrice',
+                          ),
+                        ),
+                      ],
+                      onChanged: printing
+                          ? null
+                          : (value) => setState(
+                              () => priceSource = value ?? priceSource,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: copiesController,
+                      enabled: !printing,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        labelText: 'Copies',
+                        helperText: 'Maximum $maxCopies',
+                        prefixIcon: const Icon(Icons.copy_all_outlined),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (errorText != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  errorText!,
+                  style: const TextStyle(color: red, fontSize: 11),
+                ),
+              ],
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                key: const Key('open-product-sticker-preview'),
+                onPressed: printing ? null : _print,
+                icon: printing
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.print_rounded),
+                label: Text(
+                  printing ? 'Preparing sticker…' : 'Open print preview',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _print() async {
+    final copies = int.tryParse(copiesController.text.trim());
+    final maxCopies = format == BarcodeLabelFormat.a4Sheet ? 96 : 20;
+    if (barcode.isEmpty) {
+      setState(() => errorText = 'Add a barcode or SKU to this product first.');
+      return;
+    }
+    if (selectedPrice.isEmpty) {
+      setState(() => errorText = 'Add a selling price or MRP first.');
+      return;
+    }
+    if (copies == null || copies < 1 || copies > maxCopies) {
+      setState(() => errorText = 'Enter between 1 and $maxCopies copies.');
+      return;
+    }
+    setState(() {
+      printing = true;
+      errorText = null;
+    });
+    try {
+      await printBarcodeLabels(
+        productName: productName,
+        barcode: barcode,
+        price: selectedPrice,
+        pricePrefix: priceSource == 'MRP' ? 'MRP' : 'Price',
+        department:
+            widget.product['category_name']?.toString().trim() ?? '',
+        format: format,
+        copies: copies,
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        printing = false;
+        errorText = 'The sticker preview could not be opened. Please try again.';
+      });
+    }
   }
 }
 

@@ -701,6 +701,45 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('saved product opens a product-based sticker flow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(430, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final state = AdminState()
+      ..loggedIn = true
+      ..screen = 4
+      ..products = [
+        {
+          'id': 31,
+          'name': 'Premium Tea 250 g',
+          'sku': 'TEA-250G',
+          'barcode': '2901234567896',
+          'category_name': 'Beverages',
+          'purchase_price': '110.00',
+          'selling_price': '145.00',
+          'mrp': '155.00',
+          'tax_percent': '5.00',
+          'stock_quantity': 18,
+          'stock_status': 'in_stock',
+        },
+      ];
+    addTearDown(state.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    await tester.tap(find.byKey(const ValueKey('product-sticker-31')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Generate billing sticker'), findsOneWidget);
+    expect(find.text('Premium Tea 250 g'), findsOneWidget);
+    expect(find.text('2901234567896'), findsOneWidget);
+    expect(find.text('Beverages'), findsOneWidget);
+    expect(find.text('MRP · ₹155.00'), findsOneWidget);
+    expect(find.text('Open print preview'), findsOneWidget);
+  });
+
   testWidgets('billing product actions update price and delete product', (
     tester,
   ) async {
@@ -768,6 +807,10 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
     expect(find.text('1 products available'), findsOneWidget);
     expect(find.byTooltip('Scan barcode'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('billing-sticker-product-1')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('billing-edit-product-1')));
     await tester.pumpAndSettle();
