@@ -1550,12 +1550,18 @@ class _ProductStickerSheetState extends State<_ProductStickerSheet> {
   @override
   Widget build(BuildContext context) {
     final maxCopies = format == BarcodeLabelFormat.a4Sheet ? 96 : 20;
+    final mediaQuery = MediaQuery.of(context);
+    final navigationInset = math.max(
+      mediaQuery.viewPadding.bottom,
+      mediaQuery.systemGestureInsets.bottom,
+    );
     return Padding(
+      key: const Key('product-sticker-sheet-safe-padding'),
       padding: EdgeInsets.fromLTRB(
         20,
         4,
         20,
-        MediaQuery.viewInsetsOf(context).bottom + 24,
+        mediaQuery.viewInsets.bottom + navigationInset + 24,
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(

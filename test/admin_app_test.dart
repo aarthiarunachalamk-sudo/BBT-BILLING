@@ -708,8 +708,10 @@ void main() {
   ) async {
     tester.view.physicalSize = const Size(430, 1000);
     tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(bottom: 48);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
     final state = AdminState()
       ..loggedIn = true
       ..screen = 4
@@ -745,6 +747,14 @@ void main() {
     );
     await tester.tap(find.byKey(const ValueKey('product-sticker-31')));
     await tester.pumpAndSettle();
+
+    final safePadding = tester.widget<Padding>(
+      find.byKey(const Key('product-sticker-sheet-safe-padding')),
+    );
+    expect(
+      safePadding.padding.resolve(TextDirection.ltr).bottom,
+      greaterThanOrEqualTo(72),
+    );
 
     expect(find.text('Generate billing sticker'), findsOneWidget);
     expect(find.text('Premium Tea 250 g'), findsWidgets);
