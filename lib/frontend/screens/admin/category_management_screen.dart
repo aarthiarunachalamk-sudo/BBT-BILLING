@@ -361,6 +361,7 @@ class _CategoryProductRow extends StatelessWidget {
               dimension: 52,
               child: _ProductImage(
                 url: _productImageUrl(state, product['image']),
+                product: product,
               ),
             ),
           ),

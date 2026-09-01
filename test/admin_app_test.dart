@@ -719,6 +719,14 @@ void main() {
           'name': 'Premium Tea 250 g',
           'sku': 'TEA-250G',
           'barcode': '2901234567896',
+          'manual_details': {
+            'sticker_placement': 'custom',
+            'sticker_position_x': .35,
+            'sticker_position_y': .45,
+            'sticker_scale': .9,
+            'sticker_rotation_degrees': 90,
+            'product_preview_rotation_degrees': 180,
+          },
           'category_name': 'Beverages',
           'purchase_price': '110.00',
           'selling_price': '145.00',
@@ -731,13 +739,17 @@ void main() {
     addTearDown(state.dispose);
 
     await tester.pumpWidget(MaterialApp(home: AdminViewport(state: state)));
+    expect(
+      find.byKey(const ValueKey('saved-product-sticker-31')),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const ValueKey('product-sticker-31')));
     await tester.pumpAndSettle();
 
     expect(find.text('Generate billing sticker'), findsOneWidget);
-    expect(find.text('Premium Tea 250 g'), findsOneWidget);
+    expect(find.text('Premium Tea 250 g'), findsWidgets);
     expect(find.text('2901234567896'), findsOneWidget);
-    expect(find.text('Beverages'), findsOneWidget);
+    expect(find.text('Beverages'), findsWidgets);
     expect(find.text('MRP · ₹155.00'), findsOneWidget);
     expect(find.text('Open print preview'), findsOneWidget);
   });
@@ -1598,6 +1610,14 @@ void main() {
           'product_name': 'Premium Milk 1 L',
           'sku': 'MILK-1L',
           'barcode': '2901234567896',
+          'manual_details': {
+            'sticker_placement': 'custom',
+            'sticker_position_x': .2,
+            'sticker_position_y': .3,
+            'sticker_scale': 1.1,
+            'sticker_rotation_degrees': 90,
+            'product_preview_rotation_degrees': 270,
+          },
           'store_quantity': 10,
           'minimum_quantity': 2,
           'category_name': 'Dairy',
@@ -1616,6 +1636,10 @@ void main() {
 
     expect(find.text('Premium Milk 1 L'), findsOneWidget);
     expect(find.text('Barcode: 2901234567896'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('saved-product-sticker-81')),
+      findsOneWidget,
+    );
   });
 
   testWidgets(

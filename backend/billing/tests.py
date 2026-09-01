@@ -176,6 +176,14 @@ class SplitStockServiceTests(APITestCase):
             name="Milk 1L",
             sku="SPLIT-MILK-1L",
             barcode="2901234567896",
+            manual_details={
+                "sticker_placement": "custom",
+                "sticker_position_x": 0.25,
+                "sticker_position_y": 0.4,
+                "sticker_scale": 0.9,
+                "sticker_rotation_degrees": 90,
+                "product_preview_rotation_degrees": 180,
+            },
             category=category,
             selling_price=Decimal("50.00"),
             purchase_price=Decimal("40.00"),
@@ -243,8 +251,10 @@ class SplitStockServiceTests(APITestCase):
         self.assertEqual(shelf_row["shelf_quantity"], 15)
         self.assertEqual(store_row["sku"], self.product.sku)
         self.assertEqual(store_row["barcode"], self.product.barcode)
+        self.assertEqual(store_row["manual_details"], self.product.manual_details)
         self.assertEqual(shelf_row["sku"], self.product.sku)
         self.assertEqual(shelf_row["barcode"], self.product.barcode)
+        self.assertEqual(shelf_row["manual_details"], self.product.manual_details)
         summary = self.client.get("/api/inventory/stock-summary/")
         self.assertEqual(summary.status_code, status.HTTP_200_OK)
         row = next(item for item in summary.data if item["product_id"] == self.product.pk)

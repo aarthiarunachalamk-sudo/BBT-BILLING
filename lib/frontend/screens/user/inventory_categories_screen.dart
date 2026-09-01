@@ -475,7 +475,8 @@ class _UserProductRow extends StatelessWidget {
     return ListTile(
       minTileHeight: 82,
       contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-      leading: ProductImageWidget(
+      leading: ProductStickerImageWidget(
+        product: product,
         imageUrl: product['image_url'] ?? product['product_image_url'],
         width: 52,
         height: 52,

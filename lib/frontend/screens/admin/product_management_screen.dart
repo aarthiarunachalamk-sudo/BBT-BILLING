@@ -802,6 +802,7 @@ class _MobileProductRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(7),
                 child: _ProductImage(
                   url: _productImageUrl(state, product['image']),
+                  product: product,
                 ),
               ),
             ),
@@ -1279,6 +1280,7 @@ class _ProductCatalogCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                               child: _ProductImage(
                                 url: _productImageUrl(state, product['image']),
+                                product: product,
                               ),
                             ),
                             const Positioned(
@@ -1623,6 +1625,7 @@ class _ProductStickerSheetState extends State<_ProductStickerSheet> {
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<BarcodeLabelFormat>(
+                isExpanded: true,
                 initialValue: format,
                 decoration: const InputDecoration(
                   labelText: 'Sticker format',
@@ -1653,6 +1656,7 @@ class _ProductStickerSheetState extends State<_ProductStickerSheet> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: priceSource,
                       decoration: const InputDecoration(
                         labelText: 'Sticker price',
@@ -1831,27 +1835,19 @@ Future<void> _replaceProductImage(
 }
 
 class _ProductImage extends StatelessWidget {
-  const _ProductImage({required this.url});
+  const _ProductImage({required this.url, required this.product});
 
   final String? url;
+  final Map<String, dynamic> product;
 
   @override
-  Widget build(BuildContext context) {
-    if (url == null) {
-      return const ColoredBox(
-        color: page,
-        child: Icon(Icons.inventory_2_outlined, color: blue),
-      );
-    }
-    return Image.network(
-      url!,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => const ColoredBox(
-        color: page,
-        child: Icon(Icons.broken_image_outlined, color: muted),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ProductStickerImageWidget(
+    product: product,
+    imageUrl: url,
+    width: double.infinity,
+    height: double.infinity,
+    fit: BoxFit.cover,
+  );
 }
 
 bool _sameCalendarDay(DateTime first, DateTime second) =>
