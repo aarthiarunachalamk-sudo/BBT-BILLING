@@ -32,11 +32,11 @@ class UserShell extends StatelessWidget {
           ? IconButton(onPressed: () => state.back(fallback: backPage), icon: const Icon(Icons.arrow_back))
           : Builder(builder: (context) => IconButton(onPressed: () => Scaffold.of(context).openDrawer(), icon: const Icon(Icons.menu_rounded))),
       actions: title == 'Dashboard'
-          ? [Padding(padding: const EdgeInsets.only(right: 5), child: Stack(alignment: Alignment.center, children: [IconButton(onPressed: () => state.go(UserPage.expiry), icon: const Icon(Icons.notifications_none_rounded)), const Positioned(right: 8, top: 10, child: CircleAvatar(radius: 4, backgroundColor: userRed))]))]
+          ? [Padding(padding: const EdgeInsets.only(right: 5), child: Stack(alignment: Alignment.center, children: [IconButton(tooltip: 'Expiry alerts', onPressed: () => state.go(UserPage.expiry), icon: const Icon(Icons.notifications_none_rounded)), if (number(state.dashboard['expiring_soon_count']) > 0) const Positioned(right: 8, top: 10, child: CircleAvatar(radius: 4, backgroundColor: userRed))]))]
           : [
               if (title == 'Store Stock') IconButton(tooltip: 'Stock movement history', onPressed: () => state.go(UserPage.stockMovement), icon: const Icon(Icons.history_rounded)),
               if (title == 'Billing / POS') IconButton(tooltip: 'Bill history', onPressed: () { state.lastInvoice = {}; state.go(UserPage.invoice); }, icon: const Icon(Icons.receipt_long_outlined)),
-              IconButton(onPressed: state.loading ? null : state.refresh, icon: const Icon(Icons.refresh)),
+              IconButton(tooltip: 'Refresh', onPressed: state.loading ? null : state.refresh, icon: const Icon(Icons.refresh)),
             ],
     ),
     body: SafeArea(top: false, child: Column(children: [

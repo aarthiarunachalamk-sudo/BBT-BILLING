@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../services/barcode_label_service.dart';
 import '../../../widgets/barcode_scanner_screen.dart';
 import '../../../widgets/product_image_widget.dart';
+import '../../../widgets/workspace_header.dart';
 import 'admin_state.dart';
 import 'admin_widgets.dart';
 part 'login_screen.dart';

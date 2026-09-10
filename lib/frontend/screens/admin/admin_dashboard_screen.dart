@@ -17,6 +17,25 @@ class DashboardScreen extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
         children: [
+          WorkspaceHeader(
+            title: 'Your store at a glance',
+            subtitle: 'Track today\'s sales, stock and pending decisions.',
+            actions: [
+              FilledButton.icon(
+                onPressed: () => state.go(13),
+                icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                label: const Text('View bills'),
+              ),
+              FilledButton.icon(
+                onPressed: () => state.go(11),
+                icon: const Icon(Icons.approval_outlined, size: 18),
+                label: Text(
+                  'Discount requests (${state.dashboard['pending_discount_approvals'] ?? 0})',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           _ReferenceSummaryGrid(state),
           const SizedBox(height: 10),
           _ReferencePaymentSummary(state),
@@ -117,7 +136,8 @@ class _ReferenceSummaryGrid extends StatelessWidget {
             crossAxisCount: columns,
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
-            childAspectRatio: constraints.maxWidth < 560 ? 1.62 : 1.9,
+            mainAxisExtent:
+                130 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.5),
           ),
           itemBuilder: (context, index) {
             final card = cards[index];
@@ -181,15 +201,19 @@ class _ReferenceMetricCard extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            Text(
-              value,
-              maxLines: 1,
-              style: TextStyle(
-                color: title == 'Low Stock' || title == 'Out of Stock'
-                    ? color
-                    : navy,
-              fontSize: 20,
-                fontWeight: FontWeight.w900,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: TextStyle(
+                  color: title == 'Low Stock' || title == 'Out of Stock'
+                      ? color
+                      : navy,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
             const SizedBox(height: 4),

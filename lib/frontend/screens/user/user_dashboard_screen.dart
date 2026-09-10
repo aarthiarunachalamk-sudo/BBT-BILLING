@@ -16,13 +16,33 @@ class UserDashboardScreen extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 18),
           children: [
-            GridView.count(
-              crossAxisCount: 2,
+            WorkspaceHeader(
+              title: 'Ready for your next customer',
+              subtitle: 'Create a bill or pick up where you left off.',
+              actions: [
+                FilledButton.icon(
+                  onPressed: () => state.go(UserPage.billing),
+                  icon: const Icon(Icons.point_of_sale_rounded, size: 18),
+                  label: Text(state.cart.isEmpty ? 'Start billing' : 'Resume bill (${state.cart.length})'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    state.lastInvoice = {};
+                    state.go(UserPage.invoice);
+                  },
+                  icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                  label: const Text('Bill history'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(builder: (context, constraints) => GridView.count(
+              crossAxisCount: constraints.maxWidth >= 700 ? 4 : 2,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
-              childAspectRatio: 1.72,
+              mainAxisExtent: 112 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.5),
               children: [
                 _DashboardMetric(
                   label: "Today's Sales",
@@ -65,7 +85,7 @@ class UserDashboardScreen extends StatelessWidget {
                   },
                 ),
               ],
-            ),
+            )),
             const SizedBox(height: 14),
             const Text(
               'Inventory Quick Access',
