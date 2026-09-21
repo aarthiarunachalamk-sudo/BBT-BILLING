@@ -15,8 +15,12 @@ class UserApiException implements Exception {
 }
 
 class UserApi {
-  UserApi({http.Client? client}) : _client = client ?? http.Client();
+  UserApi({
+    http.Client? client,
+    this.loginTimeout = const Duration(seconds: 60),
+  }) : _client = client ?? http.Client();
   final http.Client _client;
+  final Duration loginTimeout;
   final String baseUrl = const String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'https://bbt-billing-c16x.onrender.com/api',
@@ -228,7 +232,11 @@ class UserApi {
       final response = switch (method) {
         'POST' => await _client
             .post(uri, headers: _headers, body: jsonEncode(body))
-            .timeout(const Duration(seconds: 30)),
+            .timeout(
+              path.startsWith('auth/login')
+                  ? loginTimeout
+                  : const Duration(seconds: 30),
+            ),
         'PATCH' => await _client
             .patch(uri, headers: _headers, body: jsonEncode(body))
             .timeout(const Duration(seconds: 30)),

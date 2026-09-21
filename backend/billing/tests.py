@@ -474,6 +474,29 @@ class AdminFlowTests(APITestCase):
                 response = self.client.get(endpoint)
                 self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
+    def test_manager_can_open_admin_workspace_collections(self):
+        manager = User.objects.create_user(
+            username="store-manager",
+            email="manager@example.com",
+            password="ManagerTest@123",
+            role=User.Role.MANAGER,
+        )
+        self.client.force_authenticate(manager)
+
+        for endpoint in (
+            "/api/users/",
+            "/api/role-permissions/",
+            "/api/store-settings/",
+            "/api/audit-logs/",
+        ):
+            with self.subTest(endpoint=endpoint):
+                response = self.client.get(endpoint)
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_200_OK,
+                    response.data,
+                )
+
     def test_weight_product_seed_creates_ten_products_and_is_idempotent(self):
         output = StringIO()
         with TemporaryDirectory() as media_root, override_settings(MEDIA_ROOT=media_root):

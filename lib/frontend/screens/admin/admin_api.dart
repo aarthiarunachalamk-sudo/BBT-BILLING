@@ -20,6 +20,7 @@ class AdminApi {
     String? baseUrl,
     this.readRetryBaseDelay = const Duration(seconds: 2),
     this.writeTimeout = const Duration(seconds: 45),
+    this.loginTimeout = const Duration(seconds: 60),
   }) : _client = client ?? http.Client(),
        baseUrl = _canonicalBaseUrl(
          baseUrl ??
@@ -32,6 +33,7 @@ class AdminApi {
   final http.Client _client;
   final Duration readRetryBaseDelay;
   final Duration writeTimeout;
+  final Duration loginTimeout;
   String baseUrl;
   String? _accessToken;
 
@@ -152,29 +154,34 @@ class AdminApi {
   // ── Auth ──────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    Object? lastError;
-    for (var attempt = 1; attempt <= 2; attempt++) {
-      try {
-        final response = await _client
-            .post(
-              Uri.parse('$baseUrl/auth/login/'),
-              headers: _headers,
-              body: jsonEncode({'username': email, 'password': password}),
-            )
-            .timeout(const Duration(seconds: 30));
-        final data = _decodeMap(response);
-        _accessToken = data['access'] as String?;
-        return data;
-      } on TimeoutException catch (error) {
-        lastError = error;
-      } on SocketException catch (error) {
-        lastError = error;
-      } on http.ClientException catch (error) {
-        lastError = error;
-      }
-      await Future<void>.delayed(const Duration(seconds: 1));
+    try {
+      // The authentication request itself wakes a sleeping Render service.
+      // Keep one generous timeout instead of retrying this POST: retrying can
+      // create duplicate login audit entries when the first response is lost.
+      final response = await _client
+          .post(
+            Uri.parse('$baseUrl/auth/login/'),
+            headers: _headers,
+            body: jsonEncode({
+              'username': email.trim(),
+              'password': password,
+            }),
+          )
+          .timeout(loginTimeout);
+      final data = _decodeMap(response);
+      _accessToken = data['access'] as String?;
+      return data;
+    } on TimeoutException {
+      throw const ApiException(
+        'Login timed out while the server was starting. Please retry once.',
+      );
+    } on SocketException {
+      throw const ApiException(
+        'No network connection. Check your internet and retry.',
+      );
+    } on http.ClientException {
+      throw const ApiException('Unable to connect to the login server.');
     }
-    throw lastError!;
   }
 
   Future<Map<String, dynamic>> changePassword({

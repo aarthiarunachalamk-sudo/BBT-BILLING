@@ -1670,7 +1670,7 @@ class WhatsAppMessageViewSet(SearchableModelViewSet):
 class RolePermissionViewSet(SearchableModelViewSet):
     queryset = RolePermission.objects.all()
     serializer_class = RolePermissionSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAdminOrManager]
     search_fields = ["role"]
 
     def perform_update(self, serializer):
@@ -1759,7 +1759,7 @@ class ReturnRequestViewSet(SearchableModelViewSet):
 class StoreSettingsViewSet(SearchableModelViewSet):
     queryset = StoreSettings.objects.all().order_by("pk")
     serializer_class = StoreSettingsSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAdminOrManager]
 
     def perform_update(self, serializer):
         settings = serializer.save()
@@ -1769,7 +1769,7 @@ class StoreSettingsViewSet(SearchableModelViewSet):
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.select_related("user").all()
     serializer_class = AuditLogSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsAdminOrManager]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["user__username", "user__first_name", "action", "module", "ip_address"]
     ordering_fields = ["created_at", "module"]

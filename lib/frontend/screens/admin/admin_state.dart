@@ -155,28 +155,15 @@ class AdminState extends ChangeNotifier {
 
   Future<bool> login(String email, String password) async {
     loading = true;
-    wakingServer = true;
+    wakingServer = false;
     wakeAttempt = 0;
-    wakeMaxAttempts = 4;
+    wakeMaxAttempts = 0;
     error = null;
     notifyListeners();
     try {
-      final serverReady = await api.waitForServer(
-        maxAttempts: wakeMaxAttempts,
-        initialDelay: const Duration(seconds: 1),
-        onAttempt: (attempt, max) {
-          wakeAttempt = attempt;
-          wakeMaxAttempts = max;
-          notifyListeners();
-        },
-      );
-      if (!serverReady) {
-        error =
-            'Server is taking longer than expected to wake up. Please retry.';
-        return false;
-      }
-      wakingServer = false;
-      notifyListeners();
+      // Do not block authentication behind a separate health request. The
+      // login request wakes a cold server too, saving a full network round-trip
+      // on every warm login and avoiding stacked health + auth timeouts.
       final session = await api.login(email, password);
       final user = (session['user'] as Map?)?.cast<String, dynamic>() ?? {};
       final role = user['role']?.toString();

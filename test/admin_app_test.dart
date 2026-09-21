@@ -191,6 +191,61 @@ void main() {
     expect(state.refreshing, isFalse);
   });
 
+  test('admin login goes directly to authentication without a health gate', () async {
+    final requestedPaths = <String>[];
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      client: MockClient((request) async {
+        requestedPaths.add(request.url.path);
+        if (request.url.path.endsWith('/auth/login/')) {
+          return http.Response(
+            jsonEncode({
+              'access': 'token',
+              'user': {'role': 'admin'},
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('{}', 200);
+      }),
+    );
+    final state = AdminState(api: api);
+    addTearDown(state.dispose);
+
+    final success = await state.login(' admin ', 'password');
+
+    expect(success, isTrue);
+    expect(requestedPaths.first, '/api/auth/login/');
+    expect(requestedPaths.where((path) => path.endsWith('/health/')), isEmpty);
+  });
+
+  test('admin login timeout is reported without retrying the POST', () async {
+    var loginRequests = 0;
+    final api = AdminApi(
+      baseUrl: 'https://example.com/api',
+      loginTimeout: const Duration(milliseconds: 10),
+      client: MockClient((request) async {
+        loginRequests += 1;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        return http.Response('{}', 200);
+      }),
+    );
+    addTearDown(api.dispose);
+
+    await expectLater(
+      api.login('admin', 'password'),
+      throwsA(
+        isA<ApiException>().having(
+          (error) => error.message,
+          'message',
+          contains('Login timed out'),
+        ),
+      ),
+    );
+    expect(loginRequests, 1);
+  });
+
   test(
     'GET retries transient 5xx responses before decoding the list',
     () async {
